@@ -354,3 +354,28 @@ assertions, so critical authentication, ownership-transfer and reward paths requ
 
 CI runs formatting/linting, tests and coverage checks for every pull request. A pull request with a
 failed check, coverage below the threshold or missing tests for changed behaviour cannot be merged.
+
+### Versioning and commit convention
+
+Each microservice is versioned independently using **Semantic Versioning** in the form
+`MAJOR.MINOR.PATCH`:
+
+- **MAJOR** changes an API or event contract incompatibly;
+- **MINOR** adds backward-compatible functionality;
+- **PATCH** contains backward-compatible fixes.
+
+Stable releases are tagged `v<major>.<minor>.<patch>` in the corresponding service repository, for
+example `v1.4.2`. Release candidates may use a suffix such as `v2.0.0-rc.1`. Published tags are
+immutable; a correction requires a new version. REST paths and event envelopes carry an explicit
+major contract version when incompatible versions must coexist.
+
+Commit and squash-merge titles follow **Conventional Commits**:
+
+```text
+<type>(optional-scope): <short imperative description>
+```
+
+Allowed types are `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore` and
+`revert`. An incompatible change adds `!` after the type/scope or a `BREAKING CHANGE:` footer. For
+example: `feat(battle): add secondary creature selection` or
+`fix(raid)!: reject attacks using the legacy payload`.
