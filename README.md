@@ -336,3 +336,21 @@ Conventional Commits format.
 
 Merge commits and rebase merging are disabled in the repository settings. A branch must be updated
 with its target before merging, and failed required checks always block the merge.
+
+### Testing and coverage
+
+Every service must maintain automated tests appropriate to its responsibilities:
+
+- **unit tests** cover domain rules such as damage, permissions, rewards and stat validation;
+- **integration tests** cover the service's own PostgreSQL/Redis access and RabbitMQ consumers and
+  publishers;
+- **contract tests** verify REST/OpenAPI and event schemas across the Go and Python boundary;
+- **regression tests** reproduce every confirmed bug before its fix is merged.
+
+Each service must maintain at least **80% line coverage**. Generated code, migrations and trivial
+bootstrap files may be excluded, but lowering the threshold requires an explanation in the pull
+request and reviewer approval. Coverage is a guardrail rather than a substitute for meaningful
+assertions, so critical authentication, ownership-transfer and reward paths require explicit tests.
+
+CI runs formatting/linting, tests and coverage checks for every pull request. A pull request with a
+failed check, coverage below the threshold or missing tests for changed behaviour cannot be merged.
