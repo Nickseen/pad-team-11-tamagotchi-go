@@ -278,11 +278,9 @@ number is included so the branch can be traced back to the task.
 Examples: `feature/24-user-registration`, `fix/31-duplicate-raid-reward`,
 `docs/42-communication-contract` and `release/v1.0.0`.
 
-Regular work is branched from the latest `dev` and merged back into `dev`. A release branch is cut
-only when the integration branch is ready; after it is merged into `main`, the release is tagged and
-`main` is synchronized back into `dev`. A hotfix follows the same synchronization rule so the fix is
-not lost in the next release. Merged branches are deleted. Force pushes and direct commits to
-`main` or `dev` are not allowed.
+Regular work is branched from the latest `dev`. Release branches start from `dev`, while urgent
+hotfix branches start from `main`. Force pushes and direct commits to `main` or `dev` are not
+allowed.
 
 ### Pull request content
 
@@ -322,3 +320,19 @@ Both long-lived branches are protected and accept changes only through pull requ
 Approvals count only from collaborators with write access. Reviewers check correctness, service
 boundaries, API and event compatibility, tests, security implications and documentation. Approval
 means the change is ready to merge, not merely that it has been read.
+
+### Merge strategy
+
+The repository uses **Squash and merge** so each pull request becomes one meaningful commit and the
+history of the long-lived branches stays linear. The squashed commit title must follow the
+Conventional Commits format.
+
+- Feature, fix, documentation, refactoring and test branches merge into `dev`.
+- A release branch is cut only when `dev` is ready and merges into `main` after release validation.
+- A hotfix merges into `main`, then `main` is synchronized back into `dev` so the fix remains in the
+  next release.
+- The release commit on `main` receives a version tag.
+- The source branch is deleted after a successful merge.
+
+Merge commits and rebase merging are disabled in the repository settings. A branch must be updated
+with its target before merging, and failed required checks always block the merge.
