@@ -13,6 +13,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Technologies and Communication Patterns](#technologies-and-communication-patterns)
 - [Communication Overview](#communication-overview)
 - [Open Boundary Decisions](#open-boundary-decisions)
+- [Contribution Workflow](#contribution-workflow)
 
 ---
 
@@ -248,3 +249,37 @@ communication contract.
    rules; User Management holds the balance.
 4. **Proximity → battle.** Map only reports proximity. Turning that into a battle request is the
    client's or Battle's decision, never Map's.
+
+---
+
+## Contribution Workflow
+
+### Branching strategy
+
+The repository uses a lightweight GitFlow model with two long-lived branches:
+
+- **`main`** contains only stable, reviewed release history. Direct commits are forbidden.
+- **`dev`** is the integration branch for the next release. Completed work reaches it only through
+  a pull request.
+
+All other branches are short-lived and use lowercase kebab-case names. When an issue exists, its
+number is included so the branch can be traced back to the task.
+
+| Branch pattern | Created from | Pull request target | Purpose |
+| -------------- | ------------ | ------------------- | ------- |
+| `feature/<issue>-<description>` | `dev` | `dev` | New functionality |
+| `fix/<issue>-<description>` | `dev` | `dev` | Non-urgent bug fix |
+| `docs/<issue>-<description>` | `dev` | `dev` | Documentation only |
+| `refactor/<issue>-<description>` | `dev` | `dev` | Internal change without new behaviour |
+| `test/<issue>-<description>` | `dev` | `dev` | Test-only changes |
+| `release/v<major>.<minor>.<patch>` | `dev` | `main` | Release stabilization and metadata |
+| `hotfix/<issue>-<description>` | `main` | `main` | Urgent production fix |
+
+Examples: `feature/24-user-registration`, `fix/31-duplicate-raid-reward`,
+`docs/42-communication-contract` and `release/v1.0.0`.
+
+Regular work is branched from the latest `dev` and merged back into `dev`. A release branch is cut
+only when the integration branch is ready; after it is merged into `main`, the release is tagged and
+`main` is synchronized back into `dev`. A hotfix follows the same synchronization rule so the fix is
+not lost in the next release. Merged branches are deleted. Force pushes and direct commits to
+`main` or `dev` are not allowed.
