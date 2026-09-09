@@ -283,3 +283,27 @@ only when the integration branch is ready; after it is merged into `main`, the r
 `main` is synchronized back into `dev`. A hotfix follows the same synchronization rule so the fix is
 not lost in the next release. Merged branches are deleted. Force pushes and direct commits to
 `main` or `dev` are not allowed.
+
+### Pull request content
+
+Every pull request must be small enough to review and contain the following information in its
+description:
+
+- **Summary:** what changed and why the change is needed.
+- **Related issue:** `Closes #<issue-number>` or an explanation when no issue exists.
+- **Affected services:** the microservices, APIs, events and data stores touched by the change.
+- **Contract and data changes:** new or changed endpoints, event schemas, database migrations and
+  backward-compatibility considerations.
+- **Testing:** tests added or updated and concise steps a reviewer can use to verify the result.
+- **Breaking changes:** migration or rollout instructions; write `None` when there are none.
+
+Before requesting review, the author confirms that:
+
+- [ ] the branch follows the naming convention and is up to date with its target branch;
+- [ ] the change is focused and contains no unrelated modifications;
+- [ ] documentation and communication contracts are updated where necessary;
+- [ ] automated tests pass locally and new behaviour is covered by tests;
+- [ ] no credentials, secrets or personal data are committed.
+
+Draft pull requests may be opened for early feedback, but they cannot be merged. A pull request is
+ready for review only when its description and checklist are complete.
