@@ -282,29 +282,52 @@ Regular work is branched from the latest `dev`. Release branches start from `dev
 hotfix branches start from `main`. Force pushes and direct commits to `main` or `dev` are not
 allowed.
 
-### Pull request content
+### Pull request template
 
-Every pull request must be small enough to review and contain the following information in its
-description:
+Every pull request must be small enough to review. Its description must follow this template:
 
-- **Summary:** what changed and why the change is needed.
-- **Related issue:** `Closes #<issue-number>` or an explanation when no issue exists.
-- **Affected services:** the microservices, APIs, events and data stores touched by the change.
-- **Contract and data changes:** new or changed endpoints, event schemas, database migrations and
-  backward-compatibility considerations.
-- **Testing:** tests added or updated and concise steps a reviewer can use to verify the result.
-- **Breaking changes:** migration or rollout instructions; write `None` when there are none.
+```markdown
+## Summary
 
-Before requesting review, the author confirms that:
+<!-- What changed and why is this change needed? -->
 
-- [ ] the branch follows the naming convention and is up to date with its target branch;
-- [ ] the change is focused and contains no unrelated modifications;
-- [ ] documentation and communication contracts are updated where necessary;
-- [ ] automated tests pass locally and new behaviour is covered by tests;
-- [ ] no credentials, secrets or personal data are committed.
+## Related issue
+
+Closes #<issue-number>
+
+## Affected services
+
+<!-- List the affected microservices, APIs, events and data stores. -->
+
+- Service(s):
+- API/event contracts:
+- Data stores/migrations:
+
+## Testing
+
+<!-- List automated tests and concise manual verification steps. -->
+
+1.
+
+## Breaking changes
+
+<!-- Describe compatibility impact, migration and rollout steps. Write "None" when not applicable. -->
+
+None
+
+## Checklist
+
+- [ ] The branch follows the naming convention and is up to date with its target.
+- [ ] The change is focused and contains no unrelated modifications.
+- [ ] API, event and database changes are backward compatible or documented above.
+- [ ] Documentation and communication contracts are updated where necessary.
+- [ ] Automated tests pass locally and new behaviour is covered by tests.
+- [ ] No credentials, secrets or personal data are committed.
+```
 
 Draft pull requests may be opened for early feedback, but they cannot be merged. A pull request is
-ready for review only when its description and checklist are complete.
+ready for review only when every section is completed and every applicable checklist item is
+checked.
 
 ### Review and approval policy
 
@@ -375,7 +398,21 @@ Commit and squash-merge titles follow **Conventional Commits**:
 <type>(optional-scope): <short imperative description>
 ```
 
-Allowed types are `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore` and
-`revert`. An incompatible change adds `!` after the type/scope or a `BREAKING CHANGE:` footer. For
-example: `feat(battle): add secondary creature selection` or
-`fix(raid)!: reject attacks using the legacy payload`.
+Use the commit type that best describes the primary purpose of the change:
+
+| Type | Use for | Example |
+| ---- | ------- | ------- |
+| `feat` | A new user-visible or API capability | `feat(battle): add secondary creature selection` |
+| `fix` | A bug fix that restores expected behaviour | `fix(raid): prevent duplicate rewards` |
+| `docs` | Documentation-only changes | `docs: define branching strategy` |
+| `test` | Adding or correcting tests without changing production behaviour | `test(user): cover expired JWT` |
+| `refactor` | Internal restructuring without a feature or bug fix | `refactor(map): extract proximity calculator` |
+| `perf` | A measurable performance improvement | `perf(raid): batch damage updates` |
+| `build` | Build system, packaging or dependency changes | `build: update Go toolchain` |
+| `ci` | CI/CD workflows and automation | `ci: add coverage check` |
+| `chore` | Maintenance not covered by another type | `chore: update repository settings` |
+| `revert` | Reverting an earlier commit | `revert: feat(battle): add rematch` |
+
+The optional scope identifies the affected service or area, such as `battle`, `raid`, `user` or
+`docs`. An incompatible change adds `!` after the type/scope or a `BREAKING CHANGE:` footer, for
+example `fix(raid)!: reject attacks using the legacy payload`.
