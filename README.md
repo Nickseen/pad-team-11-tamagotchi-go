@@ -4,14 +4,13 @@ Backend-as-a-Service ecosystem for third-party Tamagotchi apps ("packages"). Eac
 own creatures, art and local growth mechanics, while a shared backend lets users from different
 packages meet, battle, trade creatures, form guilds and fight cooperative monster raids.
 
-PAD Lab, FAF.PAD21.1 — Autumn 2026.
-
 ---
 
 ## Table of Contents
 
 - [Service Boundaries](#service-boundaries)
 - [Architecture Diagram](#architecture-diagram)
+- [Technologies and Communication Patterns](#technologies-and-communication-patterns)
 - [Communication Overview](#communication-overview)
 - [Open Boundary Decisions](#open-boundary-decisions)
 
@@ -22,16 +21,16 @@ PAD Lab, FAF.PAD21.1 — Autumn 2026.
 Eight microservices. Each one owns a single slice of state and is the **only** writer of that slice;
 everything else reads it through an API or reacts to its events.
 
-| # | Service | Owns (single source of truth) | Explicitly does **not** own |
-|---|---------|-------------------------------|------------------------------|
-| 1 | User Management | accounts, credentials, friends/enemies, local + global currency balances | creature state, battle math, geolocation |
-| 2 | Tamagotchi | creature entities, owner reference, combat type, level, sprites, raw package-local stats | interpretation of those stats, damage formulas, currency |
-| 3 | Package Registry | packages, versions, moderators/admins, stat *definitions*, monster & raid *definitions* | user identity, live raid state |
-| 4 | Battle | PvP match runtime: state, turns, damage, outcome | creature ownership record, currency balances |
-| 5 | Map | latest known coordinates per user, proximity detection | notification delivery, battle creation |
-| 6 | Notification | device tokens, delivery preferences, push dispatch | any domain state whatsoever |
-| 7 | Guild | guilds, membership, roles, permissions, guild chat messages | raid mechanics, user identity |
-| 8 | Monster Raid | raid runtime: monster HP, participants, damage log, status | monster definitions, guild membership, currency |
+| # | Service          | Owns (single source of truth)                                                              | Explicitly does **not** own                               |
+| - | ---------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| 1 | User Management  | accounts, credentials, friends/enemies, local + global currency balances                   | creature state, battle math, geolocation                 |
+| 2 | Tamagotchi       | creature entities, owner reference, combat type, level, sprites, raw package-local stats   | interpretation of those stats, damage formulas, currency |
+| 3 | Package Registry | packages, versions, moderators/admins, stat *definitions*, monster & raid *definitions*    | user identity, live raid state                           |
+| 4 | Battle           | PvP match runtime: state, turns, damage, outcome                                           | creature ownership record, currency balances             |
+| 5 | Map              | latest known coordinates per user, proximity detection                                     | notification delivery, battle creation                   |
+| 6 | Notification     | device tokens, delivery preferences, push dispatch                                         | any domain state whatsoever                              |
+| 7 | Guild            | guilds, membership, roles, permissions, guild chat messages                                | raid mechanics, user identity                            |
+| 8 | Monster Raid     | raid runtime: monster HP, participants, damage log, status                                 | monster definitions, guild membership, currency          |
 
 ### 1. User Management Service
 
@@ -151,14 +150,69 @@ exists — they learn about a finished fight from an event, not a call.
 owner transfer and User Management applies the currency change, both keyed on `battleId` so a
 redelivered event cannot hand over the same creature twice.
 
+---
+
+## Technologies and Communication Patterns
+
+The implementation deliberately uses exactly **two languages: Go and Python**. Go is assigned to
+the services whose load is dominated by concurrent requests, timers or latency-sensitive state
+transitions. Python with FastAPI is assigned to data-oriented services where flexible JSON models,
+validation and third-party SDK integration matter more than raw throughput. Splitting the services
+four-to-four gives the team meaningful experience in both stacks without introducing a third
+language or a unique stack for every service.
+
+### Shared infrastructure and contracts
+
+- **Synchronous service APIs — REST over HTTP with JSON.** REST is easy to inspect and has mature
+  support in both Go and FastAPI. OpenAPI documents the request/response schemas and generates
+  clients, which reduces mistakes at the language boundary. The trade-off is more payload and less
+  compile-time coupling than gRPC; for this business case, interoperability with third-party
+  Tamagotchi packages and debuggability are more valuable than a small serialization gain.
+- **Asynchronous domain events — RabbitMQ topic exchanges with durable queues.** Producers publish
+  facts such as `BattleFinished`, `PlayersNearby` and `RaidStarted`; every interested service owns a
+  separate queue. Delivery is at least once, so consumers acknowledge only after committing their
+  local transaction, retry transient failures, route poison messages to a dead-letter queue and
+  deduplicate by `eventId`. This adds eventual consistency and broker operations, but prevents a
+  slow push provider or reward handler from blocking gameplay and lets several services react to
+  one result independently.
+- **Live client updates — WebSockets.** They are reserved for high-frequency, bidirectional or
+  server-pushed data: map updates, guild chat and the raid feed. A socket costs more operationally
+  than stateless HTTP and needs reconnect/heartbeat handling, but polling would waste bandwidth and
+  make these features feel delayed.
+- **Data ownership — database per service.** PostgreSQL is the durable default, with a separate
+  database/schema and credentials for each service; no service reads another service's tables.
+  Redis is an internal accelerator only where explicitly listed. This duplicates some data and
+  requires events to propagate changes, but preserves independent deployment and prevents one
+  service from bypassing another service's business rules.
+
+### Service-by-service selection
+
+| Service | Language and storage | Communication patterns | Motivation and trade-offs |
+| ------- | -------------------- | ---------------------- | ------------------------- |
+| **User Management** | **Go**, PostgreSQL | REST/JSON for registration, login, JWT validation, relationships and balance queries. Publishes social events; consumes battle/raid results to apply currency changes idempotently. | Authentication and balance writes need predictable latency, strict types and safe concurrency. Go produces a small deployable binary and handles many simultaneous sessions cheaply. It is more verbose than Python and schema evolution requires more explicit code, which is acceptable for security-sensitive, stable identity contracts. |
+| **Battle** | **Go**, PostgreSQL; Redis for short-lived match state and command deduplication | REST/JSON commands for creating/joining a battle and submitting a turn. Synchronous REST reads from User Management, Tamagotchi and Package Registry before damage calculation. Publishes `BattleFinished`; no distributed database writes. | Goroutines fit many independent battles, while static types make damage and reward rules explicit. Redis makes turn access fast, but adds cache/state coordination; PostgreSQL remains the durable record so a Redis restart cannot decide a match outcome. Events keep ownership transfer, rewards and notifications off the critical response path. |
+| **Map** | **Go**, Redis GEO with TTL; PostgreSQL only for durable configuration/audit data | WebSocket for the client's location stream and nearby-player updates. Synchronous REST checks relationships in User Management. Publishes `PlayersNearby` only when users cross the proximity boundary. | Location traffic is frequent, concurrent and ephemeral. Go keeps long-lived connections affordable, and Redis GEO provides proximity queries plus natural expiry of stale positions. Redis is not the durable source of user data; accepting that locations may disappear after failure is consistent with the business rule that stale positions must be discarded anyway. |
+| **Monster Raid** | **Go**, PostgreSQL; Redis atomic operations for the live HP counter and timers | REST/JSON to create/join/attack; synchronous reads from Guild, Tamagotchi and Package Registry. WebSocket broadcasts HP and participant damage. Publishes `RaidStarted` and one terminal `MonsterDefeated`/`RaidExpired` event. | A guild can hit one counter concurrently, so Go's concurrency model and atomic Redis operations suit the hot path. Durable snapshots and an idempotent terminal transition in PostgreSQL prevent rewards from firing twice. The dual-store design is more complex, but isolates high-frequency damage from durable history. |
+| **Tamagotchi** | **Python 3**, FastAPI, Pydantic, PostgreSQL JSONB | REST/JSON for creature CRUD and stat lookup. Consumes `BattleFinished` to transfer ownership and apply XP once; publishes creature lifecycle events used by Notification. | Package-local stats are intentionally non-normalized. Python handles evolving dictionaries naturally, while Pydantic validates the stable envelope around the JSONB payload. This is less compile-time-safe and slower than Go, so validation is mandatory and CPU-heavy battle calculations stay in Battle. |
+| **Notification** | **Python 3**, FastAPI, Pydantic, PostgreSQL; Firebase Admin SDK | Primarily a RabbitMQ subscriber. It consumes social, proximity, battle, creature, guild and raid events and calls Firebase Cloud Messaging; REST is limited to device-token and preference management. | Notification delivery is I/O-bound, and Python has a maintained Firebase Admin SDK plus rapid integration code. Broker queues absorb Firebase latency and outages. The cost is eventual delivery and Python's lower CPU throughput, neither of which is critical because notifications do not decide domain outcomes. |
+| **Guild** | **Python 3**, FastAPI, Pydantic, PostgreSQL | REST/JSON for guild, membership, role and invitation CRUD. WebSocket rooms carry live chat. Synchronous REST validates users through User Management; publishes `GuildInvitation` and membership-change events. | Most work is validated CRUD, for which FastAPI and Pydantic minimize boilerplate; its built-in WebSocket support covers chat without another stack. Each process needs a broker-backed fan-out when scaled horizontally, so RabbitMQ carries room messages between instances while PostgreSQL keeps chat history. |
+| **Package Registry** | **Python 3**, FastAPI, Pydantic, PostgreSQL JSONB | REST/JSON/OpenAPI for package versions, stat definitions and monster/raid definitions. Publishes versioned configuration-change events so consumers can invalidate caches. | Definitions vary between third-party packages, making Pydantic discriminated models and JSONB more adaptable than rigid Go structs. That flexibility can hide incompatible changes, so definitions are immutable by version and validated on write; runtime services request an explicit version rather than silently taking the latest one. |
+
+The language choice follows the workload rather than organizational convenience: **Go** owns the
+hot concurrent paths (identity traffic, battles, geolocation and raid counters), while
+**Python/FastAPI** owns flexible schemas, CRUD-heavy domains and Firebase integration. REST/JSON is
+the common synchronous boundary, RabbitMQ carries durable cross-domain facts, and WebSockets are
+used only when continuous client updates justify their connection-management cost.
+
 ### Persistent connections
 
-Everything else is request/response. Only these two channels stay open:
+Everything else is request/response. Only these three client channels stay open:
 
-| Channel | Service | Carries |
-|---------|---------|---------|
-| Guild chat | Guild | member messages within a guild room |
-| Raid feed | Monster Raid | live monster HP and per-participant damage |
+| Channel    | Service      | Carries                                    |
+| ---------- | ------------ | ------------------------------------------ |
+| Live map   | Map          | location updates and nearby-player changes |
+| Guild chat | Guild        | member messages within a guild room        |
+| Raid feed  | Monster Raid | live monster HP and per-participant damage |
 
 ---
 
@@ -169,10 +223,10 @@ without creature stats and their package interpretation; Raid cannot admit a pla
 confirming guild membership.
 
 **Asynchronous** where the producer does not care who reacts, or where several services must react
-to the same fact. `BattleFinished` is consumed by Tamagotchi (owner transfer), User Management
-(currency and XP) and Notification (push) independently.
+to the same fact. `BattleFinished` is consumed by Tamagotchi (owner transfer and XP), User
+Management (currency) and Notification (push) independently.
 
-**WebSockets** for sustained client connections: guild chat and live raid damage.
+**WebSockets** for sustained client connections: live map updates, guild chat and live raid damage.
 
 Every event consumer is idempotent on the event id (`battleId`, `raidId`), so a redelivered or
 duplicated event cannot transfer the same creature twice or pay out a raid twice.
