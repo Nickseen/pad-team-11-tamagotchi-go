@@ -1,0 +1,3 @@
+[submodule "services/monster-raid"]
+	path = services/monster-raid
+	url = https://github.com/Nickseen/tamagotchi-monster-raid.git
