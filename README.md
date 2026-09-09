@@ -307,3 +307,18 @@ Before requesting review, the author confirms that:
 
 Draft pull requests may be opened for early feedback, but they cannot be merged. A pull request is
 ready for review only when its description and checklist are complete.
+
+### Review and approval policy
+
+Both long-lived branches are protected and accept changes only through pull requests:
+
+- a pull request into **`dev` requires at least one approval**;
+- a pull request into **`main` requires at least two approvals**;
+- the author cannot approve their own pull request;
+- the latest push must be approved by another contributor;
+- approvals are dismissed when new commits change the reviewed diff;
+- every review conversation must be resolved before merging.
+
+Approvals count only from collaborators with write access. Reviewers check correctness, service
+boundaries, API and event compatibility, tests, security implications and documentation. Approval
+means the change is ready to merge, not merely that it has been read.
