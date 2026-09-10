@@ -686,6 +686,101 @@ so it owns the link as well and User Management reads it.
 | `POST /api/v1/raid-definitions/{raidDefinitionId}/activate` | role `admin` | — | `200` → `RaidDefinition`; publishes `registry.raid_definition_activated` |
 | `POST /api/v1/raid-definitions/{raidDefinitionId}/cancel` | role `admin` | `reason` string | `200` → `RaidDefinition` with `status: "cancelled"` |
 
+#### 4. Battle Service — `http://battle:8084`
+
+**`Battle`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `battleId` | `UUID` | Also the idempotency key for every downstream effect |
+| `status` | string | `pending`, `active`, `finished`, `declined`, `forfeited` or `expired` |
+| `challenger` / `opponent` | `BattleParticipant` | `opponent.lineup` is `null` until the challenge is accepted |
+| `currentTurnUserId` | `UUID` \| null | `null` unless `status` is `active` |
+| `turnNumber` | integer | Starts at 1 |
+| `winnerId` / `loserId` | `UUID` \| null | Set only when `status` is `finished` |
+| `packageVersion` | `SemVer` | The stat-definition version pinned at acceptance |
+| `createdAt` / `finishedAt` | `Timestamp` \| null | |
+
+**`BattleParticipant`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `userId` | `UUID` | |
+| `lineup` | object \| null | `{ "primaryTamagotchiId": UUID, "secondaryTamagotchiId": UUID \| null, "boosts": [UUID] }` |
+| `currentHp` / `maxHp` | integer | Starting HP derives from the primary and secondary levels |
+
+**`Turn`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `turnNumber` | integer | |
+| `actorId` | `UUID` | |
+| `action` | string | `attack`, `special` or `use_boost` |
+| `damageDealt` | integer | ≥ 0 |
+| `typeMultiplier` | number | From `GET /api/v1/combat-types/advantage` |
+| `statBonusMultiplier` | number | From the pinned `StatDefinition.combatBonus` rules |
+| `createdAt` | `Timestamp` | |
+
+##### Match lifecycle
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/battles` | user | `opponentId` `UUID`, `primaryTamagotchiId` `UUID`, `secondaryTamagotchiId` `UUID` \| null, `boosts` array of `UUID` | `201` → `Battle` with `status: "pending"`; publishes `battle.created` |
+| `POST /api/v1/battles/{battleId}/accept` | user | `primaryTamagotchiId` `UUID`, `secondaryTamagotchiId` `UUID` \| null, `boosts` array of `UUID` | `200` → `Battle` with `status: "active"` |
+| `POST /api/v1/battles/{battleId}/decline` | user | path `battleId` `UUID` | `200` → `Battle` with `status: "declined"` |
+| `POST /api/v1/battles/{battleId}/forfeit` | user | path `battleId` `UUID` | `200` → `Battle`; resolved as a loss for the caller |
+| `GET /api/v1/battles/{battleId}` | user | path `battleId` `UUID` | `200` → `Battle`; `403` unless the caller is a participant |
+| `GET /api/v1/battles` | user | query `userId` `UUID`, `status`, `limit`, `cursor` | `200` → `[Battle]` |
+| `GET /api/v1/battles/{battleId}/turns` | user | query `limit`, `cursor` | `200` → `[Turn]` |
+
+##### Turns
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/battles/{battleId}/turns` | user | `commandId` `UUID`, `action` string, `boostId` `UUID` \| null | `200` → `TurnResult` |
+
+`TurnResult`:
+
+```json
+{
+  "battleId": "3c9e1f70-5b2d-4a88-91cf-64bd0a2e7c15",
+  "turn": {
+    "turnNumber": 7,
+    "actorId": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11",
+    "action": "attack",
+    "damageDealt": 148,
+    "typeMultiplier": 1.5,
+    "statBonusMultiplier": 1.1,
+    "createdAt": "2026-09-10T14:25:31.482Z"
+  },
+  "challengerHp": 612,
+  "opponentHp": 274,
+  "nextTurnUserId": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22",
+  "battleStatus": "active",
+  "winnerId": null
+}
+```
+
+A repeat of the same `commandId` returns the identical `TurnResult` with `200 OK` and applies no
+further damage. Errors: `403 NOT_YOUR_TURN`, `409 BATTLE_NOT_ACTIVE`, `422 BOOST_NOT_OWNED`.
+
+##### Synchronous dependencies
+
+Before the first turn, Battle resolves everything it needs and pins it for the duration of the
+match, so a mid-battle stat edit cannot change the arithmetic retroactively:
+
+| Call | Target | Purpose |
+| ---- | ------ | ------- |
+| `GET /api/v1/internal/tamagotchis?ids=…` | Tamagotchi | Levels, combat types and current stat documents for all four creatures |
+| `GET /api/v1/internal/packages/{packageId}/versions/{version}/stat-definitions` | Package Registry | How to read those stats — maxima and combat-bonus thresholds |
+| `GET /api/v1/combat-types/advantage` | Tamagotchi | The type multiplier for each attacking pair |
+| `GET /api/v1/internal/relationships` | User Management | Rejects a challenge between users who are neither friends nor within proximity range |
+
+Battle writes to no other service's store. On completion it publishes one `battle.finished` event
+carrying the full outcome; Tamagotchi transfers the loser's primary creature, User Management
+applies both currency changes and the XP split, and Notification pushes the result — each keyed on
+`battleId`.
+
 ---
 
 ## Open Boundary Decisions
