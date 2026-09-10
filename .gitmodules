@@ -10,3 +10,9 @@
 [submodule "services/user-management"]
 	path = services/user-management
 	url = https://github.com/vladas9/tamagotchi-user-management.git
+[submodule "services/guild"]
+	path = services/guild
+	url = https://github.com/gabimiric/tamagotchi-guild.git
+[submodule "services/package-registry"]
+	path = services/package-registry
+	url = https://github.com/gabimiric/tamagotchi-package-registry.git
