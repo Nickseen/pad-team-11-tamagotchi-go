@@ -393,6 +393,115 @@ user exists before creating a membership) and reacts to deletion events afterwar
 reference is treated as a soft failure — the resource renders as `unavailable` rather than crashing
 the request.
 
+### Endpoint reference
+
+Every endpoint below is listed with the data it transfers in each direction. Request bodies are
+JSON unless the row says otherwise; path and query parameters are marked as such. `Auth` is `—` for
+public routes, `user` for a client JWT, `role` for a JWT carrying that role, and `service` for the
+internal routes that additionally require `X-Service-Token`.
+
+Resource objects are defined once per service and referenced by name from the endpoint tables. A
+response cell naming an object means that object is the entire response body; `[Object]` means a
+paginated collection of it, wrapped in the `items`/`nextCursor`/`hasMore` envelope.
+
+#### 1. User Management Service — `http://user-management:8081`
+
+**`User`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `userId` | `UUID` | |
+| `username` | string | 3–32 characters, `^[a-zA-Z0-9_]{3,32}$`, unique |
+| `email` | string | RFC 5322; returned only to the owner of the account |
+| `displayName` | string \| null | ≤ 64 characters |
+| `avatarRef` | string \| null | Asset reference resolved by the client's package |
+| `status` | string | `active`, `suspended` or `deleted` |
+| `createdAt` | `Timestamp` | |
+
+**`Balances`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `userId` | `UUID` | |
+| `globalCurrency` | `Currency` | Never negative |
+| `localBalances` | array | `[{ "packageId": UUID, "amount": Currency }]`, one entry per registered package |
+| `updatedAt` | `Timestamp` | |
+
+**`Relationship`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `userId` | `UUID` | The *other* user |
+| `relation` | string | `friend`, `enemy` or `none` |
+| `since` | `Timestamp` \| null | `null` when `relation` is `none` |
+
+**`FriendRequest`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `requestId` | `UUID` | |
+| `fromUserId` | `UUID` | |
+| `toUserId` | `UUID` | |
+| `status` | string | `pending`, `accepted`, `declined` or `cancelled` |
+| `createdAt` | `Timestamp` | |
+
+##### Authentication
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/auth/register` | — | `username` string, `email` string, `password` string (≥ 10 chars), `packageId` `UUID` | `201` → `User` |
+| `POST /api/v1/auth/login` | — | `username` string, `password` string | `200` → `TokenPair` |
+| `POST /api/v1/auth/refresh` | — | `refreshToken` string | `200` → `TokenPair` |
+| `POST /api/v1/auth/logout` | user | `refreshToken` string | `204` → empty body |
+| `GET /api/v1/.well-known/jwks.json` | — | — | `200` → `{ "keys": [JWK] }`, cacheable for 1 h |
+
+`TokenPair` is `{ "accessToken": string, "refreshToken": string, "tokenType": "Bearer",
+"expiresIn": integer (seconds), "userId": UUID }`. Access tokens live 1 hour, refresh tokens 30
+days. Errors: `401 INVALID_CREDENTIALS`, `409 USERNAME_TAKEN`, `409 EMAIL_TAKEN`,
+`422 WEAK_PASSWORD`.
+
+##### Profiles
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `GET /api/v1/users/me` | user | — | `200` → `User` including `email` |
+| `PATCH /api/v1/users/me` | user | any of `displayName` string, `avatarRef` string, `email` string | `200` → `User` |
+| `GET /api/v1/users/{userId}` | user | path `userId` `UUID` | `200` → `User` without `email` |
+| `GET /api/v1/users` | service | query `ids` — comma-separated `UUID`, ≤ 100 | `200` → `{ "items": [User] }` for bulk resolution |
+| `DELETE /api/v1/users/me` | user | `password` string | `202` → `{ "status": "scheduled", "purgeAt": Timestamp }` |
+
+##### Relationships
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `GET /api/v1/users/me/friends` | user | query `limit`, `cursor` | `200` → `[User]` |
+| `POST /api/v1/users/me/friend-requests` | user | `targetUserId` `UUID` | `201` → `FriendRequest`; publishes `user.friend_request_created` |
+| `GET /api/v1/users/me/friend-requests` | user | query `direction` = `incoming` \| `outgoing`, `status`, `limit`, `cursor` | `200` → `[FriendRequest]` |
+| `POST /api/v1/users/me/friend-requests/{requestId}/accept` | user | path `requestId` `UUID` | `200` → `FriendRequest` with `status: "accepted"`; publishes `user.friend_request_accepted` |
+| `POST /api/v1/users/me/friend-requests/{requestId}/decline` | user | path `requestId` `UUID` | `200` → `FriendRequest` with `status: "declined"` |
+| `DELETE /api/v1/users/me/friends/{userId}` | user | path `userId` `UUID` | `204` → empty body |
+| `GET /api/v1/users/me/enemies` | user | query `limit`, `cursor` | `200` → `[User]` |
+| `POST /api/v1/users/me/enemies` | user | `targetUserId` `UUID` | `201` → `Relationship` |
+| `DELETE /api/v1/users/me/enemies/{userId}` | user | path `userId` `UUID` | `204` → empty body |
+| `GET /api/v1/internal/relationships` | service | query `userId` `UUID`, `otherUserIds` — comma-separated `UUID`, ≤ 100 | `200` → `{ "items": [Relationship] }` |
+
+`GET /api/v1/internal/relationships` is the hot path for Map, which calls it on every proximity
+evaluation to decide whether a nearby user is a friend, an enemy or a stranger. It is a pure read
+and safe to cache for 30 seconds.
+
+##### Balances
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `GET /api/v1/users/me/balances` | user | — | `200` → `Balances` |
+| `GET /api/v1/internal/users/{userId}/balances` | service | path `userId` `UUID` | `200` → `Balances` |
+| `GET /api/v1/internal/users/{userId}/balances/check` | service | query `currency` = `global` \| `local`, `packageId` `UUID` (required when `local`), `amount` `Currency` | `200` → `{ "sufficient": boolean, "available": Currency }` |
+| `POST /api/v1/internal/users/{userId}/balances/adjust` | service | `commandId` `UUID`, `currency` string, `packageId` `UUID` \| null, `delta` `Currency`, `reason` string | `200` → `Balances`; idempotent on `commandId` |
+
+`delta` is signed. A debit that would drive `globalCurrency` below zero is rejected with
+`409 INSUFFICIENT_FUNDS` and the balance is unchanged. The synchronous adjust route exists for
+flows that must fail fast — a shop purchase — while battle and raid rewards arrive as events.
+
 ---
 
 ## Open Boundary Decisions
