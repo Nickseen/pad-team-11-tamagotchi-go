@@ -16,3 +16,9 @@
 [submodule "services/package-registry"]
 	path = services/package-registry
 	url = https://github.com/gabimiric/tamagotchi-package-registry.git
+[submodule "services/tamagotchi"]
+	path = services/tamagotchi
+	url = git@github.com:CyberMoonie/tamagotchi-tamagotchi.git
+[submodule "services/notification"]
+	path = services/notification
+	url = git@github.com:CyberMoonie/tamagotchi-notification.git
