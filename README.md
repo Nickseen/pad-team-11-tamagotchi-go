@@ -907,6 +907,115 @@ after which the notification is marked `failed` and the message is dead-lettered
 cannot be delivered never blocks the gameplay service that produced the event. A token rejected by
 Firebase as unregistered deletes the corresponding `Device` row.
 
+#### 7. Guild Service — `http://guild:8087`
+
+**`Guild`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `guildId` | `UUID` | |
+| `name` | string | 3–48 characters, unique |
+| `tag` | string | 2–5 uppercase characters, unique, shown next to member names |
+| `description` | string | ≤ 512 characters |
+| `emblemRef` | string \| null | |
+| `ownerId` | `UUID` | Exactly one owner at all times |
+| `memberCount` | integer | Denormalized counter, maintained by this service |
+| `maxMembers` | integer | Default `50` |
+| `level` | integer | ≥ 1; gates which raid definitions the guild may start |
+| `createdAt` | `Timestamp` | |
+
+**`Membership`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `guildId` / `userId` | `UUID` | Composite key |
+| `role` | string | `owner`, `officer` or `member` |
+| `joinedAt` | `Timestamp` | |
+
+**`Invitation`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `invitationId` | `UUID` | |
+| `guildId` | `UUID` | |
+| `invitedUserId` / `invitedByUserId` | `UUID` | |
+| `status` | string | `pending`, `accepted`, `declined` or `expired` |
+| `expiresAt` | `Timestamp` | 7 days after creation |
+
+**`ChatMessage`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `messageId` | `UUID` | Server-assigned |
+| `clientMessageId` | `UUID` | Echoed back so the sender can reconcile its optimistic copy |
+| `guildId` / `authorId` | `UUID` | |
+| `body` | string | 1–1000 characters after trimming |
+| `sentAt` | `Timestamp` | Server clock, authoritative for ordering |
+
+##### Guilds and membership
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/guilds` | user | `name` string, `tag` string, `description` string, `emblemRef` string \| null | `201` → `Guild`; the creator becomes `owner` |
+| `GET /api/v1/guilds` | user | query `query` string, `limit`, `cursor` | `200` → `[Guild]` |
+| `GET /api/v1/guilds/{guildId}` | user | path `guildId` `UUID` | `200` → `Guild` |
+| `PATCH /api/v1/guilds/{guildId}` | role `owner` \| `officer` | `description`, `emblemRef` | `200` → `Guild` |
+| `DELETE /api/v1/guilds/{guildId}` | role `owner` | — | `204`; refused with `409 RAID_IN_PROGRESS` while a raid is active |
+| `GET /api/v1/guilds/{guildId}/members` | user | query `role`, `limit`, `cursor` | `200` → `[Membership]` |
+| `PATCH /api/v1/guilds/{guildId}/members/{userId}` | role `owner` | `role` string | `200` → `Membership`; transferring `owner` demotes the previous owner to `officer` |
+| `DELETE /api/v1/guilds/{guildId}/members/{userId}` | role `owner` \| `officer` \| self | path parameters | `204`; publishes `guild.member_left` |
+| `GET /api/v1/internal/guilds/{guildId}/members/{userId}` | service | path parameters | `200` → `{ "isMember": boolean, "role": string \| null, "joinedAt": Timestamp \| null }` |
+
+The internal membership check is the call Monster Raid makes before admitting a participant — a
+raid cannot admit a player without confirming membership, so this one is synchronous rather than
+event-driven.
+
+##### Invitations
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/guilds/{guildId}/invitations` | role `owner` \| `officer` | `userId` `UUID` | `201` → `Invitation`; publishes `guild.invitation_created` |
+| `GET /api/v1/guilds/{guildId}/invitations` | role `owner` \| `officer` | query `status`, `limit`, `cursor` | `200` → `[Invitation]` |
+| `GET /api/v1/users/me/invitations` | user | query `status`, `limit`, `cursor` | `200` → `[Invitation]` |
+| `POST /api/v1/invitations/{invitationId}/accept` | user | path `invitationId` `UUID` | `200` → `Membership`; publishes `guild.member_joined` |
+| `POST /api/v1/invitations/{invitationId}/decline` | user | path `invitationId` `UUID` | `200` → `Invitation` with `status: "declined"` |
+
+Before creating an invitation the service calls `GET /api/v1/users/{userId}` on User Management to
+confirm the invitee exists; a missing user is rejected with `404 USER_NOT_FOUND` rather than stored
+as a dangling reference.
+
+##### Chat history and WebSocket — `GET /api/v1/guilds/{guildId}/chat`
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `GET /api/v1/guilds/{guildId}/messages` | member | query `limit`, `cursor` | `200` → `[ChatMessage]`, newest first |
+
+The socket upgrade requires a member JWT; a non-member is closed with `4403`. Because several
+FastAPI instances can serve the same guild, a message is written to PostgreSQL and republished on
+the Redis channel `guild:{guildId}:chat`, from which every instance fans it out to its own sockets.
+
+Client → server:
+
+| `type` | Payload |
+| ------ | ------- |
+| `chat.send` | `{ "clientMessageId": UUID, "body": string }` |
+| `chat.typing` | `{ "isTyping": boolean }` — not persisted |
+| `chat.ping` | `{}` — heartbeat, every 30 s |
+
+Server → client:
+
+| `type` | Payload | Sent when |
+| ------ | ------- | --------- |
+| `chat.history` | `{ "items": [ChatMessage] }` | Immediately after the socket opens — the last 50 messages |
+| `chat.message` | `ChatMessage` | Any member sends a message |
+| `chat.typing` | `{ "userId": UUID, "isTyping": boolean }` | Another member starts or stops typing |
+| `chat.presence` | `{ "userId": UUID, "state": "online" \| "offline" }` | A member connects or disconnects |
+| `chat.error` | `{ "code": string, "message": string, "clientMessageId": UUID \| null }` | A frame is rejected — `MESSAGE_TOO_LONG`, `RATE_LIMITED` |
+| `chat.pong` | `{ "serverTime": Timestamp }` | Reply to `chat.ping` |
+
+Rate limit: 5 messages per 10 seconds per member. Exceeding it yields `chat.error` with
+`RATE_LIMITED` rather than a disconnect.
+
 ---
 
 ## Open Boundary Decisions
