@@ -331,10 +331,13 @@ Every collection endpoint accepts `limit` (integer, `1…100`, default `20`) and
 optional) and returns:
 
 ```json
-{ "items": [ /* resource objects */ ], "nextCursor": "b3RoZXI6MTIz", "hasMore": true }
+{ "items": [ /* resource objects */ ], "nextCursor": "Y3JlYXRlZEF0OjIwMjYtMDktMTBUMTQ6MjU6MzEuNDgyWnxpZDo5ZjFjMmI3ZQ==", "hasMore": true }
 ```
 
-`nextCursor` is `null` when `hasMore` is `false`.
+`nextCursor` is `null` when `hasMore` is `false`. The cursor is base64 of the sort position of
+the last item returned — the example above decodes to
+`createdAt:2026-09-10T14:25:31.482Z|id:9f1c2b7e` — but it is opaque by contract, so the encoding
+can change without breaking a client.
 
 ### Idempotency
 
