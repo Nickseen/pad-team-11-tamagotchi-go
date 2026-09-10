@@ -1101,6 +1101,144 @@ Rewards appear in `raid.ended` for immediate display, but the service does not c
 publishes `raid.monster_defeated`; User Management applies the currency and Tamagotchi applies the
 XP, both keyed on `raidId`.
 
+### Asynchronous event contract
+
+All events go through a single durable topic exchange, `tamagotchi.events`. Routing keys are
+`<domain>.<fact>`, always past tense — an event states something that already happened and is never
+a request for someone to act.
+
+#### Envelope
+
+Every message has the same envelope; only `payload` differs.
+
+```json
+{
+  "eventId": "7c1e0b44-92a5-4f6d-8b31-5d0a2f9e13c7",
+  "eventType": "battle.finished",
+  "eventVersion": 1,
+  "occurredAt": "2026-09-10T14:25:31.482Z",
+  "producer": "battle-service",
+  "correlationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "idempotencyKey": "3c9e1f70-5b2d-4a88-91cf-64bd0a2e7c15",
+  "payload": { }
+}
+```
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `eventId` | `UUID` | Unique per publication; the deduplication key for every consumer |
+| `eventType` | string | Equal to the routing key |
+| `eventVersion` | integer | Incremented only on an incompatible payload change |
+| `occurredAt` | `Timestamp` | When the fact happened, not when it was published |
+| `producer` | string | Publishing service name |
+| `correlationId` | `UUID` | Copied from the request that caused the fact |
+| `idempotencyKey` | `UUID` | The domain key — `battleId`, `raidId` — that makes the *effect* repeatable |
+
+`eventId` and `idempotencyKey` are different on purpose: a republished message keeps the domain key
+but gets a new `eventId`, so consumers deduplicate on `eventId` and reconcile business effects on
+`idempotencyKey`.
+
+#### Catalogue
+
+| Routing key | Producer | Payload |
+| ----------- | -------- | ------- |
+| `user.registered` | User Management | `userId`, `username`, `packageId`, `registeredAt` |
+| `user.friend_request_created` | User Management | `requestId`, `fromUserId`, `toUserId` |
+| `user.friend_request_accepted` | User Management | `requestId`, `fromUserId`, `toUserId` |
+| `user.deleted` | User Management | `userId`, `purgeAt` |
+| `tamagotchi.created` | Tamagotchi | `tamagotchiId`, `ownerId`, `originPackageId`, `combatType` |
+| `tamagotchi.owner_transferred` | Tamagotchi | `tamagotchiId`, `previousOwnerId`, `newOwnerId`, `battleId` |
+| `tamagotchi.leveled_up` | Tamagotchi | `tamagotchiId`, `ownerId`, `level` |
+| `registry.package_version_published` | Package Registry | `packageId`, `version`, `publishedAt` |
+| `registry.raid_definition_activated` | Package Registry | `raidDefinitionId`, `monsterId`, `scheduledAt` |
+| `battle.created` | Battle | `battleId`, `challengerId`, `opponentId` |
+| `battle.finished` | Battle | see below |
+| `map.players_nearby` | Map | `userA`, `userB`, `distanceMeters`, `detectedAt` |
+| `guild.invitation_created` | Guild | `invitationId`, `guildId`, `invitedUserId`, `invitedByUserId` |
+| `guild.member_joined` | Guild | `guildId`, `userId`, `role` |
+| `guild.member_left` | Guild | `guildId`, `userId`, `reason` |
+| `raid.started` | Monster Raid | `raidId`, `guildId`, `monsterId`, `expiresAt` |
+| `raid.monster_defeated` | Monster Raid | see below |
+| `raid.expired` | Monster Raid | `raidId`, `guildId`, `remainingHp`, `expiredAt` |
+
+#### `battle.finished`
+
+The most consequential event in the system — three services react to it, and each one writes state
+that Battle deliberately does not own.
+
+```json
+{
+  "battleId": "3c9e1f70-5b2d-4a88-91cf-64bd0a2e7c15",
+  "winnerId": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11",
+  "loserId": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22",
+  "outcome": "knockout",
+  "turnCount": 14,
+  "transferredTamagotchiId": "4f2c8e1a-6b09-4d3e-a7c5-8e0b1d2f3a44",
+  "currency": { "winnerDelta": 250, "loserDelta": -100 },
+  "xp": {
+    "winner": { "primaryTamagotchiId": "4a1b…", "primaryXp": 180, "secondaryTamagotchiId": "9c2d…", "secondaryXp": 120 },
+    "loser":  { "primaryTamagotchiId": "4f2c…", "primaryXp": 60,  "secondaryTamagotchiId": null,   "secondaryXp": 0 }
+  },
+  "finishedAt": "2026-09-10T14:25:31.482Z"
+}
+```
+
+`outcome` is `knockout`, `forfeit` or `timeout`. `transferredTamagotchiId` is the loser's primary
+creature and is `null` when the outcome is `timeout`. The XP split follows the fixed 60/40 rule
+between primary and secondary.
+
+| Consumer | Effect | Keyed on |
+| -------- | ------ | -------- |
+| Tamagotchi | Reassigns `ownerId` of `transferredTamagotchiId`, creates a `SecondaryReference` for the winner, applies both XP grants | `battleId` |
+| User Management | Applies `winnerDelta` and `loserDelta` to `globalCurrency` | `battleId` |
+| Notification | Pushes `battle_result` to both participants | `eventId` |
+
+#### `raid.monster_defeated`
+
+```json
+{
+  "raidId": "b81f0a63-77de-4f2c-9a10-5c2e7d3b8410",
+  "guildId": "2d7c4e91-0a3b-4f8c-91de-6b2a0c5f7e33",
+  "monsterId": "e5a91c37-8b02-4d6f-a1c9-70f3b8d2e514",
+  "totalDamage": 128400,
+  "durationSeconds": 1730,
+  "rewards": [
+    { "userId": "9f1c…", "tamagotchiId": "4a1b…", "globalCurrency": 500, "xp": 300, "damageShare": 0.31 }
+  ],
+  "defeatedAt": "2026-09-10T14:25:31.482Z"
+}
+```
+
+`rewards` is computed by Monster Raid but applied by the owners of the affected state: User
+Management credits `globalCurrency`, Tamagotchi credits `xp`. Both deduplicate on `raidId`, which
+is what guarantees a raid pays out exactly once even if the message is redelivered.
+
+#### Queues and delivery
+
+Each consumer owns a named durable queue bound to its own routing keys — no queue is shared between
+two services, so a slow consumer cannot starve another.
+
+| Queue | Bound routing keys |
+| ----- | ------------------ |
+| `tamagotchi.battle-outcomes` | `battle.finished` |
+| `tamagotchi.raid-rewards` | `raid.monster_defeated` |
+| `usermgmt.rewards` | `battle.finished`, `raid.monster_defeated` |
+| `usermgmt.package-registrations` | `registry.package_version_published` |
+| `notification.fanout` | `user.*`, `battle.*`, `tamagotchi.owner_transferred`, `map.players_nearby`, `guild.*`, `raid.*` |
+| `guild.user-lifecycle` | `user.deleted` |
+| `raid.definitions` | `registry.raid_definition_activated` |
+
+Delivery rules, uniform across every consumer:
+
+- messages are persistent and queues are durable, so a broker restart loses nothing;
+- a consumer acknowledges **only after** its local transaction — effect plus `processed_events` row
+  — has committed;
+- a transient failure is negatively acknowledged and retried with exponential backoff, 5 attempts;
+- after the final attempt the message is routed to `tamagotchi.events.dlq` with the original
+  routing key and failure reason in the headers, and an operator replays it once the cause is fixed;
+- a consumer that receives an `eventVersion` higher than it understands dead-letters the message
+  instead of guessing, which is what makes the version field useful rather than decorative.
+
 ---
 
 ## Open Boundary Decisions
