@@ -350,6 +350,49 @@ table inside the same local transaction that applies the effect. Because deliver
 this is what makes it exactly-once in effect: a redelivered `battle.finished` cannot transfer the
 same creature twice or pay a raid reward twice.
 
+### Data management across services
+
+Each service owns a private datastore. **No service opens a connection to another service's
+database** — each one has its own credentials, its own schema and its own migrations, and is the
+only writer of the state listed under [Service Boundaries](#service-boundaries). Data crosses a
+boundary in exactly one of two ways: a synchronous REST read, or an asynchronous event.
+
+| Service | Primary store | Owned tables / keys | Volatile store |
+| ------- | ------------- | ------------------- | -------------- |
+| User Management | PostgreSQL `usermgmt` | `users`, `credentials`, `refresh_tokens`, `relationships`, `friend_requests`, `balances`, `balance_operations` | — |
+| Tamagotchi | PostgreSQL `tamagotchi` | `tamagotchis`, `secondary_references`, `stat_documents` (JSONB), `xp_operations` | — |
+| Package Registry | PostgreSQL `registry` | `packages`, `package_versions`, `stat_definitions` (JSONB), `package_registrations`, `monsters`, `raid_definitions` | — |
+| Battle | PostgreSQL `battle` | `battles`, `battle_turns`, `battle_participants`, `processed_commands` | Redis: `battle:{battleId}:state`, TTL 1 h |
+| Map | Redis (authoritative for positions) | `geo:users` (GEO set), `loc:{userId}` hash, TTL 5 min | PostgreSQL `map` for `proximity_audit` only |
+| Notification | PostgreSQL `notification` | `devices`, `preferences`, `notifications`, `processed_events` | — |
+| Guild | PostgreSQL `guild` | `guilds`, `memberships`, `invitations`, `chat_messages` | Redis Pub/Sub `guild:{guildId}:chat` for cross-instance fan-out |
+| Monster Raid | PostgreSQL `raid` | `raids`, `raid_participants`, `damage_log`, `processed_commands` | Redis: `raid:{raidId}:hp` counter, `raid:{raidId}:timer` |
+
+**Duplicated data is a cached projection, never a second source of truth.** Where a service keeps a
+foreign identifier — Guild storing `userId`, Raid storing `tamagotchiId` — it stores the identifier
+only and resolves the rest through the owner's API. Where it keeps a denormalized copy for display,
+the copy is refreshed from the owning service's events and is never used for an authorization or
+money decision.
+
+Three ownership rules follow directly from
+[Open Boundary Decisions](#open-boundary-decisions) and are binding on the contract below:
+
+1. **Package Registry** writes the user ↔ package link; User Management reads it.
+2. **Tamagotchi** writes the owner of a creature. Battle never does — it publishes `battle.finished`
+   and Tamagotchi performs the transfer.
+3. **User Management** writes every balance. Battle and Raid compute rewards but publish them as
+   facts; the balance change is applied by the owner of the balance.
+
+Consistency across services is therefore **eventual**, bounded by broker latency. Consistency
+*within* a service is transactional: a consumer applies the effect and records the `eventId` in the
+same PostgreSQL transaction, so an at-least-once redelivery is absorbed rather than duplicated.
+
+**Referential integrity** cannot be enforced with foreign keys across services. Instead, a service
+validates a foreign identifier synchronously at write time (Guild asks User Management whether a
+user exists before creating a membership) and reacts to deletion events afterwards. A dangling
+reference is treated as a soft failure — the resource renders as `unavailable` rather than crashing
+the request.
+
 ---
 
 ## Open Boundary Decisions
