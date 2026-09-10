@@ -579,6 +579,113 @@ The ring is fixed: `flame → nature → earth → electric → water → shadow
 `1.5` when the attacker is strong against the defender, `0.75` when weak, and `1.0` otherwise.
 Battle and Monster Raid read this instead of hard-coding the table, so the ring has one owner.
 
+#### 3. Package Registry Service — `http://package-registry:8083`
+
+**`Package`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `packageId` | `UUID` | |
+| `slug` | string | `^[a-z0-9-]{3,48}$`, globally unique |
+| `name` | string | ≤ 64 characters |
+| `description` | string | ≤ 2000 characters |
+| `status` | string | `draft`, `published`, `suspended` or `retired` |
+| `latestVersion` | `SemVer` \| null | |
+| `moderatorIds` | array of `UUID` | Users who may publish versions for this package |
+| `createdAt` / `updatedAt` | `Timestamp` | |
+
+**`PackageVersion`** — immutable once published.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `packageId` | `UUID` | |
+| `version` | `SemVer` | Unique within the package |
+| `statDefinitions` | array of `StatDefinition` | |
+| `growthRules` | object | Package-local growth mechanics, opaque to every other service |
+| `publishedAt` | `Timestamp` | |
+
+**`StatDefinition`** — the interpretation rules that make non-normalized stats usable.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `key` | string | The key as it appears in a `Stats` document, e.g. `hunger` |
+| `label` | string | Display name |
+| `minValue` / `maxValue` | number | Inclusive range |
+| `higherIsBetter` | boolean | Whether a large value is a good state |
+| `combatBonus` | object \| null | `{ "threshold": number, "comparison": "gte" \| "lte", "multiplier": number }` |
+
+**`Monster`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `monsterId` | `UUID` | |
+| `name` | string | ≤ 64 characters |
+| `description` | string | |
+| `spriteRefs` | array of string | |
+| `maxHp` | integer | ≥ 1 |
+| `combatType` | `CombatType` | |
+| `weaknesses` / `resistances` | array of `CombatType` | |
+| `specialProperties` | object | Free-form, interpreted by Monster Raid |
+
+**`RaidDefinition`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `raidDefinitionId` | `UUID` | |
+| `monsterId` | `UUID` | |
+| `durationSeconds` | integer | 60–86400 |
+| `maxParticipants` | integer | 1–100 |
+| `minGuildLevel` | integer | ≥ 0 |
+| `rewardConfig` | object | `{ "globalCurrency": Currency, "xp": integer, "distribution": "equal" \| "damage_weighted" }` |
+| `status` | string | `draft`, `scheduled`, `active`, `cancelled` or `expired` |
+| `scheduledAt` | `Timestamp` \| null | |
+
+##### Packages and versions
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/packages` | role `moderator` | `slug` string, `name` string, `description` string | `201` → `Package` |
+| `GET /api/v1/packages` | user | query `status`, `limit`, `cursor` | `200` → `[Package]` |
+| `GET /api/v1/packages/{packageId}` | user | path `packageId` `UUID` | `200` → `Package` |
+| `PATCH /api/v1/packages/{packageId}` | role `moderator` | `name`, `description`, `status` | `200` → `Package` |
+| `POST /api/v1/packages/{packageId}/versions` | role `moderator` | `version` `SemVer`, `statDefinitions` array, `growthRules` object | `201` → `PackageVersion`; publishes `registry.package_version_published` |
+| `GET /api/v1/packages/{packageId}/versions` | user | query `limit`, `cursor` | `200` → `[PackageVersion]` |
+| `GET /api/v1/packages/{packageId}/versions/{version}` | user | path `version` `SemVer` | `200` → `PackageVersion` |
+| `GET /api/v1/internal/packages/{packageId}/versions/{version}/stat-definitions` | service | path parameters as above | `200` → `{ "items": [StatDefinition], "version": SemVer }` |
+
+The internal stat-definitions route is what Battle calls before computing damage: it asks the
+Registry *how to read* a number instead of requiring every package to share a schema. Versions are
+immutable and callers request an explicit `version`, so a package cannot change a combat bonus
+underneath a battle that is already running.
+
+##### Moderators and registrations
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/packages/{packageId}/moderators` | role `admin` | `userId` `UUID` | `201` → `{ "packageId": UUID, "userId": UUID, "grantedAt": Timestamp }` |
+| `DELETE /api/v1/packages/{packageId}/moderators/{userId}` | role `admin` | path parameters | `204` → empty body |
+| `POST /api/v1/packages/{packageId}/registrations` | user | `userId` `UUID` | `201` → `{ "packageId": UUID, "userId": UUID, "registeredAt": Timestamp }` |
+| `DELETE /api/v1/packages/{packageId}/registrations/{userId}` | user | path parameters | `204` → empty body |
+| `GET /api/v1/users/{userId}/packages` | user | path `userId` `UUID`, query `limit`, `cursor` | `200` → `[Package]` |
+
+Registrations live here and not in User Management, per
+[Open Boundary Decision 1](#open-boundary-decisions): the Registry already owns package lifecycle,
+so it owns the link as well and User Management reads it.
+
+##### Monsters and raid definitions
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/monsters` | role `admin` | `name`, `description`, `spriteRefs`, `maxHp`, `combatType`, `weaknesses`, `resistances`, `specialProperties` | `201` → `Monster` |
+| `GET /api/v1/monsters` | user | query `limit`, `cursor` | `200` → `[Monster]` |
+| `GET /api/v1/monsters/{monsterId}` | user | path `monsterId` `UUID` | `200` → `Monster` |
+| `PATCH /api/v1/monsters/{monsterId}` | role `admin` | any mutable field above | `200` → `Monster` |
+| `POST /api/v1/raid-definitions` | role `admin` | `monsterId` `UUID`, `durationSeconds`, `maxParticipants`, `minGuildLevel`, `rewardConfig`, `scheduledAt` | `201` → `RaidDefinition` |
+| `GET /api/v1/raid-definitions` | user | query `status`, `limit`, `cursor` | `200` → `[RaidDefinition]` |
+| `GET /api/v1/internal/raid-definitions/{raidDefinitionId}` | service | path `raidDefinitionId` `UUID` | `200` → `RaidDefinition` with the embedded `Monster` |
+| `POST /api/v1/raid-definitions/{raidDefinitionId}/activate` | role `admin` | — | `200` → `RaidDefinition`; publishes `registry.raid_definition_activated` |
+| `POST /api/v1/raid-definitions/{raidDefinitionId}/cancel` | role `admin` | `reason` string | `200` → `RaidDefinition` with `status: "cancelled"` |
+
 ---
 
 ## Open Boundary Decisions
