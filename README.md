@@ -502,6 +502,83 @@ and safe to cache for 30 seconds.
 `409 INSUFFICIENT_FUNDS` and the balance is unchanged. The synchronous adjust route exists for
 flows that must fail fast — a shop purchase — while battle and raid rewards arrive as events.
 
+#### 2. Tamagotchi Service — `http://tamagotchi:8082`
+
+**`Tamagotchi`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `tamagotchiId` | `UUID` | |
+| `ownerId` | `UUID` | Current owner; changes only through `battle.finished` |
+| `originPackageId` | `UUID` | The package that created the creature; never changes |
+| `name` | string | 1–32 characters |
+| `combatType` | `CombatType` | Immutable after creation |
+| `level` | integer | ≥ 1 |
+| `xp` | integer | ≥ 0; resets to the level threshold on level-up |
+| `spriteRef` | string | Asset reference resolved by the owning package |
+| `stats` | `Stats` | Package-local, non-normalized; this service does not interpret it |
+| `statsVersion` | integer | Optimistic-concurrency counter, incremented on every stat write |
+| `capturedInBattleId` | `UUID` \| null | Set when the creature changed hands after a battle |
+| `createdAt` / `updatedAt` | `Timestamp` | |
+
+**`SecondaryReference`** — a *reference* to an existing `Tamagotchi`, never a copy.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `referenceId` | `UUID` | |
+| `holderId` | `UUID` | The user who may field the creature as a secondary |
+| `tamagotchiId` | `UUID` | Points at the original entity, whose level and stats stay shared |
+| `acquiredFrom` | string | `battle`, `trade` or `capture` |
+| `acquiredAt` | `Timestamp` | |
+
+##### Creatures
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/tamagotchis` | user | `packageId` `UUID`, `name` string, `combatType` `CombatType`, `spriteRef` string, `stats` `Stats` | `201` → `Tamagotchi`; publishes `tamagotchi.created` |
+| `GET /api/v1/tamagotchis/{tamagotchiId}` | user | path `tamagotchiId` `UUID` | `200` → `Tamagotchi` |
+| `GET /api/v1/tamagotchis` | user | query `ownerId` `UUID`, `packageId` `UUID`, `combatType`, `limit`, `cursor` | `200` → `[Tamagotchi]` |
+| `GET /api/v1/internal/tamagotchis` | service | query `ids` — comma-separated `UUID`, ≤ 50 | `200` → `{ "items": [Tamagotchi] }` |
+| `PATCH /api/v1/tamagotchis/{tamagotchiId}` | user | `name` string, `spriteRef` string | `200` → `Tamagotchi` |
+| `DELETE /api/v1/tamagotchis/{tamagotchiId}` | user | path `tamagotchiId` `UUID` | `204`; refused with `409 TAMAGOTCHI_IS_PRIMARY` if it is the owner's primary |
+
+`GET /api/v1/internal/tamagotchis` is the bulk read Battle and Monster Raid perform before every
+damage calculation; it is the reason the route is batched rather than one call per creature.
+
+##### Primary and secondary assignment
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `GET /api/v1/users/{userId}/primary-tamagotchi` | user | path `userId` `UUID` | `200` → `Tamagotchi`; `404 NO_PRIMARY_TAMAGOTCHI` if unset |
+| `PUT /api/v1/users/me/primary-tamagotchi` | user | `tamagotchiId` `UUID` | `200` → `Tamagotchi`; `403 TAMAGOTCHI_NOT_OWNED` if the caller is not the owner |
+| `GET /api/v1/users/{userId}/secondary-tamagotchis` | user | path `userId` `UUID`, query `limit`, `cursor` | `200` → `[SecondaryReference]` |
+| `POST /api/v1/internal/users/{userId}/secondary-tamagotchis` | service | `commandId` `UUID`, `tamagotchiId` `UUID`, `acquiredFrom` string | `201` → `SecondaryReference`; idempotent on `commandId` |
+| `DELETE /api/v1/users/me/secondary-tamagotchis/{referenceId}` | user | path `referenceId` `UUID` | `204` → empty body |
+
+##### Statistics and progression
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `GET /api/v1/tamagotchis/{tamagotchiId}/stats` | user | path `tamagotchiId` `UUID` | `200` → `{ "stats": Stats, "statsVersion": integer, "updatedAt": Timestamp }` |
+| `PUT /api/v1/tamagotchis/{tamagotchiId}/stats` | user | `stats` `Stats`, `expectedVersion` integer | `200` → `{ "stats": Stats, "statsVersion": integer }`; `409 STALE_STATS_VERSION` on a concurrent write |
+| `POST /api/v1/internal/tamagotchis/{tamagotchiId}/xp` | service | `commandId` `UUID`, `amount` integer (≥ 0), `source` string | `200` → `{ "tamagotchiId": UUID, "level": integer, "xp": integer, "leveledUp": boolean }` |
+| `POST /api/v1/internal/tamagotchis/{tamagotchiId}/transfer-owner` | service | `commandId` `UUID`, `newOwnerId` `UUID`, `battleId` `UUID` | `200` → `Tamagotchi`; publishes `tamagotchi.owner_transferred` |
+
+The stat document is written wholesale rather than patched, because only the owning package knows
+which keys are meaningful together. `expectedVersion` prevents two clients of the same package from
+silently overwriting each other.
+
+##### Combat types
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `GET /api/v1/combat-types` | — | — | `200` → `{ "items": [{ "type": CombatType, "strongAgainst": CombatType, "weakAgainst": CombatType }] }` |
+| `GET /api/v1/combat-types/advantage` | service | query `attacker` `CombatType`, `defender` `CombatType` | `200` → `{ "multiplier": number }` |
+
+The ring is fixed: `flame → nature → earth → electric → water → shadow → flame`. `multiplier` is
+`1.5` when the attacker is strong against the defender, `0.75` when weak, and `1.0` otherwise.
+Battle and Monster Raid read this instead of hard-coding the table, so the ring has one owner.
+
 ---
 
 ## Open Boundary Decisions
