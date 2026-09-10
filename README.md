@@ -846,6 +846,67 @@ Only the `map.proximity` case produces an event on the broker. The threshold is 
 crossing is edge-triggered, and a pair is suppressed for 10 minutes after firing so that two people
 standing together do not generate a stream of duplicates.
 
+#### 6. Notification Service — `http://notification:8086`
+
+A pure subscriber: it owns no domain state and exposes REST only for device registration,
+preferences and delivery history. Everything it sends originates from an event published by another
+service.
+
+**`Device`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `deviceId` | `UUID` | |
+| `userId` | `UUID` | |
+| `fcmToken` | string | Firebase Cloud Messaging registration token |
+| `platform` | string | `android`, `ios` or `web` |
+| `locale` | string | BCP 47, e.g. `ro-MD` |
+| `lastSeenAt` | `Timestamp` | Refreshed on every successful delivery |
+
+**`Notification`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `notificationId` | `UUID` | |
+| `userId` | `UUID` | |
+| `category` | string | See the table below |
+| `title` / `body` | string | Localized at send time |
+| `data` | object | Deep-link payload, e.g. `{ "battleId": UUID }` |
+| `status` | string | `queued`, `sent`, `failed` or `read` |
+| `sourceEventId` | `UUID` | The envelope id that produced it; also the deduplication key |
+| `createdAt` / `readAt` | `Timestamp` \| null | |
+
+##### REST
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/devices` | user | `fcmToken` string, `platform` string, `locale` string | `201` → `Device`; re-registering the same token returns `200` |
+| `GET /api/v1/devices` | user | — | `200` → `{ "items": [Device] }` |
+| `DELETE /api/v1/devices/{deviceId}` | user | path `deviceId` `UUID` | `204` → empty body |
+| `GET /api/v1/notifications` | user | query `status`, `category`, `limit`, `cursor` | `200` → `[Notification]` |
+| `POST /api/v1/notifications/{notificationId}/read` | user | path `notificationId` `UUID` | `200` → `Notification` with `status: "read"` |
+| `POST /api/v1/notifications/read-all` | user | — | `200` → `{ "updated": integer }` |
+| `GET /api/v1/notifications/preferences` | user | — | `200` → `{ "items": [{ "category": string, "push": boolean, "quietHours": { "from": "22:00", "to": "08:00" } \| null }] }` |
+| `PUT /api/v1/notifications/preferences` | user | `items` array as above | `200` → the stored preferences |
+
+##### Delivery matrix
+
+| Category | Triggering event | Deep-link `data` |
+| -------- | ---------------- | ---------------- |
+| `friend_request` | `user.friend_request_created` | `{ "requestId": UUID, "fromUserId": UUID }` |
+| `nearby_player` | `map.players_nearby` | `{ "userId": UUID, "distanceMeters": number }` |
+| `battle_request` | `battle.created` | `{ "battleId": UUID, "challengerId": UUID }` |
+| `battle_result` | `battle.finished` | `{ "battleId": UUID, "winnerId": UUID }` |
+| `tamagotchi_captured` | `tamagotchi.owner_transferred` | `{ "tamagotchiId": UUID, "newOwnerId": UUID }` |
+| `guild_invitation` | `guild.invitation_created` | `{ "guildId": UUID, "invitationId": UUID }` |
+| `raid_started` | `raid.started` | `{ "raidId": UUID, "guildId": UUID }` |
+| `raid_finished` | `raid.monster_defeated`, `raid.expired` | `{ "raidId": UUID, "outcome": string }` |
+
+Delivery is best-effort. A Firebase failure is retried with exponential backoff up to five times,
+after which the notification is marked `failed` and the message is dead-lettered — a push that
+cannot be delivered never blocks the gameplay service that produced the event. A token rejected by
+Firebase as unregistered deletes the corresponding `Device` row.
+
 ---
 
 ## Open Boundary Decisions
