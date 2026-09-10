@@ -7,3 +7,6 @@
 [submodule "services/battle"]
 	path = services/battle
 	url = https://github.com/vladas9/tamagotchi-battle.git
+[submodule "services/user-management"]
+	path = services/user-management
+	url = https://github.com/vladas9/tamagotchi-user-management.git
