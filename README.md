@@ -12,6 +12,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Architecture Diagram](#architecture-diagram)
 - [Technologies and Communication Patterns](#technologies-and-communication-patterns)
 - [Communication Overview](#communication-overview)
+- [Communication Contract](#communication-contract)
 - [Open Boundary Decisions](#open-boundary-decisions)
 - [Contribution Workflow](#contribution-workflow)
 
@@ -231,6 +232,123 @@ Management (currency) and Notification (push) independently.
 
 Every event consumer is idempotent on the event id (`battleId`, `raidId`), so a redelivered or
 duplicated event cannot transfer the same creature twice or pay out a raid twice.
+
+## Communication Contract
+
+This section is the normative contract between the eight services. It defines how data is managed
+across the system, every endpoint each service exposes, the payload transferred in each direction
+with its format and types, and the response returned. Anything not listed here is not part of the
+contract and may not be relied upon by another service.
+
+### Transport and conventions
+
+| Concern | Rule |
+| ------- | ---- |
+| Synchronous transport | HTTP/1.1 with TLS; `Content-Type: application/json; charset=utf-8` in both directions |
+| Path prefix | `/api/v1` on every service; the major number changes only on an incompatible change |
+| Internal-only routes | Prefixed `/api/v1/internal`; reachable from the service network, never from clients |
+| Live channels | WebSocket, JSON text frames, one JSON object per frame |
+| Asynchronous transport | RabbitMQ topic exchange `tamagotchi.events`, durable queues, at-least-once delivery |
+| Time | RFC 3339 with an explicit `Z` offset, always UTC, millisecond precision |
+| Identifiers | UUID v4 rendered as a lowercase canonical string |
+| Field naming | `camelCase` in JSON, regardless of the language implementing the service |
+| Unknown fields | Consumers ignore unknown fields; producers never remove or retype a field within a major version |
+
+### Type vocabulary
+
+These names are used in every payload table below.
+
+| Name | JSON type | Definition |
+| ---- | --------- | ---------- |
+| `UUID` | string | UUID v4, lowercase canonical form, e.g. `9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11` |
+| `Timestamp` | string | RFC 3339 UTC, e.g. `2026-09-10T14:25:31.482Z` |
+| `Currency` | integer | Signed 64-bit amount in the smallest indivisible unit; never a floating-point number |
+| `CombatType` | string | One of `flame`, `nature`, `earth`, `electric`, `water`, `shadow` |
+| `Stats` | object | Package-local statistics; opaque `string → number` map, not normalized across packages |
+| `SemVer` | string | `MAJOR.MINOR.PATCH`, e.g. `1.4.2` |
+| `Coordinate` | number | Decimal degrees, WGS 84; latitude in `[-90, 90]`, longitude in `[-180, 180]` |
+| `Cursor` | string | Opaque, service-generated pagination token; clients must not parse it |
+
+### Authentication and authorization
+
+Clients authenticate against User Management and receive a signed JWT. Every other service
+validates that token **locally** using the public keys published at
+`GET /api/v1/.well-known/jwks.json`, so a request never costs an extra round trip to User
+Management. Token claims:
+
+```json
+{
+  "sub": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11",
+  "iss": "user-management",
+  "aud": "tamagotchi-go",
+  "packageId": "1d4e9a02-8c77-4a1e-b6f0-77c3b1d9e402",
+  "roles": ["user", "moderator"],
+  "iat": 1789041931,
+  "exp": 1789045531,
+  "jti": "0b5f2a91-6d3c-4e8a-b0d2-9a1f7c4e6b33"
+}
+```
+
+Client requests carry `Authorization: Bearer <accessToken>`. Service-to-service calls carry both
+that header and `X-Service-Token`, a short-lived credential identifying the calling service; routes
+under `/api/v1/internal` require it. Every request also carries `X-Correlation-Id: UUID`, which is
+propagated through synchronous calls and copied into any event the request produces.
+
+### Error envelope
+
+Every non-2xx response from every service has exactly this shape:
+
+```json
+{
+  "error": {
+    "code": "TAMAGOTCHI_NOT_OWNED",
+    "message": "Tamagotchi 4f2c… is not owned by the requesting user.",
+    "details": { "tamagotchiId": "4f2c8e1a-…", "ownerId": "77b1c0de-…" }
+  },
+  "correlationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "timestamp": "2026-09-10T14:25:31.482Z"
+}
+```
+
+`code` is a stable `SCREAMING_SNAKE_CASE` string and is part of the contract; `message` is
+human-readable and is not. `details` is an object or `null`.
+
+| Status | Meaning in this system |
+| ------ | ---------------------- |
+| `400 Bad Request` | Malformed JSON or a value outside its documented range |
+| `401 Unauthorized` | Missing, expired or invalid token |
+| `403 Forbidden` | Authenticated but not permitted — wrong owner, role or guild |
+| `404 Not Found` | The addressed resource does not exist or is not visible to the caller |
+| `409 Conflict` | The request contradicts current state, e.g. joining a finished raid |
+| `422 Unprocessable Entity` | Schema-valid but domain-invalid, e.g. an unknown `CombatType` |
+| `429 Too Many Requests` | Rate limit exceeded; `Retry-After` is set |
+| `500 Internal Server Error` | Unexpected failure; the correlation id is required when reporting it |
+| `503 Service Unavailable` | A required downstream dependency is unreachable |
+
+### Collections and pagination
+
+Every collection endpoint accepts `limit` (integer, `1…100`, default `20`) and `cursor` (`Cursor`,
+optional) and returns:
+
+```json
+{ "items": [ /* resource objects */ ], "nextCursor": "b3RoZXI6MTIz", "hasMore": true }
+```
+
+`nextCursor` is `null` when `hasMore` is `false`.
+
+### Idempotency
+
+Two distinct mechanisms, because two distinct problems exist.
+
+**Client-issued commands** that change state and may be retried over a flaky connection — a battle
+turn, a raid attack, a balance adjustment — take a client-generated `commandId` (`UUID`) in the
+body. The service stores it with the result for at least 24 hours. A repeat of the same
+`commandId` returns the **original** result with `200 OK` instead of applying the change twice.
+
+**Event consumers** deduplicate on the envelope's `eventId`, which is recorded in a `processed_events`
+table inside the same local transaction that applies the effect. Because delivery is at-least-once,
+this is what makes it exactly-once in effect: a redelivered `battle.finished` cannot transfer the
+same creature twice or pay a raid reward twice.
 
 ---
 
