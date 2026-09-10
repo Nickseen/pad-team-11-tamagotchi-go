@@ -781,6 +781,71 @@ carrying the full outcome; Tamagotchi transfers the loser's primary creature, Us
 applies both currency changes and the XP split, and Notification pushes the result — each keyed on
 `battleId`.
 
+#### 5. Map Service — `http://map:8085`
+
+Positions are ephemeral by design: Redis holds the latest coordinate per user with a five-minute
+TTL, and anything older is treated as absent rather than stale. The service reports proximity; it
+never creates a battle and never sends a notification.
+
+**`Position`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `userId` | `UUID` | |
+| `latitude` / `longitude` | `Coordinate` | WGS 84 decimal degrees |
+| `accuracyMeters` | number | Reported by the device; positions above 100 m are ignored |
+| `recordedAt` | `Timestamp` | Device clock, rejected if more than 60 s in the future |
+| `expiresAt` | `Timestamp` | `recordedAt` + 5 minutes |
+
+**`NearbyUser`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `userId` | `UUID` | |
+| `distanceMeters` | number | Rounded to 1 m; never exact for strangers |
+| `relation` | string | `friend`, `enemy` or `none`, resolved through User Management |
+| `latitude` / `longitude` | `Coordinate` \| null | `null` for a stranger — only bearing and distance are exposed |
+| `lastSeenAt` | `Timestamp` | |
+
+##### REST
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/locations` | user | `latitude` `Coordinate`, `longitude` `Coordinate`, `accuracyMeters` number, `recordedAt` `Timestamp` | `202` → `{ "accepted": boolean, "expiresAt": Timestamp }` |
+| `GET /api/v1/map/nearby` | user | query `radiusMeters` integer (1–5000, default `500`) | `200` → `{ "items": [NearbyUser] }` |
+| `GET /api/v1/map/visible` | user | — | `200` → `{ "items": [NearbyUser] }` — friends and enemies regardless of distance |
+| `DELETE /api/v1/locations/me` | user | — | `204`; removes the position immediately and stops sharing |
+| `GET /api/v1/internal/positions/{userId}` | service | path `userId` `UUID` | `200` → `Position`; `404 POSITION_EXPIRED` when the TTL has passed |
+
+`POST /api/v1/locations` exists as a fallback for clients that cannot hold a socket open. The
+normal path is the stream below.
+
+##### WebSocket — `GET /api/v1/map/stream`
+
+Upgrade carries `Authorization: Bearer <accessToken>`. The server closes with `4401` on an invalid
+token and `4429` when the client exceeds one location frame per second.
+
+Client → server:
+
+```json
+{ "type": "location.update", "latitude": 47.0245, "longitude": 28.8323,
+  "accuracyMeters": 8.5, "recordedAt": "2026-09-10T14:25:31.482Z" }
+```
+
+Server → client:
+
+| `type` | Payload | Sent when |
+| ------ | ------- | --------- |
+| `map.snapshot` | `{ "nearby": [NearbyUser], "generatedAt": Timestamp }` | Immediately after the socket opens |
+| `map.nearby` | `{ "added": [NearbyUser], "removed": [UUID], "updated": [NearbyUser] }` | A visible user enters, leaves or moves |
+| `map.proximity` | `{ "userId": UUID, "distanceMeters": number, "relation": "none", "detectedAt": Timestamp }` | Two previously unrelated users cross the 6 m threshold |
+| `map.error` | `{ "code": string, "message": string }` | A frame is rejected without closing the socket |
+| `map.pong` | `{ "serverTime": Timestamp }` | Reply to a `map.ping` frame; the client pings every 30 s |
+
+Only the `map.proximity` case produces an event on the broker. The threshold is **6 metres**,
+crossing is edge-triggered, and a pair is suppressed for 10 minutes after firing so that two people
+standing together do not generate a stream of duplicates.
+
 ---
 
 ## Open Boundary Decisions
