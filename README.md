@@ -1016,6 +1016,91 @@ Server → client:
 Rate limit: 5 messages per 10 seconds per member. Exceeding it yields `chat.error` with
 `RATE_LIMITED` rather than a disconnect.
 
+#### 8. Monster Raid Service — `http://monster-raid:8088`
+
+**`Raid`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `raidId` | `UUID` | Idempotency key for reward distribution |
+| `guildId` | `UUID` | |
+| `raidDefinitionId` / `monsterId` | `UUID` | Copied from the Registry definition at creation |
+| `monsterName` | string | Denormalized for display only |
+| `maxHp` / `currentHp` | integer | `currentHp` never drops below 0 |
+| `status` | string | `active`, `defeated`, `expired` or `cancelled` |
+| `participantCount` | integer | |
+| `startedAt` / `expiresAt` / `endedAt` | `Timestamp` \| null | `expiresAt` = `startedAt` + `durationSeconds` |
+
+**`RaidParticipant`**
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `userId` | `UUID` | |
+| `tamagotchiId` | `UUID` | The member's primary creature, resolved at join time |
+| `combatType` | `CombatType` | Pinned at join; decides the weakness multiplier |
+| `damageDealt` | integer | Running total |
+| `attackCount` | integer | |
+| `joinedAt` | `Timestamp` | |
+
+##### Raid lifecycle
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/raids` | role `owner` \| `officer` | `guildId` `UUID`, `raidDefinitionId` `UUID` | `201` → `Raid`; publishes `raid.started` |
+| `GET /api/v1/raids/{raidId}` | member | path `raidId` `UUID` | `200` → `Raid` |
+| `GET /api/v1/guilds/{guildId}/raids` | member | query `status`, `limit`, `cursor` | `200` → `[Raid]` |
+| `POST /api/v1/raids/{raidId}/participants` | member | `primaryTamagotchiId` `UUID` | `201` → `RaidParticipant` |
+| `GET /api/v1/raids/{raidId}/participants` | member | query `limit`, `cursor` | `200` → `[RaidParticipant]` |
+| `DELETE /api/v1/raids/{raidId}/participants/me` | member | — | `204`; damage already dealt is retained |
+| `GET /api/v1/raids/{raidId}/leaderboard` | member | query `limit` integer (default `20`) | `200` → `{ "items": [{ "rank": integer, "userId": UUID, "damageDealt": integer, "share": number }] }` |
+| `POST /api/v1/raids/{raidId}/cancel` | role `admin` | `reason` string | `200` → `Raid` with `status: "cancelled"` |
+
+Joining is refused with `403 NOT_A_GUILD_MEMBER` (checked against Guild), `409 RAID_FULL` when
+`participantCount` has reached `maxParticipants`, and `409 RAID_NOT_ACTIVE` once the raid has ended.
+
+##### Attacks
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/raids/{raidId}/attacks` | participant | `commandId` `UUID` | `200` → `AttackResult` |
+
+`AttackResult`:
+
+```json
+{
+  "raidId": "b81f0a63-77de-4f2c-9a10-5c2e7d3b8410",
+  "commandId": "0e2a5c19-4d7b-4f0e-8a3c-11b9f6d2e7a4",
+  "damageDealt": 214,
+  "typeMultiplier": 1.5,
+  "monsterHpRemaining": 48320,
+  "yourTotalDamage": 12844,
+  "raidStatus": "active",
+  "attackedAt": "2026-09-10T14:25:31.482Z"
+}
+```
+
+The HP decrement is a single atomic Redis `DECRBY` clamped at zero, because an entire guild hits one
+counter concurrently. The result is appended to `damage_log` in PostgreSQL for durability, and the
+transition to `defeated` is applied exactly once with a conditional update — the first attack that
+drives HP to zero wins the transition and publishes the terminal event; every later attack receives
+`409 RAID_NOT_ACTIVE`. Rate limit: 10 attacks per second per participant.
+
+##### WebSocket — `GET /api/v1/raids/{raidId}/feed`
+
+Server-push only; the client sends nothing but heartbeats. A non-participant is closed with `4403`.
+
+| `type` | Payload | Sent when |
+| ------ | ------- | --------- |
+| `raid.snapshot` | `{ "raid": Raid, "participants": [RaidParticipant] }` | Immediately after the socket opens |
+| `raid.damage` | `{ "userId": UUID, "damageDealt": integer, "monsterHpRemaining": integer }` | Any participant lands an attack, throttled to 10 frames per second |
+| `raid.participant_joined` | `RaidParticipant` | A member joins |
+| `raid.ended` | `{ "status": "defeated" \| "expired", "endedAt": Timestamp, "rewards": [{ "userId": UUID, "globalCurrency": Currency, "xp": integer }] \| null }` | The monster dies or the timer expires |
+| `raid.pong` | `{ "serverTime": Timestamp }` | Reply to `raid.ping` |
+
+Rewards appear in `raid.ended` for immediate display, but the service does not credit them. It
+publishes `raid.monster_defeated`; User Management applies the currency and Tamagotchi applies the
+XP, both keyed on `raidId`.
+
 ---
 
 ## Open Boundary Decisions
