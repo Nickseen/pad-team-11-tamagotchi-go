@@ -14,7 +14,6 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Communication Overview](#communication-overview)
 - [Communication Contract](#communication-contract)
 - [Open Boundary Decisions](#open-boundary-decisions)
-- [Testing](#testing)
 - [Contribution Workflow](#contribution-workflow)
 
 ---
@@ -1260,25 +1259,6 @@ communication contract.
    rules; User Management holds the balance.
 4. **Proximity → battle.** Map only reports proximity. Turning that into a battle request is the
    client's or Battle's decision, never Map's.
-
----
-
-## Testing
-
-### Postman collections
-
-The [`postman/`](postman/) folder holds one collection per service, covering its CRUD endpoints,
-lifecycle flows and a representative `401`/`403`/`404` error case for each. Import the collections
-you need and see [`postman/README.md`](postman/README.md) for how to run them, including the
-Collection Runner flow that chains requests via captured ids.
-
-| Service | Collection |
-| ------- | ---------- |
-| Package Registry | [`postman/package-registry.postman_collection.json`](postman/package-registry.postman_collection.json) |
-| Guild | [`postman/guild.postman_collection.json`](postman/guild.postman_collection.json) |
-
-Every other service should add its own collection to that folder in the pull request that
-implements its CRUD endpoints.
 
 ---
 
