@@ -1,0 +1,1593 @@
+{
+  "info": {
+    "name": "Battle Service",
+    "description": "Every route of the Battle Service, in run order: a challenge is issued, accepted, fought turn by turn and resolved. The Setup folder registers its own users through User Management and befriends them, because a challenge is refused between users who are unrelated \u2014 so the collection needs no stored credential and can be run repeatedly.\n\nSet userManagementUrl, battleUrl and serviceToken in the environment. The creature identifiers are collection variables: with DEPENDENCY_MODE=mock the mocked Tamagotchi Service derives a creature deterministically from its id, and these four resolve to level 20, which keeps the scripted match from ending before the last turn. Against a live Tamagotchi Service, replace them with creatures the two users own.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runId')) {",
+          "    const runId = Date.now().toString(36);",
+          "    pm.collectionVariables.set('runId', runId);",
+          "    pm.collectionVariables.set('challengerName', 'pad_ch_' + runId);",
+          "    pm.collectionVariables.set('opponentName', 'pad_op_' + runId);",
+          "    pm.collectionVariables.set('bystanderName', 'pad_by_' + runId);",
+          "    pm.collectionVariables.set('password', 'postman-run-' + runId);",
+          "    pm.collectionVariables.set('packageId', pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "primaryA",
+      "value": "4930fdf1-6c67-47f7-a63b-f3a58076fa3e"
+    },
+    {
+      "key": "secondaryA",
+      "value": "f11d9baa-f6ae-4c2b-afaf-5f6e4619151d"
+    },
+    {
+      "key": "primaryB",
+      "value": "e6433e2a-68cc-4407-b0e2-d886131f9603"
+    },
+    {
+      "key": "secondaryB",
+      "value": "6d609c78-88b4-480f-ad9a-72caf413dac2"
+    },
+    {
+      "key": "boostId",
+      "value": "7c1e0b44-92a5-4f6d-8b31-5d0a2f9e13c7"
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "challengerName",
+      "value": ""
+    },
+    {
+      "key": "opponentName",
+      "value": ""
+    },
+    {
+      "key": "bystanderName",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "packageId",
+      "value": ""
+    },
+    {
+      "key": "challengerId",
+      "value": ""
+    },
+    {
+      "key": "opponentId",
+      "value": ""
+    },
+    {
+      "key": "bystanderId",
+      "value": ""
+    },
+    {
+      "key": "challengerToken",
+      "value": ""
+    },
+    {
+      "key": "opponentToken",
+      "value": ""
+    },
+    {
+      "key": "bystanderToken",
+      "value": ""
+    },
+    {
+      "key": "requestId",
+      "value": ""
+    },
+    {
+      "key": "battleId",
+      "value": ""
+    },
+    {
+      "key": "dependenciesMocked",
+      "value": ""
+    },
+    {
+      "key": "secondBattleId",
+      "value": ""
+    },
+    {
+      "key": "commandId",
+      "value": ""
+    },
+    {
+      "key": "firstTurnResult",
+      "value": ""
+    },
+    {
+      "key": "opponentMaxHp",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup (User Management)",
+      "item": [
+        {
+          "name": "Register the challenger",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{challengerName}}\",\n  \"email\": \"{{challengerName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('challengerId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register the opponent",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{opponentName}}\",\n  \"email\": \"{{opponentName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('opponentId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register a bystander",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{bystanderName}}\",\n  \"email\": \"{{bystanderName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('bystanderId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as the challenger",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{challengerName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('challengerToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as the opponent",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{opponentName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('opponentToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as the bystander",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{bystanderName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('bystanderToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send a friend request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUserId\": \"{{opponentId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('requestId', pm.response.json().requestId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept the friend request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests/{{requestId}}/accept",
+            "description": "Battle refuses a challenge between users who are neither friends nor enemies, so the relationship has to exist first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dependency mode",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{battleUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// One assertion below depends on this: the mocked User Management reports every pair as",
+                  "// friends, so the unrelated-users rule can only be exercised against the live service.",
+                  "pm.collectionVariables.set('dependenciesMocked', String(pm.response.json().dependenciesMocked));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Challenges",
+      "item": [
+        {
+          "name": "Challenge the opponent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"secondaryTamagotchiId\": \"{{secondaryA}}\",\n  \"boosts\": [\n    \"{{boostId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const battle = pm.response.json();",
+                  "pm.collectionVariables.set('battleId', battle.battleId);",
+                  "pm.test(\"the challenge is pending\", () => pm.expect(battle.status).to.eql(\"pending\"));",
+                  "pm.test(\"the opponent's lineup is unknown until acceptance\", () => pm.expect(battle.opponent.lineup == null).to.be.true);",
+                  "pm.test(\"a pending battle has no current turn\", () => pm.expect(battle.currentTurnUserId == null).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Challenge without a token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Challenge yourself",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{challengerId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"SELF_BATTLE\", () => pm.expect(pm.response.json().error.code).to.eql(\"SELF_BATTLE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Field one creature twice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"secondaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"DUPLICATE_CREATURE\", () => pm.expect(pm.response.json().error.code).to.eql(\"DUPLICATE_CREATURE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Challenge a user who is neither friend nor enemy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{bystanderId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The relationship is read from User Management; this service does not decide it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The mocked User Management reports every pair as friends, so the rule is only",
+                  "// observable with DEPENDENCY_MODE=live. The assertion follows the configured mode",
+                  "// instead of pretending the mock can produce the refusal.",
+                  "if (pm.collectionVariables.get('dependenciesMocked') === 'true') {",
+                  "    pm.test(\"mocked: every pair is reported as friends, so the challenge is created\", () => pm.response.to.have.status(201));",
+                  "} else {",
+                  "    pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "    pm.test(\"USERS_NOT_RELATED\", () => pm.expect(pm.response.json().error.code).to.eql(\"USERS_NOT_RELATED\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Challenge again while one is unfinished",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"BATTLE_ALREADY_IN_PROGRESS\", () => pm.expect(pm.response.json().error.code).to.eql(\"BATTLE_ALREADY_IN_PROGRESS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read the battle as a bystander",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bystanderToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 Forbidden\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"NOT_A_PARTICIPANT\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_A_PARTICIPANT\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read a battle that does not exist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/00000000-0000-4000-8000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"BATTLE_NOT_FOUND\", () => pm.expect(pm.response.json().error.code).to.eql(\"BATTLE_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept your own challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryB}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 Forbidden\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"FORBIDDEN\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept the challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryB}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Levels, combat types, the stat rules and both type multipliers are resolved once here and pinned, so a later stat edit cannot change the arithmetic."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const battle = pm.response.json();",
+                  "pm.collectionVariables.set('opponentMaxHp', battle.opponent.maxHp);",
+                  "pm.test(\"the match is running\", () => pm.expect(battle.status).to.eql(\"active\"));",
+                  "pm.test(\"the challenger moves first, on turn 1\", () => {",
+                  "    pm.expect(battle.currentTurnUserId).to.eql(pm.collectionVariables.get(\"challengerId\"));",
+                  "    pm.expect(battle.turnNumber).to.eql(1);",
+                  "});",
+                  "pm.test(\"the stat-definition version is pinned\", () => pm.expect(battle.packageVersion).to.match(/^\\d+\\.\\d+\\.\\d+$/));",
+                  "pm.test(\"starting health is derived for both sides\", () => {",
+                  "    pm.expect(battle.challenger.currentHp).to.eql(battle.challenger.maxHp);",
+                  "    pm.expect(battle.opponent.maxHp).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept a second time",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryB}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"BATTLE_NOT_PENDING\", () => pm.expect(pm.response.json().error.code).to.eql(\"BATTLE_NOT_PENDING\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Turns",
+      "item": [
+        {
+          "name": "Act out of turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 Forbidden\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"NOT_YOUR_TURN\", () => pm.expect(pm.response.json().error.code).to.eql(\"NOT_YOUR_TURN\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An action the contract does not define",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"meditate\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"UNKNOWN_ACTION\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNKNOWN_ACTION\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spend a boost that was never equipped",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"use_boost\",\n  \"boostId\": \"11111111-2222-4333-8444-555555555555\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"BOOST_NOT_OWNED\", () => pm.expect(pm.response.json().error.code).to.eql(\"BOOST_NOT_OWNED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attack",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json();",
+                  "pm.collectionVariables.set('firstTurnResult', JSON.stringify(result));",
+                  "pm.test(\"the turn is recorded as turn 1 by the challenger\", () => {",
+                  "    pm.expect(result.turn.turnNumber).to.eql(1);",
+                  "    pm.expect(result.turn.actorId).to.eql(pm.collectionVariables.get(\"challengerId\"));",
+                  "});",
+                  "pm.test(\"damage was dealt and the multipliers are reported\", () => {",
+                  "    pm.expect(result.turn.damageDealt).to.be.above(0);",
+                  "    pm.expect(result.turn.typeMultiplier).to.be.above(0);",
+                  "    pm.expect(result.turn.statBonusMultiplier).to.be.above(0);",
+                  "});",
+                  "pm.test(\"the opponent lost exactly that much health\", () => pm.expect(result.opponentHp).to.eql(Number(pm.collectionVariables.get(\"opponentMaxHp\")) - result.turn.damageDealt));",
+                  "pm.test(\"the turn passes to the opponent\", () => pm.expect(result.nextTurnUserId).to.eql(pm.collectionVariables.get(\"opponentId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retry the same commandId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The contract's idempotency rule: the same commandId returns the original TurnResult with 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a retried command returns the original result and deals no further damage\", () => pm.expect(JSON.stringify(pm.response.json())).to.eql(pm.collectionVariables.get(\"firstTurnResult\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Opponent uses a special",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"special\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json();",
+                  "pm.test(\"turn 2 belongs to the opponent\", () => pm.expect(result.turn.turnNumber).to.eql(2));",
+                  "pm.test(\"the match is still running\", () => pm.expect(result.battleStatus).to.eql(\"active\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spend the equipped boost",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"use_boost\",\n  \"boostId\": \"{{boostId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"turn 3 spends the boost\", () => pm.expect(pm.response.json().turn.turnNumber).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Opponent attacks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"turn 4\", () => pm.expect(pm.response.json().turn.turnNumber).to.eql(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spend the same boost twice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"use_boost\",\n  \"boostId\": \"{{boostId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"BOOST_NOT_OWNED\", () => pm.expect(pm.response.json().error.code).to.eql(\"BOOST_NOT_OWNED\"));",
+                  "// A boost is consumed once; the second attempt is refused like an unequipped one."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Turn history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"four turns, oldest first\", () => {",
+                  "    pm.expect(page.items.length).to.eql(4);",
+                  "    pm.expect(page.items[0].turnNumber).to.eql(1);",
+                  "});",
+                  "pm.test(\"the last page carries no cursor\", () => {",
+                  "    pm.expect(page.hasMore).to.be.false;",
+                  "    pm.expect(page.nextCursor == null).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Turn history, two at a time",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns?limit=2"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"a full page reports more and hands back a cursor\", () => {",
+                  "    pm.expect(page.items.length).to.eql(2);",
+                  "    pm.expect(page.hasMore).to.be.true;",
+                  "    pm.expect(page.nextCursor).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Turn history with an impossible limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns?limit=500"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"VALIDATION_FAILED\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_FAILED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Resolution",
+      "item": [
+        {
+          "name": "Opponent forfeits",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/forfeit"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const battle = pm.response.json();",
+                  "pm.test(\"the match is forfeited\", () => pm.expect(battle.status).to.eql(\"forfeited\"));",
+                  "pm.test(\"the forfeiting side loses\", () => {",
+                  "    pm.expect(battle.winnerId).to.eql(pm.collectionVariables.get(\"challengerId\"));",
+                  "    pm.expect(battle.loserId).to.eql(pm.collectionVariables.get(\"opponentId\"));",
+                  "});",
+                  "pm.test(\"it is stamped and has no next turn\", () => {",
+                  "    pm.expect(battle.finishedAt).to.be.a(\"string\");",
+                  "    pm.expect(battle.currentTurnUserId == null).to.be.true;",
+                  "});",
+                  "// Rewards are published as battle.finished; the creature transfer and the currency change",
+                  "// are applied by the services that own that state, both keyed on battleId."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Act after the match is decided",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"BATTLE_NOT_ACTIVE\", () => pm.expect(pm.response.json().error.code).to.eql(\"BATTLE_NOT_ACTIVE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forfeit a decided match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/forfeit"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"BATTLE_NOT_ACTIVE\", () => pm.expect(pm.response.json().error.code).to.eql(\"BATTLE_NOT_ACTIVE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My battles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the finished match is listed\", () => pm.expect(pm.response.json().items.some(b => b.battleId === pm.collectionVariables.get(\"battleId\"))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My battles, filtered by status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles?status=forfeited"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"only forfeited matches come back\", () => pm.expect(pm.response.json().items.every(b => b.status === \"forfeited\")).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Another user's battles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles?userId={{opponentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 Forbidden\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"FORBIDDEN\"));",
+                  "// The contract lists the filter, but a user may only list their own matches."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A status that does not exist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles?status=glorious"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"VALIDATION_FAILED\", () => pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_FAILED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Challenge again now that the first match is over",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('secondBattleId', pm.response.json().battleId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Decline the challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{secondBattleId}}/decline"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the challenge is declined\", () => pm.expect(pm.response.json().status).to.eql(\"declined\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Decline it twice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles/{{secondBattleId}}/decline"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"BATTLE_NOT_PENDING\", () => pm.expect(pm.response.json().error.code).to.eql(\"BATTLE_NOT_PENDING\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{battleUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"reports whether the dependencies are mocked\", () => pm.expect(pm.response.json().dependenciesMocked).to.be.a(\"boolean\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{battleUrl}}/ready"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the database is reachable\", () => pm.expect(pm.response.json().status).to.eql(\"ready\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
