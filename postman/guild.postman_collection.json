@@ -1,0 +1,330 @@
+{
+  "info": {
+    "name": "Guild Service",
+    "description": "CRUD and lifecycle requests for the Guild service (guilds, membership, invitations). Run folders top-to-bottom with the Collection Runner — later requests reuse ids captured from earlier responses via collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8087" },
+    { "key": "ownerUserId", "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11" },
+    { "key": "inviteeUserId", "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22" },
+    { "key": "officerUserId", "value": "4a1b2c3d-5e6f-4a1b-8c9d-0e1f2a3b4c5d" },
+    { "key": "guildId", "value": "" },
+    { "key": "invitationId", "value": "" },
+    { "key": "declineInvitationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Guilds",
+      "item": [
+        {
+          "name": "Create guild",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('guildId', json.guildId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ember Wardens\",\n  \"tag\": \"EMBR\",\n  \"description\": \"A guild for flame-type trainers\",\n  \"emblemRef\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List guilds",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guilds?query=Ember",
+              "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds"],
+              "query": [{ "key": "query", "value": "Ember" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get guild",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update guild (owner/officer)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated guild description\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Invitations",
+      "item": [
+        {
+          "name": "Create invitation (owner/officer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('invitationId', json.invitationId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{inviteeUserId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}/invitations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "invitations"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List guild invitations (owner/officer)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}/invitations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "invitations"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List my invitations (invitee)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-User-Id", "value": "{{inviteeUserId}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/users/me/invitations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "me", "invitations"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Accept invitation (invitee)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "X-User-Id", "value": "{{inviteeUserId}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/invitations/{{invitationId}}/accept", "host": ["{{baseUrl}}"], "path": ["api", "v1", "invitations", "{{invitationId}}", "accept"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create second invitation (for decline demo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('declineInvitationId', json.invitationId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{officerUserId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}/invitations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "invitations"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Decline invitation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "X-User-Id", "value": "{{officerUserId}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/invitations/{{declineInvitationId}}/decline", "host": ["{{baseUrl}}"], "path": ["api", "v1", "invitations", "{{declineInvitationId}}", "decline"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Membership",
+      "item": [
+        {
+          "name": "List members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}/members", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "members"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Promote member to officer (owner)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"officer\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "members", "{{inviteeUserId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - membership check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/internal/guilds/{{guildId}}/members/{{inviteeUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "internal", "guilds", "{{guildId}}", "members", "{{inviteeUserId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove member (owner/officer)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "members", "{{inviteeUserId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "item": [
+        {
+          "name": "401 - create guild without X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"No Auth Guild\",\n  \"tag\": \"NOAU\",\n  \"description\": \"Missing auth header\",\n  \"emblemRef\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds"] }
+          },
+          "response": []
+        },
+        {
+          "name": "404 - get unknown guild",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/00000000-0000-4000-8000-000000000000", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "00000000-0000-4000-8000-000000000000"] }
+          },
+          "response": []
+        },
+        {
+          "name": "403 - delete guild as non-owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-User-Id", "value": "{{officerUserId}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cleanup",
+      "item": [
+        {
+          "name": "Delete guild (owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
