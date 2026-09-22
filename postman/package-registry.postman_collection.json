@@ -40,8 +40,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('201 Created', () => pm.response.to.have.status(201));",
-                  "const json = pm.response.json();",
-                  "pm.collectionVariables.set('packageId', json.packageId);"
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('packageId', pm.response.json().packageId);",
+                  "}"
                 ]
               }
             }
@@ -54,7 +55,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"slug\": \"dragon-pack\",\n  \"name\": \"Dragon Pack\",\n  \"description\": \"A Tamagotchi package with fire creatures\"\n}",
+              "raw": "{\n  \"slug\": \"dragon-pack-{{$timestamp}}\",\n  \"name\": \"Dragon Pack\",\n  \"description\": \"A Tamagotchi package with fire creatures\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{baseUrl}}/api/v1/packages", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages"] }

@@ -40,8 +40,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('201 Created', () => pm.response.to.have.status(201));",
-                  "const json = pm.response.json();",
-                  "pm.collectionVariables.set('guildId', json.guildId);"
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('guildId', pm.response.json().guildId);",
+                  "}"
                 ]
               }
             }
