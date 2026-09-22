@@ -1,0 +1,439 @@
+{
+  "info": {
+    "name": "Package Registry Service",
+    "description": "CRUD and lifecycle requests for the Package Registry service (packages, versions, moderators, registrations, monsters, raid definitions). Run folders top-to-bottom with the Collection Runner — later requests reuse ids captured from earlier responses via collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8083" },
+    { "key": "moderatorUserId", "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11" },
+    { "key": "otherUserId", "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22" },
+    { "key": "version", "value": "1.0.0" },
+    { "key": "packageId", "value": "" },
+    { "key": "monsterId", "value": "" },
+    { "key": "raidDefinitionId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Packages & Versions",
+      "item": [
+        {
+          "name": "Create package",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('packageId', json.packageId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{moderatorUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"dragon-pack\",\n  \"name\": \"Dragon Pack\",\n  \"description\": \"A Tamagotchi package with fire creatures\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/packages", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List packages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/packages?limit=20",
+              "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages"],
+              "query": [{ "key": "limit", "value": "20" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get package by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update package (moderator)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "X-User-Id", "value": "{{moderatorUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"status\": \"published\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Publish version (moderator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{moderatorUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"{{version}}\",\n  \"statDefinitions\": [\n    {\n      \"key\": \"hunger\",\n      \"label\": \"Hunger\",\n      \"minValue\": 0,\n      \"maxValue\": 100,\n      \"higherIsBetter\": false,\n      \"combatBonus\": { \"threshold\": 80, \"comparison\": \"gte\", \"multiplier\": 1.2 }\n    }\n  ],\n  \"growthRules\": { \"hungerDecayPerHour\": 5 }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List versions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions/{{version}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions", "{{version}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - get stat definitions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/internal/packages/{{packageId}}/versions/{{version}}/stat-definitions",
+              "host": ["{{baseUrl}}"], "path": ["api", "v1", "internal", "packages", "{{packageId}}", "versions", "{{version}}", "stat-definitions"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Moderators & Registrations",
+      "item": [
+        {
+          "name": "Grant moderator (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Roles", "value": "admin", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/moderators", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke moderator (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Roles", "value": "admin", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/moderators/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators", "{{otherUserId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Register user with package",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/registrations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Unregister user",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/registrations/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations", "{{otherUserId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List packages a user is registered with",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/users/{{otherUserId}}/packages", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{otherUserId}}", "packages"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Monsters",
+      "item": [
+        {
+          "name": "Create monster (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('monsterId', json.monsterId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Roles", "value": "admin", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ash Wyrm\",\n  \"description\": \"A fire-breathing wyrm\",\n  \"spriteRefs\": [\"ash-wyrm-idle.png\"],\n  \"maxHp\": 50000,\n  \"combatType\": \"flame\",\n  \"weaknesses\": [\"water\"],\n  \"resistances\": [\"earth\"],\n  \"specialProperties\": {}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/monsters", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List monsters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/monsters", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get monster",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update monster (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "X-Roles", "value": "admin", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"maxHp\": 60000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Raid Definitions",
+      "item": [
+        {
+          "name": "Create raid definition (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('raidDefinitionId', json.raidDefinitionId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Roles", "value": "admin", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monsterId\": \"{{monsterId}}\",\n  \"durationSeconds\": 1800,\n  \"maxParticipants\": 20,\n  \"minGuildLevel\": 1,\n  \"rewardConfig\": { \"globalCurrency\": 500, \"xp\": 300, \"distribution\": \"damage_weighted\" },\n  \"scheduledAt\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List raid definitions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - get raid definition (with monster)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/internal/raid-definitions/{{raidDefinitionId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "internal", "raid-definitions", "{{raidDefinitionId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Activate raid definition (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "X-Roles", "value": "admin", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/activate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "activate"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel raid definition (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Roles", "value": "admin", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Testing cancellation flow\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/cancel", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "cancel"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "item": [
+        {
+          "name": "401 - create package without X-User-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"no-auth-pack\",\n  \"name\": \"No Auth\",\n  \"description\": \"Missing auth header\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/packages", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages"] }
+          },
+          "response": []
+        },
+        {
+          "name": "404 - get unknown package",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/00000000-0000-4000-8000-000000000000", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "00000000-0000-4000-8000-000000000000"] }
+          },
+          "response": []
+        },
+        {
+          "name": "403 - publish version as non-moderator",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{otherUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"9.9.9\",\n  \"statDefinitions\": [],\n  \"growthRules\": {}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
