@@ -654,9 +654,35 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"403 Forbidden\", () => pm.response.to.have.status(403));",
-                  "pm.test(\"FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"FORBIDDEN\"));",
-                  "// Internal routes demand the service credential, not a user token."
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));",
+                  "// Service routes demand the service credential, and a missing one is an authentication failure."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk resolve with a wrong service token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "not-the-configured-token"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users?ids={{userAId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));",
+                  "// The header is compared against the configured SERVICE_TOKEN, not merely required to exist."
                 ]
               }
             }
