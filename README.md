@@ -13,6 +13,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Technologies and Communication Patterns](#technologies-and-communication-patterns)
 - [Communication Overview](#communication-overview)
 - [Communication Contract](#communication-contract)
+- [Running the Stack](#running-the-stack)
 - [Postman Collections](#postman-collections)
 - [Open Boundary Decisions](#open-boundary-decisions)
 - [Contribution Workflow](#contribution-workflow)
@@ -1242,6 +1243,142 @@ Delivery rules, uniform across every consumer:
   routing key and failure reason in the headers, and an operator replays it once the cause is fixed;
 - a consumer that receives an `eventVersion` higher than it understands dead-letters the message
   instead of guessing, which is what makes the version field useful rather than decorative.
+
+---
+
+## Running the Stack
+
+The whole ecosystem runs from the images published on Docker Hub. The repository root holds
+[`docker-compose.yml`](docker-compose.yml), which starts all eight services and the stores each one
+owns — 17 containers — without building anything locally.
+
+### Docker Hub images
+
+Every repository is public and every tag is published for `linux/amd64` and `linux/arm64`, so the
+same Compose file runs on Intel, AMD and Apple Silicon machines.
+
+| Service | Image | Tag | Port | Store |
+| ------- | ----- | --- | ---- | ----- |
+| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management) | `1.0.0` | 8081 | PostgreSQL |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi) | `1.1.0` | 8082 | PostgreSQL |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry) | `0.3.0` | 8083 | PostgreSQL |
+| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle) | `1.0.0` | 8084 | PostgreSQL |
+| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map) | `1.1.0` | 8085 | Redis |
+| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification) | `1.0.0` | 8086 | PostgreSQL |
+| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild) | `0.3.0` | 8087 | PostgreSQL |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid) | `1.1.0` | 8088 | PostgreSQL and Redis |
+
+The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:
+version 18 moved the data directory, so the volumes below would silently stop persisting.
+
+### Prerequisites
+
+- Docker with Compose v2 — Docker Desktop, or Docker Engine with the `docker compose` plugin.
+- Host ports `8081` to `8088` free. Only the services publish ports; the databases stay on the
+  Compose network.
+- No local toolchain: nothing is compiled.
+
+### Configure
+
+Copy the example environment and replace every `CHANGE_ME`. The `.env` file is git-ignored, so the
+values never reach the repository, and `docker compose up` refuses to start while a required value
+is missing.
+
+```sh
+cp .env.example .env
+openssl rand -hex 16    # one way to produce each secret
+```
+
+| Variable | Used by | Value |
+| -------- | ------- | ----- |
+| `SERVICE_TOKEN` | User Management, Battle, Map, Monster Raid | Shared credential sent as `X-Service-Token` on internal calls. One value for the whole stack: a caller's token is compared against the callee's |
+| `MOCK_JWT_SECRET` | Tamagotchi, Notification | At least 32 characters. Signs the Lab 1 test tokens these two services accept |
+| `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
+| `MAP_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Monster Raid | Redis passwords |
+| `MAP_AUTH_TOKENS` | Map | Bearer tokens Map accepts, as `<token>=<userId>`, comma-separated. Map refuses to start without one |
+| `RAID_AUTH_TOKENS` | Monster Raid | Bearer tokens Monster Raid accepts, as `<token>=<userId>:<role>\|<role>`, comma-separated. Keep the value in double quotes, because of the `\|` |
+
+Four variables are not secrets. They are commented out in `.env.example`, and each one switches one
+service from mocked neighbours to real calls:
+
+| Variable | Default | Live value |
+| -------- | ------- | ---------- |
+| `BATTLE_DEPENDENCY_MODE` | `mock` | `live` |
+| `GUILD_USER_MANAGEMENT_MODE` | `mock` | `real` |
+| `MAP_RELATIONSHIP_MODE` | `mock` | `http` |
+| `RAID_DEPENDENCY_MODE` | `mock` | `http` |
+
+Every other setting, such as service URLs, database names and ports, is fixed in the Compose file.
+The services reach each other by their Compose names, which are the hostnames the communication
+contract uses.
+
+### Start
+
+```sh
+docker compose up -d
+docker compose ps
+```
+
+The first start pulls about 450 MB of compressed images. The databases become healthy first; the
+services that do not retry their database connection wait for that health check, and restart on
+failure as a fallback. Once the images are pulled, a cold start takes about 15 seconds. Every
+container except User Management and Battle then reports `healthy`: those two images are distroless
+and carry no shell to run a health check with, so they retry their database connection themselves.
+
+To check each service, request its health route:
+
+| Service | Health route |
+| ------- | ------------ |
+| User Management, Tamagotchi, Package Registry, Battle, Notification, Guild | `http://localhost:<port>/health` |
+| Map, Monster Raid | `http://localhost:<port>/healthz` |
+
+```sh
+curl localhost:8081/health    # {"status":"ok"}
+```
+
+### Data and volumes
+
+Every store keeps its data in a named volume, so `docker compose down` followed by `up` loses
+nothing. `docker compose down -v` deletes the volumes and starts everything empty.
+
+| Volume | Store |
+| ------ | ----- |
+| `usermgmt-data` | User Management database |
+| `tamagotchi-data` | Tamagotchi database |
+| `registry-data` | Package Registry database |
+| `battle-data` | Battle database |
+| `map-redis-data` | Map Redis, append-only |
+| `notification-data` | Notification database |
+| `guild-data` | Guild database |
+| `raid-data` | Monster Raid database |
+| `raid-redis-data` | Monster Raid Redis, append-only |
+
+Every service creates its own schema on start-up, so an empty database is all it needs. No seed
+script is needed either: the Postman collections create everything they use. The SQL schemas are
+published in [`db/`](db/) for reference. Do not mount them as initialisation scripts; the
+[`db/README.md`](db/README.md) explains why.
+
+### Test with Postman
+
+The [Postman Collections](#postman-collections) below run against this stack. Give the shared
+environment the values from your `.env`:
+
+| Environment variable | Value from `.env` |
+| -------------------- | ----------------- |
+| `serviceToken` | `SERVICE_TOKEN` |
+| `mockJwtSecret` | `MOCK_JWT_SECRET` |
+| `mapUserToken` | a `<token>` from `MAP_AUTH_TOKENS` |
+| `raidUserToken` | the owner `<token>` from `RAID_AUTH_TOKENS` |
+| `raidAdminToken` | the admin `<token>` from `RAID_AUTH_TOKENS` |
+
+### Mock and live modes
+
+With the defaults, every service answers its cross-service calls from in-process mocks, and all
+eight Postman collections below pass against the stack. Switching a service to live mode makes it
+call its neighbours for real. In Lab 1 this works for Map → User Management, and for
+Monster Raid → Guild and Package Registry. Battle → Tamagotchi, Monster Raid → Tamagotchi and
+Guild → User Management are refused with `401`, because the services do not yet agree on how one
+service authenticates to another. That is tracked in the communication contract review.
 
 ---
 
