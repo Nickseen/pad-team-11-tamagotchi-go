@@ -291,10 +291,14 @@ Management. Token claims:
 }
 ```
 
-Client requests carry `Authorization: Bearer <accessToken>`. Service-to-service calls carry both
-that header and `X-Service-Token`, a short-lived credential identifying the calling service; routes
-under `/api/v1/internal` require it. Every request also carries `X-Correlation-Id: UUID`, which is
-propagated through synchronous calls and copied into any event the request produces.
+Client requests carry `Authorization: Bearer <accessToken>`. Service-to-service calls carry
+`X-Service-Token`, the credential identifying the calling service, and no user token. Routes marked
+`service` below — every route under `/api/v1/internal`, plus the few service routes outside it such
+as `GET /api/v1/users` and `GET /api/v1/combat-types/advantage` — are authorised by that header
+alone: the callee compares it against its own configured `SERVICE_TOKEN` (one value for the whole
+stack), never merely checks that it is present, and answers a missing or wrong value with
+`401 UNAUTHORIZED`. Every request also carries `X-Correlation-Id: UUID`, which is propagated through
+synchronous calls and copied into any event the request produces.
 
 ### Error envelope
 
@@ -738,6 +742,11 @@ so it owns the link as well and User Management reads it.
 | `GET /api/v1/battles` | user | query `userId` `UUID`, `status`, `limit`, `cursor` | `200` → `[Battle]` |
 | `GET /api/v1/battles/{battleId}/turns` | user | query `limit`, `cursor` | `200` → `[Turn]` |
 
+**Boosts are planned.** No service owns boosts yet, so in Lab 1 `boosts` must be an empty array and
+`use_boost` cannot be played: a non-empty `boosts`, `action: "use_boost"` or a non-null `boostId`
+is refused with `422 BOOSTS_NOT_SUPPORTED`. The fields stay in every payload, so enabling boosts
+once an owner and data model are agreed changes no shape; `BOOST_NOT_OWNED` is reserved for that.
+
 ##### Turns
 
 | Method and path | Auth | Request | Response |
@@ -767,7 +776,7 @@ so it owns the link as well and User Management reads it.
 ```
 
 A repeat of the same `commandId` returns the identical `TurnResult` with `200 OK` and applies no
-further damage. Errors: `403 NOT_YOUR_TURN`, `409 BATTLE_NOT_ACTIVE`, `422 BOOST_NOT_OWNED`.
+further damage. Errors: `403 NOT_YOUR_TURN`, `409 BATTLE_NOT_ACTIVE`, `422 BOOSTS_NOT_SUPPORTED`.
 
 ##### Synchronous dependencies
 
@@ -777,9 +786,19 @@ match, so a mid-battle stat edit cannot change the arithmetic retroactively:
 | Call | Target | Purpose |
 | ---- | ------ | ------- |
 | `GET /api/v1/internal/tamagotchis?ids=…` | Tamagotchi | Levels, combat types and current stat documents for all four creatures |
+| `GET /api/v1/packages/{packageId}` | Package Registry | Its `latestVersion` is the version pinned at acceptance |
 | `GET /api/v1/internal/packages/{packageId}/versions/{version}/stat-definitions` | Package Registry | How to read those stats — maxima and combat-bonus thresholds |
 | `GET /api/v1/combat-types/advantage` | Tamagotchi | The type multiplier for each attacking pair |
 | `GET /api/v1/internal/relationships` | User Management | Rejects a challenge between users who are neither friends nor within proximity range |
+
+Every call carries `X-Service-Token` and no user token. The current version is read from the
+Package resource because the versions collection is listed oldest first; a dedicated internal
+current-version route on Package Registry will replace it. Verifying that the primary is the
+caller's *selected* primary, and that the caller holds the secondary, needs internal Tamagotchi
+routes that do not exist yet; until then Battle checks only that the caller owns the primary.
+
+In Lab 1 Battle stores everything in PostgreSQL. The Redis match cache and RabbitMQ publishing are
+planned: events are written to the service log at their real publication points.
 
 Battle writes to no other service's store. On completion it publishes one `battle.finished` event
 carrying the full outcome; Tamagotchi transfers the loser's primary creature, User Management
@@ -1259,10 +1278,10 @@ same Compose file runs on Intel, AMD and Apple Silicon machines.
 
 | Service | Image | Tag | Port | Store |
 | ------- | ----- | --- | ---- | ----- |
-| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management) | `1.0.0` | 8081 | PostgreSQL |
+| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management) | `1.1.0` | 8081 | PostgreSQL |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi) | `1.1.0` | 8082 | PostgreSQL |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry) | `0.3.0` | 8083 | PostgreSQL |
-| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle) | `1.0.0` | 8084 | PostgreSQL |
+| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle) | `1.1.0` | 8084 | PostgreSQL |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map) | `1.1.0` | 8085 | Redis |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification) | `1.0.0` | 8086 | PostgreSQL |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild) | `0.3.0` | 8087 | PostgreSQL |
@@ -1376,9 +1395,11 @@ environment the values from your `.env`:
 With the defaults, every service answers its cross-service calls from in-process mocks, and all
 eight Postman collections below pass against the stack. Switching a service to live mode makes it
 call its neighbours for real. In Lab 1 this works for Map → User Management, and for
-Monster Raid → Guild and Package Registry. Battle → Tamagotchi, Monster Raid → Tamagotchi and
-Guild → User Management are refused with `401`, because the services do not yet agree on how one
-service authenticates to another. That is tracked in the communication contract review.
+Monster Raid → Guild and Package Registry. Battle → Tamagotchi and Monster Raid → Tamagotchi are
+refused with `401`, because Tamagotchi's service routes still demand a user token instead of
+accepting `X-Service-Token` alone. Guild → User Management is refused because Guild calls the
+user route `GET /api/v1/users/{userId}`; the service route `GET /api/v1/users?ids=…` answers it with
+`X-Service-Token` alone.
 
 ---
 
