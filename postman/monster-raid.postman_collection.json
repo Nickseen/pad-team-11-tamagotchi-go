@@ -91,7 +91,7 @@
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));",
                   "const json = pm.response.json();",
                   "pm.test('Active raid is created', () => pm.expect(json.status).to.eql('active'));",
-                  "pm.environment.set('monsterRaidId', json.raidId);"
+                  "pm.collectionVariables.set('monsterRaidId', json.raidId);"
                 ]
               }
             }
@@ -129,7 +129,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Correct raid is returned', () => pm.expect(pm.response.json().raidId).to.eql(pm.environment.get('monsterRaidId')));"
+                  "pm.test('Correct raid is returned', () => pm.expect(pm.response.json().raidId).to.eql(pm.collectionVariables.get('monsterRaidId')));"
                 ]
               }
             }
@@ -232,7 +232,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));",
-                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.environment.get('monsterRaidPrimaryTamagotchiId')));"
+                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.collectionVariables.get('monsterRaidPrimaryTamagotchiId')));"
                 ]
               }
             }
@@ -329,7 +329,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('monsterRaidCommandId', pm.variables.replaceIn('{{$guid}}'));"
+                  "pm.collectionVariables.set('monsterRaidCommandId', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
             },
@@ -341,7 +341,7 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
                   "const json = pm.response.json();",
                   "pm.test('Damage is applied', () => pm.expect(json.damageDealt).to.be.above(0));",
-                  "pm.environment.set('monsterRaidAttackSnapshot', JSON.stringify(json));"
+                  "pm.collectionVariables.set('monsterRaidAttackSnapshot', JSON.stringify(json));"
                 ]
               }
             }
@@ -394,7 +394,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const original = JSON.parse(pm.environment.get('monsterRaidAttackSnapshot'));",
+                  "const original = JSON.parse(pm.collectionVariables.get('monsterRaidAttackSnapshot'));",
                   "const replay = pm.response.json();",
                   "pm.test('Idempotent response is unchanged', () => { pm.expect(replay.commandId).to.eql(original.commandId); pm.expect(replay.monsterHpRemaining).to.eql(original.monsterHpRemaining); pm.expect(replay.yourTotalDamage).to.eql(original.yourTotalDamage); pm.expect(replay.attackedAt).to.eql(original.attackedAt); });"
                 ]
@@ -638,7 +638,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('monsterRaidCommandId', pm.variables.replaceIn('{{$guid}}'));"
+                  "pm.collectionVariables.set('monsterRaidCommandId', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
             },
@@ -815,6 +815,36 @@
           ]
         }
       ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "monsterRaidGuildId",
+      "value": "2d7c4e91-0a3b-4f8c-91de-6b2a0c5f7e33"
+    },
+    {
+      "key": "monsterRaidDefinitionId",
+      "value": "e5a91c37-8b02-4d6f-a1c9-70f3b8d2e514"
+    },
+    {
+      "key": "monsterRaidPrimaryTamagotchiId",
+      "value": "4a1b2c3d-1111-4111-8111-111111111111"
+    },
+    {
+      "key": "monsterRaidExampleId",
+      "value": "b81f0a63-77de-4f2c-9a10-5c2e7d3b8410"
+    },
+    {
+      "key": "monsterRaidId",
+      "value": ""
+    },
+    {
+      "key": "monsterRaidCommandId",
+      "value": ""
+    },
+    {
+      "key": "monsterRaidAttackSnapshot",
+      "value": ""
     }
   ]
 }

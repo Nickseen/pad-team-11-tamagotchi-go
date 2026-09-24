@@ -88,7 +88,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('mapRecordedAt', new Date().toISOString());"
+                  "pm.collectionVariables.set('mapRecordedAt', new Date().toISOString());"
                 ]
               }
             },
@@ -200,7 +200,7 @@
               },
               {
                 "key": "X-Service-Token",
-                "value": "{{mapServiceToken}}",
+                "value": "{{serviceToken}}",
                 "type": "text"
               }
             ],
@@ -226,7 +226,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.environment.get('mapUserId')));"
+                  "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.collectionVariables.get('mapUserId')));"
                 ]
               }
             }
@@ -365,7 +365,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('mapRecordedAt', new Date().toISOString());"
+                  "pm.collectionVariables.set('mapRecordedAt', new Date().toISOString());"
                 ]
               }
             },
@@ -426,7 +426,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('mapExpiredRecordedAt', new Date(Date.now() - 10 * 60 * 1000).toISOString());"
+                  "pm.collectionVariables.set('mapExpiredRecordedAt', new Date(Date.now() - 10 * 60 * 1000).toISOString());"
                 ]
               }
             },
@@ -579,6 +579,36 @@
           ]
         }
       ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "mapUserId",
+      "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11"
+    },
+    {
+      "key": "mapLatitude",
+      "value": "47.0245"
+    },
+    {
+      "key": "mapLongitude",
+      "value": "28.8323"
+    },
+    {
+      "key": "mapAccuracyMeters",
+      "value": "8.5"
+    },
+    {
+      "key": "mapRadiusMeters",
+      "value": "500"
+    },
+    {
+      "key": "mapRecordedAt",
+      "value": ""
+    },
+    {
+      "key": "mapExpiredRecordedAt",
+      "value": ""
     }
   ]
 }
