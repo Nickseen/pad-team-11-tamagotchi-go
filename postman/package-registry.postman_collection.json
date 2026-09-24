@@ -1,16 +1,54 @@
 {
   "info": {
     "name": "Package Registry Service",
-    "description": "CRUD and lifecycle requests for the Package Registry service (packages, versions, moderators, registrations, monsters, raid definitions). Run folders top-to-bottom with the Collection Runner — later requests reuse ids captured from earlier responses via collection variables.",
+    "description": "CRUD and lifecycle requests for the Package Registry service (packages, versions, moderators, registrations, monsters, raid definitions). Run folders top-to-bottom with the Collection Runner \u2014 later requests reuse ids captured from earlier responses via collection variables.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "moderatorUserId", "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11" },
-    { "key": "otherUserId", "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22" },
-    { "key": "version", "value": "1.0.0" },
-    { "key": "registryPackageId", "value": "" },
-    { "key": "monsterId", "value": "" },
-    { "key": "raidDefinitionId", "value": "" }
+    {
+      "key": "moderatorUserId",
+      "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11"
+    },
+    {
+      "key": "otherUserId",
+      "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22"
+    },
+    {
+      "key": "adminUserId",
+      "value": "0b5f2a91-6d3c-4e8a-b0d2-9a1f7c4e6b33"
+    },
+    {
+      "key": "devJwksUrl",
+      "value": "http://localhost:9999"
+    },
+    {
+      "key": "moderatorToken",
+      "value": ""
+    },
+    {
+      "key": "otherUserToken",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "version",
+      "value": "1.0.0"
+    },
+    {
+      "key": "registryPackageId",
+      "value": ""
+    },
+    {
+      "key": "monsterId",
+      "value": ""
+    },
+    {
+      "key": "raidDefinitionId",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -21,7 +59,15 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/health", "host": ["{{packageRegistryUrl}}"], "path": ["health"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/health",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
           },
           "response": []
         }
@@ -49,15 +95,37 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{moderatorUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"slug\": \"dragon-pack-{{$timestamp}}\",\n  \"name\": \"Dragon Pack\",\n  \"description\": \"A Tamagotchi package with fire creatures\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages"
+              ]
+            }
           },
           "response": []
         },
@@ -68,8 +136,20 @@
             "header": [],
             "url": {
               "raw": "{{packageRegistryUrl}}/api/v1/packages?limit=20",
-              "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages"],
-              "query": [{ "key": "limit", "value": "20" }]
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
             }
           },
           "response": []
@@ -79,7 +159,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -88,15 +179,38 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-User-Id", "value": "{{moderatorUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"description\": \"Updated description\",\n  \"status\": \"published\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -116,15 +230,39 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{moderatorUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"version\": \"{{version}}\",\n  \"statDefinitions\": [\n    {\n      \"key\": \"hunger\",\n      \"label\": \"Hunger\",\n      \"minValue\": 0,\n      \"maxValue\": 100,\n      \"higherIsBetter\": false,\n      \"combatBonus\": { \"threshold\": 80, \"comparison\": \"gte\", \"multiplier\": 1.2 }\n    }\n  ],\n  \"growthRules\": { \"hungerDecayPerHour\": 5 }\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "versions"
+              ]
+            }
           },
           "response": []
         },
@@ -133,7 +271,19 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "versions"
+              ]
+            }
           },
           "response": []
         },
@@ -142,7 +292,20 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions/{{version}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions", "{{version}}"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions/{{version}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "versions",
+                "{{version}}"
+              ]
+            }
           },
           "response": []
         },
@@ -150,10 +313,49 @@
           "name": "Internal - get stat definitions",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions",
-              "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "internal", "packages", "{{registryPackageId}}", "versions", "{{version}}", "stat-definitions"]
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "packages",
+                "{{registryPackageId}}",
+                "versions",
+                "{{version}}",
+                "stat-definitions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - get current version",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{moderatorToken}}", "type": "text" },
+              { "key": "X-Service-Token", "value": "{{serviceToken}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current",
+              "host": ["{{packageRegistryUrl}}"],
+              "path": ["api", "v1", "internal", "packages", "{{registryPackageId}}", "versions", "current"]
             }
           },
           "response": []
@@ -168,15 +370,39 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Roles", "value": "admin", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "moderators"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "moderators"
+              ]
+            }
           },
           "response": []
         },
@@ -184,8 +410,27 @@
           "name": "Revoke moderator (admin)",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "X-Roles", "value": "admin", "type": "text" }],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators/{{otherUserId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "moderators", "{{otherUserId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators/{{otherUserId}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "moderators",
+                "{{otherUserId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -193,13 +438,35 @@
           "name": "Register user with package",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "registrations"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "registrations"
+              ]
+            }
           },
           "response": []
         },
@@ -208,7 +475,20 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations/{{otherUserId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "registrations", "{{otherUserId}}"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations/{{otherUserId}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "registrations",
+                "{{otherUserId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -217,7 +497,19 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/users/{{otherUserId}}/packages", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "users", "{{otherUserId}}", "packages"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/users/{{otherUserId}}/packages",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{otherUserId}}",
+                "packages"
+              ]
+            }
           },
           "response": []
         }
@@ -244,15 +536,37 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Roles", "value": "admin", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Ash Wyrm\",\n  \"description\": \"A fire-breathing wyrm\",\n  \"spriteRefs\": [\"ash-wyrm-idle.png\"],\n  \"maxHp\": 50000,\n  \"combatType\": \"flame\",\n  \"weaknesses\": [\"water\"],\n  \"resistances\": [\"earth\"],\n  \"specialProperties\": {}\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/monsters",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "monsters"
+              ]
+            }
           },
           "response": []
         },
@@ -261,7 +575,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/monsters",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "monsters"
+              ]
+            }
           },
           "response": []
         },
@@ -270,7 +594,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "monsters",
+                "{{monsterId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -279,15 +614,38 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-Roles", "value": "admin", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"maxHp\": 60000\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "monsters",
+                "{{monsterId}}"
+              ]
+            }
           },
           "response": []
         }
@@ -314,15 +672,37 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Roles", "value": "admin", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"monsterId\": \"{{monsterId}}\",\n  \"durationSeconds\": 1800,\n  \"maxParticipants\": 20,\n  \"minGuildLevel\": 1,\n  \"rewardConfig\": { \"globalCurrency\": 500, \"xp\": 300, \"distribution\": \"damage_weighted\" },\n  \"scheduledAt\": null\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raid-definitions"
+              ]
+            }
           },
           "response": []
         },
@@ -331,7 +711,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raid-definitions"
+              ]
+            }
           },
           "response": []
         },
@@ -339,8 +729,31 @@
           "name": "Internal - get raid definition (with monster)",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/internal/raid-definitions/{{raidDefinitionId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "internal", "raid-definitions", "{{raidDefinitionId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/internal/raid-definitions/{{raidDefinitionId}}",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "raid-definitions",
+                "{{raidDefinitionId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -348,8 +761,26 @@
           "name": "Activate raid definition (admin)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "X-Roles", "value": "admin", "type": "text" }],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/activate", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "activate"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/activate",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raid-definitions",
+                "{{raidDefinitionId}}",
+                "activate"
+              ]
+            }
           },
           "response": []
         },
@@ -358,15 +789,39 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Roles", "value": "admin", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"Testing cancellation flow\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/cancel", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "cancel"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/cancel",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raid-definitions",
+                "{{raidDefinitionId}}",
+                "cancel"
+              ]
+            }
           },
           "response": []
         }
@@ -376,22 +831,50 @@
       "name": "Error Scenarios",
       "item": [
         {
-          "name": "401 - create package without X-User-Id",
+          "name": "401 - create package without a token",
           "event": [
             {
               "listen": "test",
-              "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] }
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "// NOTE: this service's code is UNAUTHENTICATED; tamagotchi/notification",
+                  "// use UNAUTHORIZED for the same case — flagged for the Stage 2 review.",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHENTICATED'));"
+                ]
+              }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"slug\": \"no-auth-pack\",\n  \"name\": \"No Auth\",\n  \"description\": \"Missing auth header\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages"
+              ]
+            }
           },
           "response": []
         },
@@ -400,13 +883,29 @@
           "event": [
             {
               "listen": "test",
-              "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] }
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
             }
           ],
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/00000000-0000-4000-8000-000000000000", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "00000000-0000-4000-8000-000000000000"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
           },
           "response": []
         },
@@ -415,25 +914,99 @@
           "event": [
             {
               "listen": "test",
-              "script": { "type": "text/javascript", "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] }
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
             }
           ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{otherUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{otherUserToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"version\": \"9.9.9\",\n  \"statDefinitions\": [],\n  \"growthRules\": {}\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions"] }
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions",
+              "host": [
+                "{{packageRegistryUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "packages",
+                "{{registryPackageId}}",
+                "versions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route without X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{moderatorToken}}", "type": "text" }],
+            "url": {
+              "raw": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current",
+              "host": ["{{packageRegistryUrl}}"],
+              "path": ["api", "v1", "internal", "packages", "{{registryPackageId}}", "versions", "current"]
+            }
           },
           "response": []
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Mints throwaway RS256 tokens from scripts/dev_jwks_server.py if no",
+          "// real ones were supplied via the environment (e.g. against a live",
+          "// User Management). Requires: python scripts/dev_jwks_server.py",
+          "const base = pm.collectionVariables.get('devJwksUrl');",
+          "function mintIfMissing(varName, sub, roles) {",
+          "  if (pm.collectionVariables.get(varName)) return;",
+          "  pm.sendRequest(`${base}/mint?sub=${sub}&roles=${roles}`, (err, res) => {",
+          "    if (!err && res.code === 200) pm.collectionVariables.set(varName, res.json().token);",
+          "  });",
+          "}",
+          "mintIfMissing('moderatorToken', pm.collectionVariables.get('moderatorUserId'), 'moderator');",
+          "mintIfMissing('otherUserToken', pm.collectionVariables.get('otherUserId'), 'moderator');",
+          "mintIfMissing('adminToken', pm.collectionVariables.get('adminUserId'), 'admin');"
+        ]
+      }
     }
   ]
 }

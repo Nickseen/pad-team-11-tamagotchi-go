@@ -1,16 +1,50 @@
 {
   "info": {
     "name": "Guild Service",
-    "description": "CRUD and lifecycle requests for the Guild service (guilds, membership, invitations). Run folders top-to-bottom with the Collection Runner — later requests reuse ids captured from earlier responses via collection variables.",
+    "description": "CRUD and lifecycle requests for the Guild service (guilds, membership, invitations). Run folders top-to-bottom with the Collection Runner \u2014 later requests reuse ids captured from earlier responses via collection variables.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "ownerUserId", "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11" },
-    { "key": "inviteeUserId", "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22" },
-    { "key": "officerUserId", "value": "4a1b2c3d-5e6f-4a1b-8c9d-0e1f2a3b4c5d" },
-    { "key": "guildId", "value": "" },
-    { "key": "invitationId", "value": "" },
-    { "key": "declineInvitationId", "value": "" }
+    {
+      "key": "ownerUserId",
+      "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11"
+    },
+    {
+      "key": "inviteeUserId",
+      "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22"
+    },
+    {
+      "key": "officerUserId",
+      "value": "4a1b2c3d-5e6f-4a1b-8c9d-0e1f2a3b4c5d"
+    },
+    {
+      "key": "devJwksUrl",
+      "value": "http://localhost:9999"
+    },
+    {
+      "key": "ownerToken",
+      "value": ""
+    },
+    {
+      "key": "inviteeToken",
+      "value": ""
+    },
+    {
+      "key": "officerToken",
+      "value": ""
+    },
+    {
+      "key": "guildId",
+      "value": ""
+    },
+    {
+      "key": "invitationId",
+      "value": ""
+    },
+    {
+      "key": "declineInvitationId",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -21,7 +55,15 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{guildUrl}}/health", "host": ["{{guildUrl}}"], "path": ["health"] }
+            "url": {
+              "raw": "{{guildUrl}}/health",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
           },
           "response": []
         }
@@ -49,15 +91,37 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Ember Wardens\",\n  \"tag\": \"EMBR\",\n  \"description\": \"A guild for flame-type trainers\",\n  \"emblemRef\": null\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds"
+              ]
+            }
           },
           "response": []
         },
@@ -68,8 +132,20 @@
             "header": [],
             "url": {
               "raw": "{{guildUrl}}/api/v1/guilds?query=Ember",
-              "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds"],
-              "query": [{ "key": "query", "value": "Ember" }]
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "Ember"
+                }
+              ]
             }
           },
           "response": []
@@ -79,7 +155,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -88,15 +175,38 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"description\": \"Updated guild description\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}"
+              ]
+            }
           },
           "response": []
         }
@@ -123,15 +233,39 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"userId\": \"{{inviteeUserId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "invitations"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "invitations"
+              ]
+            }
           },
           "response": []
         },
@@ -139,8 +273,26 @@
           "name": "List guild invitations (owner/officer)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" }],
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "invitations"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "invitations"
+              ]
+            }
           },
           "response": []
         },
@@ -148,8 +300,26 @@
           "name": "List my invitations (invitee)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-User-Id", "value": "{{inviteeUserId}}", "type": "text" }],
-            "url": { "raw": "{{guildUrl}}/api/v1/users/me/invitations", "host": ["{{guildUrl}}"], "path": ["api", "v1", "users", "me", "invitations"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{inviteeToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/users/me/invitations",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "invitations"
+              ]
+            }
           },
           "response": []
         },
@@ -157,8 +327,26 @@
           "name": "Accept invitation (invitee)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "X-User-Id", "value": "{{inviteeUserId}}", "type": "text" }],
-            "url": { "raw": "{{guildUrl}}/api/v1/invitations/{{invitationId}}/accept", "host": ["{{guildUrl}}"], "path": ["api", "v1", "invitations", "{{invitationId}}", "accept"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{inviteeToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/invitations/{{invitationId}}/accept",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invitations",
+                "{{invitationId}}",
+                "accept"
+              ]
+            }
           },
           "response": []
         },
@@ -179,15 +367,39 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"userId\": \"{{officerUserId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "invitations"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "invitations"
+              ]
+            }
           },
           "response": []
         },
@@ -195,8 +407,26 @@
           "name": "Decline invitation",
           "request": {
             "method": "POST",
-            "header": [{ "key": "X-User-Id", "value": "{{officerUserId}}", "type": "text" }],
-            "url": { "raw": "{{guildUrl}}/api/v1/invitations/{{declineInvitationId}}/decline", "host": ["{{guildUrl}}"], "path": ["api", "v1", "invitations", "{{declineInvitationId}}", "decline"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{officerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/invitations/{{declineInvitationId}}/decline",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invitations",
+                "{{declineInvitationId}}",
+                "decline"
+              ]
+            }
           },
           "response": []
         }
@@ -210,7 +440,19 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "members"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "members"
+              ]
+            }
           },
           "response": []
         },
@@ -219,15 +461,40 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" },
-              { "key": "Content-Type", "value": "application/json", "type": "text" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"role\": \"officer\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeUserId}}", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "members", "{{inviteeUserId}}"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeUserId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "members",
+                "{{inviteeUserId}}"
+              ]
+            }
           },
           "response": []
         },
@@ -235,8 +502,49 @@
           "name": "Internal - membership check",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": { "raw": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members/{{inviteeUserId}}", "host": ["{{guildUrl}}"], "path": ["api", "v1", "internal", "guilds", "{{guildId}}", "members", "{{inviteeUserId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members/{{inviteeUserId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "guilds",
+                "{{guildId}}",
+                "members",
+                "{{inviteeUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - list members (bulk, for Notification)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ownerToken}}", "type": "text" },
+              { "key": "X-Service-Token", "value": "{{serviceToken}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members",
+              "host": ["{{guildUrl}}"],
+              "path": ["api", "v1", "internal", "guilds", "{{guildId}}", "members"]
+            }
           },
           "response": []
         },
@@ -244,8 +552,27 @@
           "name": "Remove member (owner/officer)",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" }],
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeUserId}}", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}", "members", "{{inviteeUserId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeUserId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "members",
+                "{{inviteeUserId}}"
+              ]
+            }
           },
           "response": []
         }
@@ -255,22 +582,50 @@
       "name": "Error Scenarios",
       "item": [
         {
-          "name": "401 - create guild without X-User-Id",
+          "name": "401 - create guild without a token",
           "event": [
             {
               "listen": "test",
-              "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] }
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "// NOTE: this service's code is UNAUTHENTICATED; tamagotchi/notification",
+                  "// use UNAUTHORIZED for the same case — flagged for the Stage 2 review.",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHENTICATED'));"
+                ]
+              }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"No Auth Guild\",\n  \"tag\": \"NOAU\",\n  \"description\": \"Missing auth header\",\n  \"emblemRef\": null\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds"
+              ]
+            }
           },
           "response": []
         },
@@ -279,13 +634,29 @@
           "event": [
             {
               "listen": "test",
-              "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] }
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
             }
           ],
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/00000000-0000-4000-8000-000000000000", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "00000000-0000-4000-8000-000000000000"] }
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
           },
           "response": []
         },
@@ -294,13 +665,54 @@
           "event": [
             {
               "listen": "test",
-              "script": { "type": "text/javascript", "exec": ["pm.test('403 Forbidden', () => pm.response.to.have.status(403));"] }
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
             }
           ],
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "X-User-Id", "value": "{{officerUserId}}", "type": "text" }],
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{officerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route without X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ownerToken}}", "type": "text" }],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members",
+              "host": ["{{guildUrl}}"],
+              "path": ["api", "v1", "internal", "guilds", "{{guildId}}", "members"]
+            }
           },
           "response": []
         }
@@ -314,17 +726,62 @@
           "event": [
             {
               "listen": "test",
-              "script": { "type": "text/javascript", "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"] }
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
             }
           ],
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "X-User-Id", "value": "{{ownerUserId}}", "type": "text" }],
-            "url": { "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}", "host": ["{{guildUrl}}"], "path": ["api", "v1", "guilds", "{{guildId}}"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds/{{guildId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}"
+              ]
+            }
           },
           "response": []
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Mints throwaway RS256 tokens from scripts/dev_jwks_server.py if no",
+          "// real ones were supplied via the environment (e.g. against a live",
+          "// User Management). Requires: python scripts/dev_jwks_server.py",
+          "const base = pm.collectionVariables.get('devJwksUrl');",
+          "function mintIfMissing(varName, sub) {",
+          "  if (pm.collectionVariables.get(varName)) return;",
+          "  pm.sendRequest(`${base}/mint?sub=${sub}`, (err, res) => {",
+          "    if (!err && res.code === 200) pm.collectionVariables.set(varName, res.json().token);",
+          "  });",
+          "}",
+          "mintIfMissing('ownerToken', pm.collectionVariables.get('ownerUserId'));",
+          "mintIfMissing('inviteeToken', pm.collectionVariables.get('inviteeUserId'));",
+          "mintIfMissing('officerToken', pm.collectionVariables.get('officerUserId'));"
+        ]
+      }
     }
   ]
 }
