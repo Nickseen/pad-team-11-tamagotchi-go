@@ -15,9 +15,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{raidBaseUrl}}/healthz",
+              "raw": "{{monsterRaidUrl}}/healthz",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "healthz"
@@ -51,7 +51,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               },
               {
@@ -62,7 +62,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"guildId\": \"{{guildId}}\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "raw": "{\n  \"guildId\": \"{{monsterRaidGuildId}}\",\n  \"raidDefinitionId\": \"{{monsterRaidDefinitionId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -70,9 +70,9 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
@@ -91,7 +91,7 @@
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));",
                   "const json = pm.response.json();",
                   "pm.test('Active raid is created', () => pm.expect(json.status).to.eql('active'));",
-                  "pm.environment.set('raidId', json.raidId);"
+                  "pm.environment.set('monsterRaidId', json.raidId);"
                 ]
               }
             }
@@ -104,20 +104,20 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}"
+                "{{monsterRaidId}}"
               ]
             },
             "description": "Expected: 200 for the created raid."
@@ -129,7 +129,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Correct raid is returned', () => pm.expect(pm.response.json().raidId).to.eql(pm.environment.get('raidId')));"
+                  "pm.test('Correct raid is returned', () => pm.expect(pm.response.json().raidId).to.eql(pm.environment.get('monsterRaidId')));"
                 ]
               }
             }
@@ -142,20 +142,20 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/guilds/{{guildId}}/raids?status=active&limit=20",
+              "raw": "{{monsterRaidUrl}}/api/v1/guilds/{{monsterRaidGuildId}}/raids?status=active&limit=20",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "guilds",
-                "{{guildId}}",
+                "{{monsterRaidGuildId}}",
                 "raids"
               ],
               "query": [
@@ -192,7 +192,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               },
               {
@@ -203,7 +203,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryTamagotchiId}}\"\n}",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{monsterRaidPrimaryTamagotchiId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -211,15 +211,15 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/participants",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "participants"
               ]
             },
@@ -232,7 +232,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));",
-                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.environment.get('primaryTamagotchiId')));"
+                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.environment.get('monsterRaidPrimaryTamagotchiId')));"
                 ]
               }
             }
@@ -245,20 +245,20 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants?limit=20",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/participants?limit=20",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "participants"
               ],
               "query": [
@@ -290,7 +290,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               },
               {
@@ -301,7 +301,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "raw": "{\n  \"commandId\": \"{{monsterRaidCommandId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -309,15 +309,15 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/attacks",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "attacks"
               ]
             },
@@ -329,7 +329,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                  "pm.environment.set('monsterRaidCommandId', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
             },
@@ -341,7 +341,7 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
                   "const json = pm.response.json();",
                   "pm.test('Damage is applied', () => pm.expect(json.damageDealt).to.be.above(0));",
-                  "pm.environment.set('attackSnapshot', JSON.stringify(json));"
+                  "pm.environment.set('monsterRaidAttackSnapshot', JSON.stringify(json));"
                 ]
               }
             }
@@ -354,7 +354,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               },
               {
@@ -365,7 +365,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "raw": "{\n  \"commandId\": \"{{monsterRaidCommandId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -373,15 +373,15 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/attacks",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "attacks"
               ]
             },
@@ -394,7 +394,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const original = JSON.parse(pm.environment.get('attackSnapshot'));",
+                  "const original = JSON.parse(pm.environment.get('monsterRaidAttackSnapshot'));",
                   "const replay = pm.response.json();",
                   "pm.test('Idempotent response is unchanged', () => { pm.expect(replay.commandId).to.eql(original.commandId); pm.expect(replay.monsterHpRemaining).to.eql(original.monsterHpRemaining); pm.expect(replay.yourTotalDamage).to.eql(original.yourTotalDamage); pm.expect(replay.attackedAt).to.eql(original.attackedAt); });"
                 ]
@@ -409,20 +409,20 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/leaderboard?limit=20",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/leaderboard?limit=20",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "leaderboard"
               ],
               "query": [
@@ -454,20 +454,20 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants/me",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/participants/me",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "participants",
                 "me"
               ]
@@ -493,7 +493,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               },
               {
@@ -504,7 +504,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryTamagotchiId}}\"\n}",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{monsterRaidPrimaryTamagotchiId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -512,15 +512,15 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/participants",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "participants"
               ]
             },
@@ -546,7 +546,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{adminToken}}",
+                "value": "Bearer {{raidAdminToken}}",
                 "type": "text"
               },
               {
@@ -565,15 +565,15 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/cancel",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/cancel",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "cancel"
               ]
             },
@@ -599,7 +599,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               },
               {
@@ -610,7 +610,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "raw": "{\n  \"commandId\": \"{{monsterRaidCommandId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -618,15 +618,15 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidId}}/attacks",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{raidId}}",
+                "{{monsterRaidId}}",
                 "attacks"
               ]
             },
@@ -638,7 +638,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                  "pm.environment.set('monsterRaidCommandId', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
             },
@@ -674,7 +674,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"guildId\": \"{{guildId}}\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "raw": "{\n  \"guildId\": \"{{monsterRaidGuildId}}\",\n  \"raidDefinitionId\": \"{{monsterRaidDefinitionId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -682,9 +682,9 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
@@ -715,7 +715,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{raidUserToken}}",
                 "type": "text"
               },
               {
@@ -726,7 +726,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"guildId\": \"not-a-uuid\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "raw": "{\n  \"guildId\": \"not-a-uuid\",\n  \"raidDefinitionId\": \"{{monsterRaidDefinitionId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -734,9 +734,9 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
@@ -767,7 +767,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{adminToken}}",
+                "value": "Bearer {{raidAdminToken}}",
                 "type": "text"
               },
               {
@@ -786,15 +786,15 @@
               }
             },
             "url": {
-              "raw": "{{raidBaseUrl}}/api/v1/raids/{{exampleRaidId}}/cancel",
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{monsterRaidExampleId}}/cancel",
               "host": [
-                "{{raidBaseUrl}}"
+                "{{monsterRaidUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "raids",
-                "{{exampleRaidId}}",
+                "{{monsterRaidExampleId}}",
                 "cancel"
               ]
             },

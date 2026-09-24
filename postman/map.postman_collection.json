@@ -15,9 +15,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{mapBaseUrl}}/healthz",
+              "raw": "{{mapUrl}}/healthz",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "healthz"
@@ -51,7 +51,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               },
               {
@@ -62,7 +62,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"accuracyMeters\": {{accuracyMeters}},\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": {{mapLatitude}},\n  \"longitude\": {{mapLongitude}},\n  \"accuracyMeters\": {{mapAccuracyMeters}},\n  \"recordedAt\": \"{{mapRecordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -70,9 +70,9 @@
               }
             },
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "raw": "{{mapUrl}}/api/v1/locations",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -88,7 +88,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('recordedAt', new Date().toISOString());"
+                  "pm.environment.set('mapRecordedAt', new Date().toISOString());"
                 ]
               }
             },
@@ -113,14 +113,14 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
+              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{mapRadiusMeters}}",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -131,7 +131,7 @@
               "query": [
                 {
                   "key": "radiusMeters",
-                  "value": "{{radiusMeters}}"
+                  "value": "{{mapRadiusMeters}}"
                 }
               ]
             },
@@ -157,14 +157,14 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/map/visible",
+              "raw": "{{mapUrl}}/api/v1/map/visible",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -195,26 +195,26 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               },
               {
                 "key": "X-Service-Token",
-                "value": "{{serviceToken}}",
+                "value": "{{mapServiceToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/internal/positions/{{userId}}",
+              "raw": "{{mapUrl}}/api/v1/internal/positions/{{mapUserId}}",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "internal",
                 "positions",
-                "{{userId}}"
+                "{{mapUserId}}"
               ]
             },
             "description": "Expected: 200. Requires bearer and service tokens."
@@ -226,7 +226,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.environment.get('userId')));"
+                  "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.environment.get('mapUserId')));"
                 ]
               }
             }
@@ -239,14 +239,14 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/locations/me",
+              "raw": "{{mapUrl}}/api/v1/locations/me",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -287,7 +287,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{mapRecordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -295,9 +295,9 @@
               }
             },
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "raw": "{{mapUrl}}/api/v1/locations",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -328,7 +328,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               },
               {
@@ -339,7 +339,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": 91,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": 91,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{mapRecordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -347,9 +347,9 @@
               }
             },
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "raw": "{{mapUrl}}/api/v1/locations",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -365,7 +365,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('recordedAt', new Date().toISOString());"
+                  "pm.environment.set('mapRecordedAt', new Date().toISOString());"
                 ]
               }
             },
@@ -389,7 +389,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               },
               {
@@ -400,7 +400,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{expiredRecordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{mapExpiredRecordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -408,9 +408,9 @@
               }
             },
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "raw": "{{mapUrl}}/api/v1/locations",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -426,7 +426,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('expiredRecordedAt', new Date(Date.now() - 10 * 60 * 1000).toISOString());"
+                  "pm.environment.set('mapExpiredRecordedAt', new Date(Date.now() - 10 * 60 * 1000).toISOString());"
                 ]
               }
             },
@@ -450,14 +450,14 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/map/nearby?radiusMeters=5001",
+              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters=5001",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -495,7 +495,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               },
               {
@@ -505,16 +505,16 @@
               }
             ],
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/internal/positions/{{userId}}",
+              "raw": "{{mapUrl}}/api/v1/internal/positions/{{mapUserId}}",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
                 "internal",
                 "positions",
-                "{{userId}}"
+                "{{mapUserId}}"
               ]
             },
             "description": "Expected: 401 INVALID_SERVICE_TOKEN."
@@ -540,14 +540,14 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{userToken}}",
+                "value": "Bearer {{mapUserToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapBaseUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
+              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{mapRadiusMeters}}",
               "host": [
-                "{{mapBaseUrl}}"
+                "{{mapUrl}}"
               ],
               "path": [
                 "api",
@@ -558,7 +558,7 @@
               "query": [
                 {
                   "key": "radiusMeters",
-                  "value": "{{radiusMeters}}"
+                  "value": "{{mapRadiusMeters}}"
                 }
               ]
             },
