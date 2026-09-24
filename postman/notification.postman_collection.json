@@ -4,32 +4,35 @@
     "description": "Every route of the Notification service (Lab 1), in the order the Runner should run them. Tokens are signed from the environment's mockJwtSecret, which must equal the service's MOCK_JWT_SECRET.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "// Signs fresh test tokens the way the mocked User Management does: HS256 with MOCK_JWT_SECRET.",
-          "// Wrapped in its own scope so its names cannot clash with the sandbox's globals.",
-          "(() => {",
-          "    const cryptoJs = require('crypto-js');",
-          "    const base64url = words => cryptoJs.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
-          "    const encode = object => base64url(cryptoJs.enc.Utf8.parse(JSON.stringify(object)));",
-          "    const sign = userId => {",
-          "        const now = Math.floor(Date.now() / 1000);",
-          "        const unsigned = encode({ alg: 'HS256', typ: 'JWT' }) + '.' +",
-          "            encode({ sub: userId, iss: 'user-management', aud: 'tamagotchi-go', iat: now, exp: now + 3600 });",
-          "        return unsigned + '.' + base64url(cryptoJs.HmacSHA256(unsigned, pm.environment.get('mockJwtSecret')));",
-          "    };",
-          "    pm.variables.set('tokenA', sign(pm.environment.get('userA')));",
-          "    pm.variables.set('tokenB', sign(pm.environment.get('userB')));",
-          "})();"
-        ]
-      }
-    }
-  ],
   "variable": [
+    {
+      "key": "usernameA",
+      "value": "postman_user_a"
+    },
+    {
+      "key": "usernameB",
+      "value": "postman_user_b"
+    },
+    {
+      "key": "password",
+      "value": "postman-test-password"
+    },
+    {
+      "key": "tokenA",
+      "value": ""
+    },
+    {
+      "key": "tokenB",
+      "value": ""
+    },
+    {
+      "key": "userAId",
+      "value": ""
+    },
+    {
+      "key": "userBId",
+      "value": ""
+    },
     {
       "key": "fcmTokenA",
       "value": ""
@@ -73,9 +76,137 @@
     {
       "key": "notificationId",
       "value": ""
+    },
+    {
+      "key": "requestId",
+      "value": ""
     }
   ],
   "item": [
+    {
+      "name": "Setup (User Management)",
+      "description": "Tokens come from User Management; nothing is signed locally.",
+      "item": [
+        {
+          "name": "Register user A",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"postman-a@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created or 409 already registered\", () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as user A",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenA', pm.response.json().accessToken);",
+                  "pm.collectionVariables.set('userAId', pm.response.json().userId);",
+                  "pm.test(\"an access token was returned\", () => pm.expect(pm.response.json().tokenType).to.eql(\"Bearer\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register user B",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"postman-b@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created or 409 already registered\", () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as user B",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenB', pm.response.json().accessToken);",
+                  "pm.collectionVariables.set('userBId', pm.response.json().userId);",
+                  "pm.test(\"an access token was returned\", () => pm.expect(pm.response.json().tokenType).to.eql(\"Bearer\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Devices",
       "description": "FCM token registration.",
@@ -461,7 +592,7 @@
             "url": "{{notificationUrl}}/api/v1/internal/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userA}}\",\n    \"loserId\": \"{{userB}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -587,7 +718,7 @@
             "url": "{{notificationUrl}}/api/v1/internal/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userA}}\",\n    \"loserId\": \"{{userB}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -625,7 +756,7 @@
             "url": "{{notificationUrl}}/api/v1/internal/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.registered\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"userId\": \"{{userA}}\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.registered\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"userId\": \"{{userAId}}\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -708,6 +839,52 @@
           ]
         },
         {
+          "name": "battle.created with the service token only",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"challengerId\": \"{{userAId}}\",\n    \"opponentId\": \"{{userBId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', require('uuid').v4());",
+                  "pm.collectionVariables.set('battleId', require('uuid').v4());",
+                  "pm.collectionVariables.set('correlationId', require('uuid').v4());",
+                  "pm.collectionVariables.set('idempotencyKey', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"applied\", () => pm.expect(pm.response.json().status === 'applied').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Error: event version this service does not understand",
           "request": {
             "method": "POST",
@@ -724,7 +901,7 @@
             "url": "{{notificationUrl}}/api/v1/internal/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 2,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userA}}\",\n    \"loserId\": \"{{userB}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 2,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -771,7 +948,7 @@
             "url": "{{notificationUrl}}/api/v1/internal/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userA}}\",\n    \"loserId\": \"{{userB}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -851,6 +1028,52 @@
           ]
         },
         {
+          "name": "A friend request for user A, so read-all has something to mark",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.friend_request_created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"requestId\": \"{{requestId}}\",\n    \"fromUserId\": \"{{userBId}}\",\n    \"toUserId\": \"{{userAId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', require('uuid').v4());",
+                  "pm.collectionVariables.set('requestId', require('uuid').v4());",
+                  "pm.collectionVariables.set('correlationId', require('uuid').v4());",
+                  "pm.collectionVariables.set('idempotencyKey', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"applied\", () => pm.expect(pm.response.json().status === 'applied').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Mark all as read",
           "request": {
             "method": "POST",
@@ -869,7 +1092,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"the raid notification was unread\", () => pm.expect(pm.response.json().updated >= 1).to.be.true);"
+                  "pm.test(\"the friend request was still unread\", () => pm.expect(pm.response.json().updated >= 1).to.be.true);"
                 ]
               }
             }
