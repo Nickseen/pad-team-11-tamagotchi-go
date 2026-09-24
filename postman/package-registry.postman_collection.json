@@ -9,7 +9,7 @@
     { "key": "moderatorUserId", "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11" },
     { "key": "otherUserId", "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22" },
     { "key": "version", "value": "1.0.0" },
-    { "key": "packageId", "value": "" },
+    { "key": "registryPackageId", "value": "" },
     { "key": "monsterId", "value": "" },
     { "key": "raidDefinitionId", "value": "" }
   ],
@@ -41,7 +41,7 @@
                 "exec": [
                   "pm.test('201 Created', () => pm.response.to.have.status(201));",
                   "if (pm.response.code === 201) {",
-                  "  pm.collectionVariables.set('packageId', pm.response.json().packageId);",
+                  "  pm.collectionVariables.set('registryPackageId', pm.response.json().packageId);",
                   "}"
                 ]
               }
@@ -80,7 +80,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}"] }
           },
           "response": []
         },
@@ -97,7 +97,7 @@
               "raw": "{\n  \"description\": \"Updated description\",\n  \"status\": \"published\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}"] }
           },
           "response": []
         },
@@ -125,7 +125,7 @@
               "raw": "{\n  \"version\": \"{{version}}\",\n  \"statDefinitions\": [\n    {\n      \"key\": \"hunger\",\n      \"label\": \"Hunger\",\n      \"minValue\": 0,\n      \"maxValue\": 100,\n      \"higherIsBetter\": false,\n      \"combatBonus\": { \"threshold\": 80, \"comparison\": \"gte\", \"multiplier\": 1.2 }\n    }\n  ],\n  \"growthRules\": { \"hungerDecayPerHour\": 5 }\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions"] }
           },
           "response": []
         },
@@ -134,7 +134,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions"] }
           },
           "response": []
         },
@@ -143,7 +143,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions/{{version}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions", "{{version}}"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/versions/{{version}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions", "{{version}}"] }
           },
           "response": []
         },
@@ -153,8 +153,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/internal/packages/{{packageId}}/versions/{{version}}/stat-definitions",
-              "host": ["{{baseUrl}}"], "path": ["api", "v1", "internal", "packages", "{{packageId}}", "versions", "{{version}}", "stat-definitions"]
+              "raw": "{{baseUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions",
+              "host": ["{{baseUrl}}"], "path": ["api", "v1", "internal", "packages", "{{registryPackageId}}", "versions", "{{version}}", "stat-definitions"]
             }
           },
           "response": []
@@ -177,7 +177,7 @@
               "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/moderators", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/moderators", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "moderators"] }
           },
           "response": []
         },
@@ -186,7 +186,7 @@
           "request": {
             "method": "DELETE",
             "header": [{ "key": "X-Roles", "value": "admin", "type": "text" }],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/moderators/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators", "{{otherUserId}}"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/moderators/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "moderators", "{{otherUserId}}"] }
           },
           "response": []
         },
@@ -200,7 +200,7 @@
               "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/registrations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/registrations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "registrations"] }
           },
           "response": []
         },
@@ -209,7 +209,7 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/registrations/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations", "{{otherUserId}}"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/registrations/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "registrations", "{{otherUserId}}"] }
           },
           "response": []
         },
@@ -430,7 +430,7 @@
               "raw": "{\n  \"version\": \"9.9.9\",\n  \"statDefinitions\": [],\n  \"growthRules\": {}\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{registryPackageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{registryPackageId}}", "versions"] }
           },
           "response": []
         }

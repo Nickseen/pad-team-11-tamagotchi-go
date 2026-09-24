@@ -17,7 +17,7 @@
           "    pm.collectionVariables.set('opponentName', 'pad_op_' + runId);",
           "    pm.collectionVariables.set('bystanderName', 'pad_by_' + runId);",
           "    pm.collectionVariables.set('password', 'postman-run-' + runId);",
-          "    pm.collectionVariables.set('packageId', pm.variables.replaceIn('{{$guid}}'));",
+          "    pm.collectionVariables.set('runPackageId', pm.variables.replaceIn('{{$guid}}'));",
           "}",
           "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
         ]
@@ -66,7 +66,7 @@
       "value": ""
     },
     {
-      "key": "packageId",
+      "key": "runPackageId",
       "value": ""
     },
     {
@@ -134,7 +134,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{challengerName}}\",\n  \"email\": \"{{challengerName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{challengerName}}\",\n  \"email\": \"{{challengerName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -163,7 +163,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{opponentName}}\",\n  \"email\": \"{{opponentName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{opponentName}}\",\n  \"email\": \"{{opponentName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -192,7 +192,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{bystanderName}}\",\n  \"email\": \"{{bystanderName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{bystanderName}}\",\n  \"email\": \"{{bystanderName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
