@@ -665,11 +665,14 @@ Battle and Monster Raid read this instead of hard-coding the table, so the ring 
 | `GET /api/v1/packages/{packageId}/versions` | user | query `limit`, `cursor` | `200` → `[PackageVersion]` |
 | `GET /api/v1/packages/{packageId}/versions/{version}` | user | path `version` `SemVer` | `200` → `PackageVersion` |
 | `GET /api/v1/internal/packages/{packageId}/versions/{version}/stat-definitions` | service | path parameters as above | `200` → `{ "items": [StatDefinition], "version": SemVer }` |
+| `GET /api/v1/internal/packages/{packageId}/versions/current` | service | path `packageId` | `200` → `PackageVersion`; `404 NO_CURRENT_VERSION` if none published; `404 PACKAGE_NOT_FOUND` |
 
 The internal stat-definitions route is what Battle calls before computing damage: it asks the
 Registry *how to read* a number instead of requiring every package to share a schema. Versions are
 immutable and callers request an explicit `version`, so a package cannot change a combat bonus
-underneath a battle that is already running.
+underneath a battle that is already running. `versions/current` resolves the package's
+`latestVersion` server-side, so Battle does not have to read it off the paginated versions list
+(which is oldest first) to find it.
 
 ##### Moderators and registrations
 
@@ -993,6 +996,15 @@ Firebase as unregistered deletes the corresponding `Device` row.
 | `PATCH /api/v1/guilds/{guildId}/members/{userId}` | role `owner` | `role` string | `200` → `Membership`; transferring `owner` demotes the previous owner to `officer` |
 | `DELETE /api/v1/guilds/{guildId}/members/{userId}` | role `owner` \| `officer` \| self | path parameters | `204`; publishes `guild.member_left` |
 | `GET /api/v1/internal/guilds/{guildId}/members/{userId}` | service | path parameters | `200` → `{ "isMember": boolean, "role": string \| null, "joinedAt": Timestamp \| null }` |
+| `GET /api/v1/internal/guilds/{guildId}` | service | path `guildId` `UUID` | `200` → `Guild`; `404 GUILD_NOT_FOUND` |
+| `GET /api/v1/internal/guilds/{guildId}/members` | service | query `limit`, `cursor` | `200` → `[Membership]`; `404 GUILD_NOT_FOUND` |
+
+`GET /api/v1/internal/guilds/{guildId}` is what Monster Raid reads to check a guild's `level`
+against a raid definition's `minGuildLevel` before starting a raid. `level` is always `1` in Lab 1,
+since nothing raises it yet.
+
+`GET /api/v1/internal/guilds/{guildId}/members` (bulk) is what Notification calls to resolve every
+member of a guild at once, instead of one internal call per member.
 
 The internal membership check is the call Monster Raid makes before admitting a participant — a
 raid cannot admit a player without confirming membership, so this one is synchronous rather than
@@ -1284,11 +1296,11 @@ same Compose file runs on Intel, AMD and Apple Silicon machines.
 | ------- | ----- | --- | ---- | ----- |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management) | `1.1.0` | 8081 | PostgreSQL |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi) | `2.1.0` | 8082 | PostgreSQL |
-| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry) | `0.3.0` | 8083 | PostgreSQL |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry) | `2.0.1` | 8083 | PostgreSQL |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle) | `1.1.0` | 8084 | PostgreSQL |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map) | `1.1.0` | 8085 | Redis |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification) | `2.1.0` | 8086 | PostgreSQL |
-| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild) | `0.3.0` | 8087 | PostgreSQL |
+| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild) | `2.0.1` | 8087 | PostgreSQL |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid) | `1.1.0` | 8088 | PostgreSQL and Redis |
 
 The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:
@@ -1314,7 +1326,7 @@ openssl rand -hex 16    # one way to produce each secret
 
 | Variable | Used by | Value |
 | -------- | ------- | ----- |
-| `SERVICE_TOKEN` | User Management, Battle, Map, Monster Raid, Tamagotchi, Notification | Shared credential sent as `X-Service-Token` on internal calls. One value for the whole stack: a caller's token is compared against the callee's |
+| `SERVICE_TOKEN` | User Management, Battle, Map, Monster Raid, Tamagotchi, Notification, Package Registry, Guild | Shared credential sent as `X-Service-Token` on internal calls. One value for the whole stack: a caller's token is compared against the callee's |
 | `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
 | `MAP_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Monster Raid | Redis passwords |
 | `MAP_AUTH_TOKENS` | Map | Bearer tokens Map accepts, as `<token>=<userId>`, comma-separated. Map refuses to start without one |
@@ -1396,11 +1408,11 @@ environment the values from your `.env`:
 
 With the defaults, every service answers its cross-service calls from in-process mocks, and all
 eight Postman collections below pass against the stack. Switching a service to live mode makes it
-call its neighbours for real. In Lab 1 this works for Map → User Management, and for
-Monster Raid → Guild and Package Registry. Battle → Tamagotchi and Monster Raid → Tamagotchi work
-with `X-Service-Token` alone since Tamagotchi 2.1.0. Guild → User Management is refused because
-Guild calls the user route `GET /api/v1/users/{userId}`; the service route `GET /api/v1/users?ids=…`
-answers it with `X-Service-Token` alone.
+call its neighbours for real. In Lab 1 this works for Map → User Management, for
+Monster Raid → Guild and Package Registry, and for Battle → Tamagotchi and Monster Raid → Tamagotchi
+with `X-Service-Token` alone since Tamagotchi 2.1.0. Guild → User Management also works with
+`X-Service-Token` alone since Guild 2.0.1: it calls the service route `GET /api/v1/users?ids=…`
+instead of the user route `GET /api/v1/users/{userId}` it used before.
 
 ---
 

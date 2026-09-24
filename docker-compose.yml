@@ -111,13 +111,17 @@ services:
       test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
 
   package-registry:
-    image: gabimiric/tamagotchi-package-registry:0.3.0
+    image: gabimiric/tamagotchi-package-registry:2.0.1
     restart: on-failure
     depends_on:
       package-registry-db:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@package-registry-db:5432/registry
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
+      JWT_ISSUER: user-management
+      JWT_AUDIENCE: tamagotchi-go
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"]
@@ -228,7 +232,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U guild -d guild"]
 
   guild:
-    image: gabimiric/tamagotchi-guild:0.3.0
+    image: gabimiric/tamagotchi-guild:2.0.1
     restart: on-failure
     depends_on:
       guild-db:
@@ -237,6 +241,10 @@ services:
       DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
       USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-mock}
       USER_MANAGEMENT_URL: http://user-management:8081
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
+      JWT_ISSUER: user-management
+      JWT_AUDIENCE: tamagotchi-go
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8087/health')"]
