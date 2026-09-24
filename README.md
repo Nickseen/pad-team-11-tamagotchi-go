@@ -1310,8 +1310,7 @@ openssl rand -hex 16    # one way to produce each secret
 
 | Variable | Used by | Value |
 | -------- | ------- | ----- |
-| `SERVICE_TOKEN` | User Management, Battle, Map, Monster Raid | Shared credential sent as `X-Service-Token` on internal calls. One value for the whole stack: a caller's token is compared against the callee's |
-| `MOCK_JWT_SECRET` | Tamagotchi, Notification | At least 32 characters. Signs the Lab 1 test tokens these two services accept |
+| `SERVICE_TOKEN` | User Management, Battle, Map, Monster Raid, Tamagotchi, Notification | Shared credential sent as `X-Service-Token` on internal calls. One value for the whole stack: a caller's token is compared against the callee's |
 | `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
 | `MAP_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Monster Raid | Redis passwords |
 | `MAP_AUTH_TOKENS` | Map | Bearer tokens Map accepts, as `<token>=<userId>`, comma-separated. Map refuses to start without one |
@@ -1385,7 +1384,6 @@ environment the values from your `.env`:
 | Environment variable | Value from `.env` |
 | -------------------- | ----------------- |
 | `serviceToken` | `SERVICE_TOKEN` |
-| `mockJwtSecret` | `MOCK_JWT_SECRET` |
 | `mapUserToken` | a `<token>` from `MAP_AUTH_TOKENS` |
 | `raidUserToken` | the owner `<token>` from `RAID_AUTH_TOKENS` |
 | `raidAdminToken` | the admin `<token>` from `RAID_AUTH_TOKENS` |
