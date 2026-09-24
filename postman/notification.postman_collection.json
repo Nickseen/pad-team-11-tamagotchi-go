@@ -76,6 +76,10 @@
     {
       "key": "notificationId",
       "value": ""
+    },
+    {
+      "key": "requestId",
+      "value": ""
     }
   ],
   "item": [
@@ -1024,6 +1028,52 @@
           ]
         },
         {
+          "name": "A friend request for user A, so read-all has something to mark",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.friend_request_created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"requestId\": \"{{requestId}}\",\n    \"fromUserId\": \"{{userBId}}\",\n    \"toUserId\": \"{{userAId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', require('uuid').v4());",
+                  "pm.collectionVariables.set('requestId', require('uuid').v4());",
+                  "pm.collectionVariables.set('correlationId', require('uuid').v4());",
+                  "pm.collectionVariables.set('idempotencyKey', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"applied\", () => pm.expect(pm.response.json().status === 'applied').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Mark all as read",
           "request": {
             "method": "POST",
@@ -1042,7 +1092,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"the raid notification was unread\", () => pm.expect(pm.response.json().updated >= 1).to.be.true);"
+                  "pm.test(\"the friend request was still unread\", () => pm.expect(pm.response.json().updated >= 1).to.be.true);"
                 ]
               }
             }
