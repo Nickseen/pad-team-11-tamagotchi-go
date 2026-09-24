@@ -11,8 +11,9 @@
 # store keeps its data in a named volume, so `docker compose down` followed by `up` loses nothing.
 # `docker compose down -v` is the command that deletes the data.
 #
-# Dependency modes: every service starts with its cross-service calls mocked, so the stack comes up
-# green on its own. Each *_MODE variable in .env switches one service to call its neighbours for real.
+# Dependency modes: every service except Guild starts with its cross-service calls mocked. Guild calls
+# User Management for real, which works in Lab 1 and is what Guild's Postman collection checks. Each
+# *_MODE variable in .env switches one service between mocked and real neighbours.
 
 x-postgres: &postgres
   image: postgres:17-alpine # 18 moved the data directory; the volume path below is 17's
@@ -239,7 +240,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
-      USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-mock}
+      USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-real}
       USER_MANAGEMENT_URL: http://user-management:8081
       SERVICE_TOKEN: ${SERVICE_TOKEN}
       JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json

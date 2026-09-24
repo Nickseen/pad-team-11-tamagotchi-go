@@ -1333,14 +1333,14 @@ openssl rand -hex 16    # one way to produce each secret
 | `RAID_AUTH_TOKENS` | Monster Raid | Bearer tokens Monster Raid accepts, as `<token>=<userId>:<role>\|<role>`, comma-separated. Keep the value in double quotes, because of the `\|` |
 
 Four variables are not secrets. They are commented out in `.env.example`, and each one switches one
-service from mocked neighbours to real calls:
+service between mocked neighbours and real calls:
 
-| Variable | Default | Live value |
-| -------- | ------- | ---------- |
-| `BATTLE_DEPENDENCY_MODE` | `mock` | `live` |
-| `GUILD_USER_MANAGEMENT_MODE` | `mock` | `real` |
-| `MAP_RELATIONSHIP_MODE` | `mock` | `http` |
-| `RAID_DEPENDENCY_MODE` | `mock` | `http` |
+| Variable | Mocked | Real | Default |
+| -------- | ------ | ---- | ------- |
+| `BATTLE_DEPENDENCY_MODE` | `mock` | `live` | `mock` |
+| `GUILD_USER_MANAGEMENT_MODE` | `mock` | `real` | `real` |
+| `MAP_RELATIONSHIP_MODE` | `mock` | `http` | `mock` |
+| `RAID_DEPENDENCY_MODE` | `mock` | `http` | `mock` |
 
 Every other setting, such as service URLs, database names and ports, is fixed in the Compose file.
 The services reach each other by their Compose names, which are the hostnames the communication
@@ -1406,9 +1406,11 @@ environment the values from your `.env`:
 
 ### Mock and live modes
 
-With the defaults, every service answers its cross-service calls from in-process mocks, and all
-eight Postman collections below pass against the stack. Switching a service to live mode makes it
-call its neighbours for real. In Lab 1 this works for Map → User Management, for
+With the defaults, every service except Guild answers its cross-service calls from in-process
+mocks. Guild calls User Management for real: its Postman collection checks that inviting an
+unregistered user is refused with `404`, which only the real User Management can answer. With
+these defaults all eight Postman collections below pass against the stack. Switching a service to
+live mode makes it call its neighbours for real. In Lab 1 this works for Map → User Management, for
 Monster Raid → Guild and Package Registry, and for Battle → Tamagotchi and Monster Raid → Tamagotchi
 with `X-Service-Token` alone since Tamagotchi 2.1.0. Guild → User Management also works with
 `X-Service-Token` alone since Guild 2.0.1: it calls the service route `GET /api/v1/users?ids=…`
