@@ -7,11 +7,11 @@
   "variable": [
     {
       "key": "usernameA",
-      "value": "postman-user-a"
+      "value": "postman_user_a"
     },
     {
       "key": "usernameB",
-      "value": "postman-user-b"
+      "value": "postman_user_b"
     },
     {
       "key": "password",
@@ -817,6 +817,52 @@
                 "exec": [
                   "pm.collectionVariables.set('eventId', require('uuid').v4());",
                   "pm.collectionVariables.set('raidId', require('uuid').v4());",
+                  "pm.collectionVariables.set('correlationId', require('uuid').v4());",
+                  "pm.collectionVariables.set('idempotencyKey', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"applied\", () => pm.expect(pm.response.json().status === 'applied').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "battle.created with the service token only",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"challengerId\": \"{{userAId}}\",\n    \"opponentId\": \"{{userBId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', require('uuid').v4());",
+                  "pm.collectionVariables.set('battleId', require('uuid').v4());",
                   "pm.collectionVariables.set('correlationId', require('uuid').v4());",
                   "pm.collectionVariables.set('idempotencyKey', require('uuid').v4());"
                 ]

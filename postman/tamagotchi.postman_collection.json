@@ -7,11 +7,11 @@
   "variable": [
     {
       "key": "usernameA",
-      "value": "postman-user-a"
+      "value": "postman_user_a"
     },
     {
       "key": "usernameB",
-      "value": "postman-user-b"
+      "value": "postman_user_b"
     },
     {
       "key": "password",
@@ -59,6 +59,10 @@
     },
     {
       "key": "xpCommandId",
+      "value": ""
+    },
+    {
+      "key": "holdingCommandId",
       "value": ""
     },
     {
@@ -1230,6 +1234,179 @@
                 "exec": [
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
                   "pm.test(\"now owned by user B\", () => pm.expect(pm.response.json().ownerId === pm.collectionVariables.get('userBId')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primary of user A (service token only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/primary-tamagotchi"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"it is the creature set as primary\", () => pm.expect(pm.response.json().tamagotchiId === pm.collectionVariables.get('tamagotchiId')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: primary of a user who has none",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/00000000-0000-4000-8000-000000000000/primary-tamagotchi"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 NO_PRIMARY_TAMAGOTCHI\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('NO_PRIMARY_TAMAGOTCHI');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attach a secondary reference for the holding check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{holdingCommandId}}\",\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n  \"acquiredFrom\": \"capture\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('holdingCommandId', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Secondary holding: held",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/{{opponentTamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"isHeld is true\", () => pm.expect(pm.response.json().isHeld === true).to.be.true);",
+                  "pm.test(\"a referenceId is returned\", () => pm.expect(pm.response.json().referenceId !== null).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Secondary holding: not held",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userBId}}/secondary-tamagotchis/{{secondTamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"isHeld is false\", () => pm.expect(pm.response.json().isHeld === false).to.be.true);",
+                  "pm.test(\"referenceId is null\", () => pm.expect(pm.response.json().referenceId === null).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: holding check for an unknown Tamagotchi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/00000000-0000-4000-8000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 TAMAGOTCHI_NOT_FOUND\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('TAMAGOTCHI_NOT_FOUND');",
+                  "});"
                 ]
               }
             }
