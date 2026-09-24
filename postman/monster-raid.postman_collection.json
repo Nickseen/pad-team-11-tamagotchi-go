@@ -1,0 +1,820 @@
+{
+  "info": {
+    "_postman_id": "e0ae5ad6-4bcb-4c79-93c5-fcefe518ab89",
+    "name": "Tamagotchi Go - Monster Raid Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Executable examples for every Monster Raid HTTP route. Health and dependency-independent errors run with the service alone. The lifecycle folder requires local Guild, Registry, and Tamagotchi services or their mocks."
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{raidBaseUrl}}/healthz",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            },
+            "description": "Expected: 200 and {\"status\":\"ok\"}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Service is healthy', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Raid lifecycle (dependencies required)",
+      "description": "Run in order with Guild, Registry, and Tamagotchi dependencies or mocks. Values must describe an owner/officer, an active definition, and that user’s primary Tamagotchi.",
+      "item": [
+        {
+          "name": "Create raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guildId\": \"{{guildId}}\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids"
+              ]
+            },
+            "description": "Expected: 201. Saves raidId for following requests."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('Active raid is created', () => pm.expect(json.status).to.eql('active'));",
+                  "pm.environment.set('raidId', json.raidId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get raid",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}"
+              ]
+            },
+            "description": "Expected: 200 for the created raid."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct raid is returned', () => pm.expect(pm.response.json().raidId).to.eql(pm.environment.get('raidId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List guild raids",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/guilds/{{guildId}}/raids?status=active&limit=20",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "raids"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Expected: 200 collection envelope containing the created raid."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Collection envelope is returned', () => { pm.expect(json.items).to.be.an('array'); pm.expect(json.hasMore).to.be.a('boolean'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Join raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryTamagotchiId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants"
+              ]
+            },
+            "description": "Expected: 201 with the pinned primary Tamagotchi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.environment.get('primaryTamagotchiId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List participants",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants?limit=20",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Expected: 200 collection envelope."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Participant is listed', () => pm.expect(pm.response.json().items).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attack raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "attacks"
+              ]
+            },
+            "description": "Expected: 200. Generates commandId and stores the response for idempotency verification."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Damage is applied', () => pm.expect(json.damageDealt).to.be.above(0));",
+                  "pm.environment.set('attackSnapshot', JSON.stringify(json));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay same attack command",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "attacks"
+              ]
+            },
+            "description": "Expected: 200 with exactly the original result and no second damage application."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const original = JSON.parse(pm.environment.get('attackSnapshot'));",
+                  "const replay = pm.response.json();",
+                  "pm.test('Idempotent response is unchanged', () => { pm.expect(replay.commandId).to.eql(original.commandId); pm.expect(replay.monsterHpRemaining).to.eql(original.monsterHpRemaining); pm.expect(replay.yourTotalDamage).to.eql(original.yourTotalDamage); pm.expect(replay.attackedAt).to.eql(original.attackedAt); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/leaderboard?limit=20",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "leaderboard"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Expected: 200 with ranked damage entries."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Leaderboard has ranks', () => pm.expect(pm.response.json().items[0].rank).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leave raid",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants/me",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants",
+                "me"
+              ]
+            },
+            "description": "Expected: 204. Damage history remains stored."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rejoin raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryTamagotchiId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/participants",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants"
+              ]
+            },
+            "description": "Expected: 201 using the same pinned Tamagotchi; previous damage is retained."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Damage survives rejoin', () => pm.expect(pm.response.json().damageDealt).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel raid as admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Postman state-transition check\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/cancel",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "cancel"
+              ]
+            },
+            "description": "Expected: 200 and status=cancelled."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Raid is cancelled', () => pm.expect(pm.response.json().status).to.eql('cancelled'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject attack after cancellation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "attacks"
+              ]
+            },
+            "description": "Expected: 409 RAID_NOT_ACTIVE."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error code is RAID_NOT_ACTIVE', () => pm.expect(pm.response.json().error.code).to.eql('RAID_NOT_ACTIVE'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Errors without dependencies",
+      "description": "These requests are validated before any downstream call and can run with Monster Raid alone.",
+      "item": [
+        {
+          "name": "Reject missing bearer token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guildId\": \"{{guildId}}\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids"
+              ]
+            },
+            "description": "Expected: 401 UNAUTHORIZED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error code is UNAUTHORIZED', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid identifiers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guildId\": \"not-a-uuid\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids"
+              ]
+            },
+            "description": "Expected: 400 INVALID_ID."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is INVALID_ID', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_ID'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject empty cancellation reason",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{raidBaseUrl}}/api/v1/raids/{{exampleRaidId}}/cancel",
+              "host": [
+                "{{raidBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{exampleRaidId}}",
+                "cancel"
+              ]
+            },
+            "description": "Expected: 400 INVALID_REASON before raid lookup."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is INVALID_REASON', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_REASON'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

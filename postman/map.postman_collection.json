@@ -1,0 +1,584 @@
+{
+  "info": {
+    "_postman_id": "bfd7c342-023a-46b6-b8c3-c81d223db4d1",
+    "name": "Tamagotchi Go - Map Service",
+    "description": "Executable examples for every Map HTTP route. Run requests in folder order against a local service. Values come from the accompanying safe environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mapBaseUrl}}/healthz",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            },
+            "description": "Expected: 200 and {\"status\":\"ok\"}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Service is healthy', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Location flow",
+      "description": "Run in order. The first request creates a fresh position and the final request deletes it.",
+      "item": [
+        {
+          "name": "Update my location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"accuracyMeters\": {{accuracyMeters}},\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations"
+              ]
+            },
+            "description": "Expected: 202, accepted=true. Generates a current UTC recordedAt value."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('recordedAt', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 202', () => pm.response.to.have.status(202));",
+                  "const json = pm.response.json();",
+                  "pm.test('Position is accepted', () => pm.expect(json.accepted).to.eql(true));",
+                  "pm.test('Expiry is returned', () => pm.expect(json.expiresAt).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Find nearby users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "map",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "radiusMeters",
+                  "value": "{{radiusMeters}}"
+                }
+              ]
+            },
+            "description": "Expected: 200 with an items array. With one local token the array is normally empty."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Items is an array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List visible related users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/map/visible",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "map",
+                "visible"
+              ]
+            },
+            "description": "Expected: 200 with an items array. The current empty relationship provider returns no users."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Items is an array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read position internally",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/internal/positions/{{userId}}",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "positions",
+                "{{userId}}"
+              ]
+            },
+            "description": "Expected: 200. Requires bearer and service tokens."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.environment.get('userId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete my location",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/locations/me",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations",
+                "me"
+              ]
+            },
+            "description": "Expected: 204 with no response body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Representative errors",
+      "item": [
+        {
+          "name": "Reject missing bearer token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations"
+              ]
+            },
+            "description": "Expected: 401 UNAUTHORIZED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error code is UNAUTHORIZED', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid coordinates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 91,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations"
+              ]
+            },
+            "description": "Expected: 400 INVALID_COORDINATE."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('recordedAt', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is INVALID_COORDINATE', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_COORDINATE'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject expired position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{expiredRecordedAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/locations",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations"
+              ]
+            },
+            "description": "Expected: 400 POSITION_ALREADY_EXPIRED."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('expiredRecordedAt', new Date(Date.now() - 10 * 60 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is POSITION_ALREADY_EXPIRED', () => pm.expect(pm.response.json().error.code).to.eql('POSITION_ALREADY_EXPIRED'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid radius",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/map/nearby?radiusMeters=5001",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "map",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "radiusMeters",
+                  "value": "5001"
+                }
+              ]
+            },
+            "description": "Expected: 400 INVALID_RADIUS. Requires an active caller position; run Location flow through the update first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is INVALID_RADIUS', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_RADIUS'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid service token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "invalid-local-token",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/internal/positions/{{userId}}",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "positions",
+                "{{userId}}"
+              ]
+            },
+            "description": "Expected: 401 INVALID_SERVICE_TOKEN."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error code is INVALID_SERVICE_TOKEN', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_SERVICE_TOKEN'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report missing position after deletion",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{mapBaseUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
+              "host": [
+                "{{mapBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "map",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "radiusMeters",
+                  "value": "{{radiusMeters}}"
+                }
+              ]
+            },
+            "description": "Expected: 404 POSITION_EXPIRED when run after Delete my location."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error code is POSITION_EXPIRED', () => pm.expect(pm.response.json().error.code).to.eql('POSITION_EXPIRED'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
