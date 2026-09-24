@@ -399,7 +399,7 @@
             "url": "{{battleUrl}}/api/v1/battles",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"secondaryTamagotchiId\": \"{{secondaryA}}\",\n  \"boosts\": [\n    \"{{boostId}}\"\n  ]\n}",
+              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"secondaryTamagotchiId\": \"{{secondaryA}}\",\n  \"boosts\": []\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -482,6 +482,41 @@
                 "exec": [
                   "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
                   "pm.test(\"SELF_BATTLE\", () => pm.expect(pm.response.json().error.code).to.eql(\"SELF_BATTLE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Challenge with a boost equipped",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              }
+            ],
+            "url": "{{battleUrl}}/api/v1/battles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": [\n    \"{{boostId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Boosts have no owning service yet, so Lab 1 requires an empty boosts array."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"BOOSTS_NOT_SUPPORTED\", () => pm.expect(pm.response.json().error.code).to.eql(\"BOOSTS_NOT_SUPPORTED\"));"
                 ]
               }
             }
@@ -853,7 +888,7 @@
           ]
         },
         {
-          "name": "Spend a boost that was never equipped",
+          "name": "Play use_boost",
           "request": {
             "method": "POST",
             "header": [
@@ -889,7 +924,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
-                  "pm.test(\"BOOST_NOT_OWNED\", () => pm.expect(pm.response.json().error.code).to.eql(\"BOOST_NOT_OWNED\"));"
+                  "pm.test(\"BOOSTS_NOT_SUPPORTED\", () => pm.expect(pm.response.json().error.code).to.eql(\"BOOSTS_NOT_SUPPORTED\"));",
+                  "// use_boost is a contract action, but it is planned: refused explicitly rather than reported as unknown."
                 ]
               }
             }
@@ -1031,7 +1067,7 @@
           ]
         },
         {
-          "name": "Spend the equipped boost",
+          "name": "Challenger uses a special",
           "request": {
             "method": "POST",
             "header": [
@@ -1043,7 +1079,7 @@
             "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"use_boost\",\n  \"boostId\": \"{{boostId}}\"\n}",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"special\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1067,7 +1103,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"turn 3 spends the boost\", () => pm.expect(pm.response.json().turn.turnNumber).to.eql(3));"
+                  "pm.test(\"turn 3 is a special\", () => {",
+                  "    pm.expect(pm.response.json().turn.turnNumber).to.eql(3);",
+                  "    pm.expect(pm.response.json().turn.action).to.eql(\"special\");",
+                  "});"
                 ]
               }
             }
@@ -1117,7 +1156,7 @@
           ]
         },
         {
-          "name": "Spend the same boost twice",
+          "name": "Attack carrying a boostId",
           "request": {
             "method": "POST",
             "header": [
@@ -1129,7 +1168,7 @@
             "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"use_boost\",\n  \"boostId\": \"{{boostId}}\"\n}",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\",\n  \"boostId\": \"{{boostId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1153,8 +1192,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
-                  "pm.test(\"BOOST_NOT_OWNED\", () => pm.expect(pm.response.json().error.code).to.eql(\"BOOST_NOT_OWNED\"));",
-                  "// A boost is consumed once; the second attempt is refused like an unequipped one."
+                  "pm.test(\"BOOSTS_NOT_SUPPORTED\", () => pm.expect(pm.response.json().error.code).to.eql(\"BOOSTS_NOT_SUPPORTED\"));",
+                  "// A boostId is refused on any action while boosts are planned."
                 ]
               }
             }
