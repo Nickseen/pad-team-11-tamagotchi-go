@@ -13,6 +13,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Technologies and Communication Patterns](#technologies-and-communication-patterns)
 - [Communication Overview](#communication-overview)
 - [Communication Contract](#communication-contract)
+- [Postman Collections](#postman-collections)
 - [Open Boundary Decisions](#open-boundary-decisions)
 - [Contribution Workflow](#contribution-workflow)
 
@@ -1241,6 +1242,73 @@ Delivery rules, uniform across every consumer:
   routing key and failure reason in the headers, and an operator replays it once the cause is fixed;
 - a consumer that receives an `eventVersion` higher than it understands dead-letters the message
   instead of guessing, which is what makes the version field useful rather than decorative.
+
+---
+
+## Postman Collections
+
+The [`postman/`](postman/) directory contains one Lab 1 collection for every service and one shared
+example environment. The committed environment contains localhost URLs and non-working credential
+placeholders only. Do not commit exported environments containing real tokens or secrets.
+
+| Service | Collection | Base URL variable |
+| ------- | ---------- | ----------------- |
+| User Management | `user-management.postman_collection.json` | `userManagementUrl` |
+| Tamagotchi | `tamagotchi.postman_collection.json` | `tamagotchiUrl` |
+| Package Registry | `package-registry.postman_collection.json` | `packageRegistryUrl` |
+| Battle | `battle.postman_collection.json` | `battleUrl` |
+| Map | `map.postman_collection.json` | `mapUrl` |
+| Notification | `notification.postman_collection.json` | `notificationUrl` |
+| Guild | `guild.postman_collection.json` | `guildUrl` |
+| Monster Raid | `monster-raid.postman_collection.json` | `monsterRaidUrl` |
+
+### Import and configure
+
+1. Start the required services and their databases. The shared environment expects the host ports
+   from the communication contract: `8081` through `8088` for the services listed above.
+2. In Postman, import `postman/tamagotchi-go.postman_environment.json`.
+3. Import the collection files you want to run and select **Tamagotchi Go (local)**.
+4. Set the environment's **Current value** for every credential placeholder used by the selected
+   collection. Keep those current values local and do not export them back into the repository.
+5. Run a collection with the Collection Runner in its saved order. Collection-scoped variables
+   hold scenario identifiers and generated values, so one service cannot overwrite another
+   service's state.
+
+Map requires `mapUserToken` to match a token configured through `MAP_AUTH_TOKENS`. Its
+`serviceToken` value must match `MAP_SERVICE_TOKEN`. Monster Raid requires `raidUserToken` and
+`raidAdminToken` to match identities configured through `RAID_AUTH_TOKENS`. The admin identity must
+include the `admin` role. Services using the Lab 1 mock JWT adapter require `mockJwtSecret` to match
+their runtime configuration.
+
+For example, compatible Map and Monster Raid token mappings have this form; choose your own local
+values instead of committing them:
+
+```text
+MAP_AUTH_TOKENS=<mapUserToken>=<mapUserId>
+MAP_SERVICE_TOKEN=<serviceToken>
+RAID_AUTH_TOKENS=<raidUserToken>=<userId>:user|owner,<raidAdminToken>=<userId>:user|admin
+```
+
+### Run with Newman
+
+Install Newman or run it through `npx`, then pass the shared environment. Supply credentials at
+runtime so they do not need to be written to the JSON file:
+
+```sh
+npx newman run postman/map.postman_collection.json \
+  -e postman/tamagotchi-go.postman_environment.json \
+  --env-var mapUserToken="$MAP_POSTMAN_USER_TOKEN" \
+  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+
+npx newman run postman/monster-raid.postman_collection.json \
+  -e postman/tamagotchi-go.postman_environment.json \
+  --env-var raidUserToken="$RAID_POSTMAN_USER_TOKEN" \
+  --env-var raidAdminToken="$RAID_POSTMAN_ADMIN_TOKEN"
+```
+
+Use the same command form for another service by changing the collection filename. Run dependency
+services first when exercising a collection's integration folders; independently runnable mock
+scenarios use the mock configuration documented in the corresponding service repository.
 
 ---
 
