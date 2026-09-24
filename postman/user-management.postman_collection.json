@@ -19,7 +19,7 @@
           "    pm.collectionVariables.set('usernameB', 'pad_b_' + runId);",
           "    pm.collectionVariables.set('usernameC', 'pad_c_' + runId);",
           "    pm.collectionVariables.set('password', 'postman-run-' + runId);",
-          "    pm.collectionVariables.set('packageId', pm.variables.replaceIn('{{$guid}}'));",
+          "    pm.collectionVariables.set('runPackageId', pm.variables.replaceIn('{{$guid}}'));",
           "}",
           "// The contract asks every request to carry a correlation id.",
           "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
@@ -49,7 +49,7 @@
       "value": ""
     },
     {
-      "key": "packageId",
+      "key": "runPackageId",
       "value": ""
     },
     {
@@ -97,7 +97,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -127,7 +127,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"email\": \"{{usernameB}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"email\": \"{{usernameB}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -156,7 +156,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{usernameC}}\",\n  \"email\": \"{{usernameC}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{usernameC}}\",\n  \"email\": \"{{usernameC}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -185,7 +185,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -219,7 +219,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{usernameA}}_short\",\n  \"email\": \"short_{{usernameA}}@example.com\",\n  \"password\": \"short\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{usernameA}}_short\",\n  \"email\": \"short_{{usernameA}}@example.com\",\n  \"password\": \"short\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -248,7 +248,7 @@
             "url": "{{userManagementUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{usernameA}}_mail\",\n  \"email\": \"not-an-address\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "raw": "{\n  \"username\": \"{{usernameA}}_mail\",\n  \"email\": \"not-an-address\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
