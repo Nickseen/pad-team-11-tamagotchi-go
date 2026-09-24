@@ -82,14 +82,15 @@ services:
       test: ["CMD-SHELL", "pg_isready -U tamagotchi -d tamagotchi"]
 
   tamagotchi:
-    image: crislp/tamagotchi-tamagotchi:1.1.0
+    image: crislp/tamagotchi-tamagotchi:2.1.0
     restart: on-failure
     depends_on:
       tamagotchi-db:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://tamagotchi:${TAMAGOTCHI_DB_PASSWORD}@tamagotchi-db:5432/tamagotchi
-      MOCK_JWT_SECRET: ${MOCK_JWT_SECRET:?set MOCK_JWT_SECRET in .env}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
@@ -198,14 +199,15 @@ services:
       test: ["CMD-SHELL", "pg_isready -U notification -d notification"]
 
   notification:
-    image: crislp/tamagotchi-notification:1.0.0
+    image: crislp/tamagotchi-notification:2.1.0
     restart: on-failure
     depends_on:
       notification-db:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://notification:${NOTIFICATION_DB_PASSWORD}@notification-db:5432/notification
-      MOCK_JWT_SECRET: ${MOCK_JWT_SECRET}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
