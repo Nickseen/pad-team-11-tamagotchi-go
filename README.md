@@ -562,6 +562,8 @@ damage calculation; it is the reason the route is batched rather than one call p
 | `PUT /api/v1/users/me/primary-tamagotchi` | user | `tamagotchiId` `UUID` | `200` → `Tamagotchi`; `403 TAMAGOTCHI_NOT_OWNED` if the caller is not the owner |
 | `GET /api/v1/users/{userId}/secondary-tamagotchis` | user | path `userId` `UUID`, query `limit`, `cursor` | `200` → `[SecondaryReference]` |
 | `POST /api/v1/internal/users/{userId}/secondary-tamagotchis` | service | `commandId` `UUID`, `tamagotchiId` `UUID`, `acquiredFrom` string | `201` → `SecondaryReference`; idempotent on `commandId` |
+| `GET /api/v1/internal/users/{userId}/primary-tamagotchi` | service | path `userId` `UUID` | `200` → `Tamagotchi`; `404 NO_PRIMARY_TAMAGOTCHI` if unset |
+| `GET /api/v1/internal/users/{userId}/secondary-tamagotchis/{tamagotchiId}` | service | path parameters as above | `200` → `{ "isHeld": boolean, "referenceId": UUID \| null }`; `404 TAMAGOTCHI_NOT_FOUND` if the creature does not exist |
 | `DELETE /api/v1/users/me/secondary-tamagotchis/{referenceId}` | user | path `referenceId` `UUID` | `204` → empty body |
 
 ##### Statistics and progression
@@ -572,6 +574,8 @@ damage calculation; it is the reason the route is batched rather than one call p
 | `PUT /api/v1/tamagotchis/{tamagotchiId}/stats` | user | `stats` `Stats`, `expectedVersion` integer | `200` → `{ "stats": Stats, "statsVersion": integer }`; `409 STALE_STATS_VERSION` on a concurrent write |
 | `POST /api/v1/internal/tamagotchis/{tamagotchiId}/xp` | service | `commandId` `UUID`, `amount` integer (≥ 0), `source` string | `200` → `{ "tamagotchiId": UUID, "level": integer, "xp": integer, "leveledUp": boolean }` |
 | `POST /api/v1/internal/tamagotchis/{tamagotchiId}/transfer-owner` | service | `commandId` `UUID`, `newOwnerId` `UUID`, `battleId` `UUID` | `200` → `Tamagotchi`; publishes `tamagotchi.owner_transferred` |
+
+Battle calls the two internal lookups before a match: the first confirms which creature a player fields as primary, the second whether a player may field a creature acquired as a secondary. The holding check answers `isHeld: false` for a creature that exists but is not held, and `404` only when the creature itself is unknown, so a missing reference is not confused with a missing creature.
 
 The stat document is written wholesale rather than patched, because only the owning package knows
 which keys are meaningful together. `expectedVersion` prevents two clients of the same package from
