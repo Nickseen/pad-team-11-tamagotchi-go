@@ -5,7 +5,6 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8083" },
     { "key": "moderatorUserId", "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11" },
     { "key": "otherUserId", "value": "77b1c0de-9a41-4e2f-8c0b-3d5a1e9f0c22" },
     { "key": "version", "value": "1.0.0" },
@@ -22,7 +21,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+            "url": { "raw": "{{packageRegistryUrl}}/health", "host": ["{{packageRegistryUrl}}"], "path": ["health"] }
           },
           "response": []
         }
@@ -58,7 +57,7 @@
               "raw": "{\n  \"slug\": \"dragon-pack-{{$timestamp}}\",\n  \"name\": \"Dragon Pack\",\n  \"description\": \"A Tamagotchi package with fire creatures\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages"] }
           },
           "response": []
         },
@@ -68,8 +67,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/packages?limit=20",
-              "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages"],
+              "raw": "{{packageRegistryUrl}}/api/v1/packages?limit=20",
+              "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages"],
               "query": [{ "key": "limit", "value": "20" }]
             }
           },
@@ -80,7 +79,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
           },
           "response": []
         },
@@ -97,7 +96,7 @@
               "raw": "{\n  \"description\": \"Updated description\",\n  \"status\": \"published\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}"] }
           },
           "response": []
         },
@@ -125,7 +124,7 @@
               "raw": "{\n  \"version\": \"{{version}}\",\n  \"statDefinitions\": [\n    {\n      \"key\": \"hunger\",\n      \"label\": \"Hunger\",\n      \"minValue\": 0,\n      \"maxValue\": 100,\n      \"higherIsBetter\": false,\n      \"combatBonus\": { \"threshold\": 80, \"comparison\": \"gte\", \"multiplier\": 1.2 }\n    }\n  ],\n  \"growthRules\": { \"hungerDecayPerHour\": 5 }\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
           },
           "response": []
         },
@@ -134,7 +133,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
           },
           "response": []
         },
@@ -143,7 +142,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions/{{version}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions", "{{version}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/versions/{{version}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions", "{{version}}"] }
           },
           "response": []
         },
@@ -153,8 +152,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/internal/packages/{{packageId}}/versions/{{version}}/stat-definitions",
-              "host": ["{{baseUrl}}"], "path": ["api", "v1", "internal", "packages", "{{packageId}}", "versions", "{{version}}", "stat-definitions"]
+              "raw": "{{packageRegistryUrl}}/api/v1/internal/packages/{{packageId}}/versions/{{version}}/stat-definitions",
+              "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "internal", "packages", "{{packageId}}", "versions", "{{version}}", "stat-definitions"]
             }
           },
           "response": []
@@ -177,7 +176,7 @@
               "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/moderators", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/moderators", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators"] }
           },
           "response": []
         },
@@ -186,7 +185,7 @@
           "request": {
             "method": "DELETE",
             "header": [{ "key": "X-Roles", "value": "admin", "type": "text" }],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/moderators/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators", "{{otherUserId}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/moderators/{{otherUserId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "moderators", "{{otherUserId}}"] }
           },
           "response": []
         },
@@ -200,7 +199,7 @@
               "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/registrations", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/registrations", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations"] }
           },
           "response": []
         },
@@ -209,7 +208,7 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/registrations/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations", "{{otherUserId}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/registrations/{{otherUserId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "registrations", "{{otherUserId}}"] }
           },
           "response": []
         },
@@ -218,7 +217,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/users/{{otherUserId}}/packages", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{otherUserId}}", "packages"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/users/{{otherUserId}}/packages", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "users", "{{otherUserId}}", "packages"] }
           },
           "response": []
         }
@@ -253,7 +252,7 @@
               "raw": "{\n  \"name\": \"Ash Wyrm\",\n  \"description\": \"A fire-breathing wyrm\",\n  \"spriteRefs\": [\"ash-wyrm-idle.png\"],\n  \"maxHp\": 50000,\n  \"combatType\": \"flame\",\n  \"weaknesses\": [\"water\"],\n  \"resistances\": [\"earth\"],\n  \"specialProperties\": {}\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/monsters", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters"] }
           },
           "response": []
         },
@@ -262,7 +261,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/monsters", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters"] }
           },
           "response": []
         },
@@ -271,7 +270,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
           },
           "response": []
         },
@@ -288,7 +287,7 @@
               "raw": "{\n  \"maxHp\": 60000\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "monsters", "{{monsterId}}"] }
           },
           "response": []
         }
@@ -323,7 +322,7 @@
               "raw": "{\n  \"monsterId\": \"{{monsterId}}\",\n  \"durationSeconds\": 1800,\n  \"maxParticipants\": 20,\n  \"minGuildLevel\": 1,\n  \"rewardConfig\": { \"globalCurrency\": 500, \"xp\": 300, \"distribution\": \"damage_weighted\" },\n  \"scheduledAt\": null\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions"] }
           },
           "response": []
         },
@@ -332,7 +331,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions"] }
           },
           "response": []
         },
@@ -341,7 +340,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/internal/raid-definitions/{{raidDefinitionId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "internal", "raid-definitions", "{{raidDefinitionId}}"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/internal/raid-definitions/{{raidDefinitionId}}", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "internal", "raid-definitions", "{{raidDefinitionId}}"] }
           },
           "response": []
         },
@@ -350,7 +349,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "X-Roles", "value": "admin", "type": "text" }],
-            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/activate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "activate"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/activate", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "activate"] }
           },
           "response": []
         },
@@ -367,7 +366,7 @@
               "raw": "{\n  \"reason\": \"Testing cancellation flow\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/cancel", "host": ["{{baseUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "cancel"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/cancel", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "raid-definitions", "{{raidDefinitionId}}", "cancel"] }
           },
           "response": []
         }
@@ -392,7 +391,7 @@
               "raw": "{\n  \"slug\": \"no-auth-pack\",\n  \"name\": \"No Auth\",\n  \"description\": \"Missing auth header\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages"] }
           },
           "response": []
         },
@@ -407,7 +406,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/00000000-0000-4000-8000-000000000000", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "00000000-0000-4000-8000-000000000000"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/00000000-0000-4000-8000-000000000000", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "00000000-0000-4000-8000-000000000000"] }
           },
           "response": []
         },
@@ -430,7 +429,7 @@
               "raw": "{\n  \"version\": \"9.9.9\",\n  \"statDefinitions\": [],\n  \"growthRules\": {}\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{baseUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{baseUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
+            "url": { "raw": "{{packageRegistryUrl}}/api/v1/packages/{{packageId}}/versions", "host": ["{{packageRegistryUrl}}"], "path": ["api", "v1", "packages", "{{packageId}}", "versions"] }
           },
           "response": []
         }
