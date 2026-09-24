@@ -1279,11 +1279,11 @@ same Compose file runs on Intel, AMD and Apple Silicon machines.
 | Service | Image | Tag | Port | Store |
 | ------- | ----- | --- | ---- | ----- |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management) | `1.1.0` | 8081 | PostgreSQL |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi) | `1.1.0` | 8082 | PostgreSQL |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi) | `2.1.0` | 8082 | PostgreSQL |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry) | `0.3.0` | 8083 | PostgreSQL |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle) | `1.1.0` | 8084 | PostgreSQL |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map) | `1.1.0` | 8085 | Redis |
-| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification) | `1.0.0` | 8086 | PostgreSQL |
+| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification) | `2.1.0` | 8086 | PostgreSQL |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild) | `0.3.0` | 8087 | PostgreSQL |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid) | `1.1.0` | 8088 | PostgreSQL and Redis |
 
@@ -1393,11 +1393,10 @@ environment the values from your `.env`:
 With the defaults, every service answers its cross-service calls from in-process mocks, and all
 eight Postman collections below pass against the stack. Switching a service to live mode makes it
 call its neighbours for real. In Lab 1 this works for Map → User Management, and for
-Monster Raid → Guild and Package Registry. Battle → Tamagotchi and Monster Raid → Tamagotchi are
-refused with `401`, because Tamagotchi's service routes still demand a user token instead of
-accepting `X-Service-Token` alone. Guild → User Management is refused because Guild calls the
-user route `GET /api/v1/users/{userId}`; the service route `GET /api/v1/users?ids=…` answers it with
-`X-Service-Token` alone.
+Monster Raid → Guild and Package Registry. Battle → Tamagotchi and Monster Raid → Tamagotchi work
+with `X-Service-Token` alone since Tamagotchi 2.1.0. Guild → User Management is refused because
+Guild calls the user route `GET /api/v1/users/{userId}`; the service route `GET /api/v1/users?ids=…`
+answers it with `X-Service-Token` alone.
 
 ---
 
@@ -1433,8 +1432,7 @@ placeholders only. Do not commit exported environments containing real tokens or
 Map requires `mapUserToken` to match a token configured through `MAP_AUTH_TOKENS`. Its
 `serviceToken` value must match `MAP_SERVICE_TOKEN`. Monster Raid requires `raidUserToken` and
 `raidAdminToken` to match identities configured through `RAID_AUTH_TOKENS`. The admin identity must
-include the `admin` role. Services using the Lab 1 mock JWT adapter require `mockJwtSecret` to match
-their runtime configuration.
+include the `admin` role.
 
 For example, compatible Map and Monster Raid token mappings have this form; choose your own local
 values instead of committing them:

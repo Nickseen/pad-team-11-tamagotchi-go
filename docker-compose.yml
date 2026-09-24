@@ -89,7 +89,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://tamagotchi:${TAMAGOTCHI_DB_PASSWORD}@tamagotchi-db:5432/tamagotchi
-      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
       JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
     healthcheck:
       <<: *python-healthcheck
@@ -206,7 +206,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://notification:${NOTIFICATION_DB_PASSWORD}@notification-db:5432/notification
-      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
       JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
     healthcheck:
       <<: *python-healthcheck
