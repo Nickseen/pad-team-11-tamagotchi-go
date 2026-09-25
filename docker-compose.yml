@@ -278,17 +278,21 @@ services:
       - raid-redis-data:/data
 
   monster-raid:
-    image: nickseen/tamagotchi-monster-raid:1.1.0
+    image: nickseen/tamagotchi-monster-raid:2.0.0
     restart: on-failure
     depends_on:
       monster-raid-db:
         condition: service_healthy
       monster-raid-redis:
         condition: service_healthy
+      user-management:
+        condition: service_started
     environment:
       RAID_ADDR: ":8088"
-      RAID_AUTH_TOKENS: ${RAID_AUTH_TOKENS:?set RAID_AUTH_TOKENS in .env}
-      RAID_SERVICE_TOKEN: ${SERVICE_TOKEN}
+      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
+      JWT_ISSUER: user-management
+      JWT_AUDIENCE: tamagotchi-go
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
       RAID_STORAGE: postgres-redis
       DATABASE_URL: postgres://raid:${RAID_DB_PASSWORD}@monster-raid-db:5432/raid?sslmode=disable
       RAID_REDIS_ADDR: monster-raid-redis:6379
