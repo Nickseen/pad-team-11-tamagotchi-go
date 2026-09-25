@@ -1,0 +1,1742 @@
+{
+  "info": {
+    "name": "Tamagotchi Service",
+    "description": "Every route of the Tamagotchi service (Lab 1), in the order the Runner should run them. Tokens are signed from the environment's mockJwtSecret, which must equal the service's MOCK_JWT_SECRET.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "usernameA",
+      "value": "postman_user_a"
+    },
+    {
+      "key": "usernameB",
+      "value": "postman_user_b"
+    },
+    {
+      "key": "password",
+      "value": "postman-test-password"
+    },
+    {
+      "key": "tokenA",
+      "value": ""
+    },
+    {
+      "key": "tokenB",
+      "value": ""
+    },
+    {
+      "key": "userAId",
+      "value": ""
+    },
+    {
+      "key": "userBId",
+      "value": ""
+    },
+    {
+      "key": "tamagotchiId",
+      "value": ""
+    },
+    {
+      "key": "secondTamagotchiId",
+      "value": ""
+    },
+    {
+      "key": "opponentTamagotchiId",
+      "value": ""
+    },
+    {
+      "key": "cursor",
+      "value": ""
+    },
+    {
+      "key": "secondaryCommandId",
+      "value": ""
+    },
+    {
+      "key": "referenceId",
+      "value": ""
+    },
+    {
+      "key": "xpCommandId",
+      "value": ""
+    },
+    {
+      "key": "holdingCommandId",
+      "value": ""
+    },
+    {
+      "key": "transferCommandId",
+      "value": ""
+    },
+    {
+      "key": "transferBattleId",
+      "value": ""
+    },
+    {
+      "key": "eventId",
+      "value": ""
+    },
+    {
+      "key": "battleId",
+      "value": ""
+    },
+    {
+      "key": "raidId",
+      "value": ""
+    },
+    {
+      "key": "correlationId",
+      "value": ""
+    },
+    {
+      "key": "idempotencyKey",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup (User Management)",
+      "description": "Tokens come from User Management; nothing is signed locally.",
+      "item": [
+        {
+          "name": "Register user A",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"postman-a@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created or 409 already registered\", () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as user A",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenA', pm.response.json().accessToken);",
+                  "pm.collectionVariables.set('userAId', pm.response.json().userId);",
+                  "pm.test(\"an access token was returned\", () => pm.expect(pm.response.json().tokenType).to.eql(\"Bearer\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register user B",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"postman-b@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created or 409 already registered\", () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as user B",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenB', pm.response.json().accessToken);",
+                  "pm.collectionVariables.set('userBId', pm.response.json().userId);",
+                  "pm.test(\"an access token was returned\", () => pm.expect(pm.response.json().tokenType).to.eql(\"Bearer\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Creatures",
+      "description": "CRUD, ownership and validation errors.",
+      "item": [
+        {
+          "name": "Create a Tamagotchi (user A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{packageId}}\",\n  \"name\": \"Sparky\",\n  \"combatType\": \"flame\",\n  \"spriteRef\": \"sprites/sparky.png\",\n  \"stats\": {\n    \"hunger\": 5,\n    \"energy\": 7.5\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('tamagotchiId', pm.response.json().tamagotchiId);",
+                  "pm.test(\"starts at level 1 with 0 XP\", () => pm.expect(pm.response.json().level === 1 && pm.response.json().xp === 0).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a second Tamagotchi (user A)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{packageId}}\",\n  \"name\": \"Bolt\",\n  \"combatType\": \"electric\",\n  \"spriteRef\": \"sprites/sparky.png\",\n  \"stats\": {\n    \"hunger\": 5,\n    \"energy\": 7.5\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('secondTamagotchiId', pm.response.json().tamagotchiId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a Tamagotchi (user B)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{packageId}}\",\n  \"name\": \"Gloom\",\n  \"combatType\": \"shadow\",\n  \"spriteRef\": \"sprites/sparky.png\",\n  \"stats\": {\n    \"hunger\": 5,\n    \"energy\": 7.5\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('opponentTamagotchiId', pm.response.json().tamagotchiId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a Tamagotchi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"camelCase fields\", () => pm.expect('ownerId' in pm.response.json()).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List user A's Tamagotchis, one per page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis?ownerId={{userAId}}&limit=1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"another page exists\", () => pm.expect(pm.response.json().hasMore === true).to.be.true);",
+                  "pm.collectionVariables.set('cursor', pm.response.json().nextCursor);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List the next page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis?ownerId={{userAId}}&limit=1&cursor={{cursor}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"one item\", () => pm.expect(pm.response.json().items.length === 1).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rename a Tamagotchi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sparky II\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"renamed\", () => pm.expect(pm.response.json().name === 'Sparky II').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: rename someone else's Tamagotchi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Stolen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 TAMAGOTCHI_NOT_OWNED\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('TAMAGOTCHI_NOT_OWNED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: unknown combat type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{packageId}}\",\n  \"name\": \"Sparky\",\n  \"combatType\": \"plasma\",\n  \"spriteRef\": \"sprites/sparky.png\",\n  \"stats\": {\n    \"hunger\": 5,\n    \"energy\": 7.5\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 UNSUPPORTED_VALUE\", () => {",
+                  "    pm.response.to.have.status(422);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('UNSUPPORTED_VALUE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: name longer than 32 characters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{packageId}}\",\n  \"name\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\n  \"combatType\": \"flame\",\n  \"spriteRef\": \"sprites/sparky.png\",\n  \"stats\": {\n    \"hunger\": 5,\n    \"energy\": 7.5\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 VALIDATION_FAILED\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: unknown Tamagotchi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/00000000-0000-4000-8000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 TAMAGOTCHI_NOT_FOUND\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('TAMAGOTCHI_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: no token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Statistics",
+      "description": "Opaque stats with optimistic concurrency.",
+      "item": [
+        {
+          "name": "Get stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}/stats"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"version 1\", () => pm.expect(pm.response.json().statsVersion === 1).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replace stats (expectedVersion 1)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}/stats",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stats\": {\n    \"hunger\": 9,\n    \"mood\": 3\n  },\n  \"expectedVersion\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"version 2\", () => pm.expect(pm.response.json().statsVersion === 2).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: stale expectedVersion",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}/stats",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stats\": {\n    \"hunger\": 0\n  },\n  \"expectedVersion\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 STALE_STATS_VERSION\", () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('STALE_STATS_VERSION');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Primary and secondary",
+      "description": "One primary per user; secondaries are references, never copies.",
+      "item": [
+        {
+          "name": "Set user A's primary",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/users/me/primary-tamagotchi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tamagotchiId\": \"{{tamagotchiId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set user B's primary",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/users/me/primary-tamagotchi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get user A's primary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/users/{{userAId}}/primary-tamagotchi"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"it is the one just set\", () => pm.expect(pm.response.json().tamagotchiId === pm.collectionVariables.get('tamagotchiId')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: delete a primary Tamagotchi",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 TAMAGOTCHI_IS_PRIMARY\", () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('TAMAGOTCHI_IS_PRIMARY');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: choose someone else's Tamagotchi as primary",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/users/me/primary-tamagotchi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 TAMAGOTCHI_NOT_OWNED\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('TAMAGOTCHI_NOT_OWNED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attach a secondary reference (service)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{secondaryCommandId}}\",\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n  \"acquiredFrom\": \"trade\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('secondaryCommandId', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('referenceId', pm.response.json().referenceId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attach it again with the same commandId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{secondaryCommandId}}\",\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n  \"acquiredFrom\": \"trade\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK (the original result)\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"same reference\", () => pm.expect(pm.response.json().referenceId === pm.collectionVariables.get('referenceId')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List user A's secondaries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/users/{{userAId}}/secondary-tamagotchis"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove the secondary reference",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/users/me/secondary-tamagotchis/{{referenceId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Combat types",
+      "description": "The fixed advantage ring flame \u2192 nature \u2192 earth \u2192 electric \u2192 water \u2192 shadow \u2192 flame.",
+      "item": [
+        {
+          "name": "List combat types (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{tamagotchiUrl}}/api/v1/combat-types"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"six types\", () => pm.expect(pm.response.json().items.length === 6).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Advantage: flame attacks nature",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/combat-types/advantage?attacker=flame&defender=nature"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"strong: 1.5\", () => pm.expect(pm.response.json().multiplier === 1.5).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Advantage: flame attacks shadow",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/combat-types/advantage?attacker=flame&defender=shadow"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"weak: 0.75\", () => pm.expect(pm.response.json().multiplier === 0.75).to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal routes",
+      "description": "Called by Battle and Monster Raid; need X-Service-Token.",
+      "item": [
+        {
+          "name": "Bulk read",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/tamagotchis?ids={{tamagotchiId}},{{secondTamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"both found\", () => pm.expect(pm.response.json().items.length === 2).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Grant XP (levels up)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/xp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{xpCommandId}}\",\n  \"amount\": 120,\n  \"source\": \"raid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('xpCommandId', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"level 2 with 20 XP left\", () => pm.expect(pm.response.json().level === 2 && pm.response.json().xp === 20).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Grant the same XP command again",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/xp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{xpCommandId}}\",\n  \"amount\": 120,\n  \"source\": \"raid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"not applied twice\", () => pm.expect(pm.response.json().xp === 20).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transfer ownership after a battle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/transfer-owner",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{transferCommandId}}\",\n  \"newOwnerId\": \"{{userBId}}\",\n  \"battleId\": \"{{transferBattleId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('transferCommandId', require('uuid').v4());",
+                  "pm.collectionVariables.set('transferBattleId', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"now owned by user B\", () => pm.expect(pm.response.json().ownerId === pm.collectionVariables.get('userBId')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primary of user A (service token only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/primary-tamagotchi"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"it is the creature set as primary\", () => pm.expect(pm.response.json().tamagotchiId === pm.collectionVariables.get('tamagotchiId')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: primary of a user who has none",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/00000000-0000-4000-8000-000000000000/primary-tamagotchi"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 NO_PRIMARY_TAMAGOTCHI\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('NO_PRIMARY_TAMAGOTCHI');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attach a secondary reference for the holding check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{holdingCommandId}}\",\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n  \"acquiredFrom\": \"capture\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('holdingCommandId', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Secondary holding: held",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/{{opponentTamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"isHeld is true\", () => pm.expect(pm.response.json().isHeld === true).to.be.true);",
+                  "pm.test(\"a referenceId is returned\", () => pm.expect(pm.response.json().referenceId !== null).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Secondary holding: not held",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userBId}}/secondary-tamagotchis/{{secondTamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"isHeld is false\", () => pm.expect(pm.response.json().isHeld === false).to.be.true);",
+                  "pm.test(\"referenceId is null\", () => pm.expect(pm.response.json().referenceId === null).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: holding check for an unknown Tamagotchi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/00000000-0000-4000-8000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 TAMAGOTCHI_NOT_FOUND\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('TAMAGOTCHI_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: internal route without X-Service-Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/tamagotchis?ids={{tamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Events (mock of RabbitMQ)",
+      "description": "Events other services would publish, delivered by hand.",
+      "item": [
+        {
+          "name": "battle.finished: user B beats user A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userBId}}\",\n    \"loserId\": \"{{userAId}}\",\n    \"outcome\": \"knockout\",\n    \"turnCount\": 9,\n    \"transferredTamagotchiId\": \"{{tamagotchiId}}\",\n    \"currency\": {\n      \"winnerDelta\": 250,\n      \"loserDelta\": -100\n    },\n    \"xp\": {\n      \"winner\": {\n        \"primaryTamagotchiId\": \"{{opponentTamagotchiId}}\",\n        \"primaryXp\": 180,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      },\n      \"loser\": {\n        \"primaryTamagotchiId\": \"{{tamagotchiId}}\",\n        \"primaryXp\": 60,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      }\n    },\n    \"finishedAt\": \"2026-09-22T12:00:00.000Z\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', require('uuid').v4());",
+                  "pm.collectionVariables.set('battleId', require('uuid').v4());",
+                  "pm.collectionVariables.set('correlationId', require('uuid').v4());",
+                  "pm.collectionVariables.set('idempotencyKey', pm.collectionVariables.get('battleId'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"applied\", () => pm.expect(pm.response.json().status === 'applied').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The loser's primary now belongs to the winner",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{tamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"owned by user B\", () => pm.expect(pm.response.json().ownerId === pm.collectionVariables.get('userBId')).to.be.true);",
+                  "pm.test(\"captured in this battle\", () => pm.expect(pm.response.json().capturedInBattleId === pm.collectionVariables.get('battleId')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User A has lost the primary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/users/{{userAId}}/primary-tamagotchi"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 NO_PRIMARY_TAMAGOTCHI\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('NO_PRIMARY_TAMAGOTCHI');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same event redelivered",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userBId}}\",\n    \"loserId\": \"{{userAId}}\",\n    \"outcome\": \"knockout\",\n    \"turnCount\": 9,\n    \"transferredTamagotchiId\": \"{{tamagotchiId}}\",\n    \"currency\": {\n      \"winnerDelta\": 250,\n      \"loserDelta\": -100\n    },\n    \"xp\": {\n      \"winner\": {\n        \"primaryTamagotchiId\": \"{{opponentTamagotchiId}}\",\n        \"primaryXp\": 180,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      },\n      \"loser\": {\n        \"primaryTamagotchiId\": \"{{tamagotchiId}}\",\n        \"primaryXp\": 60,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      }\n    },\n    \"finishedAt\": \"2026-09-22T12:00:00.000Z\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"recognised as duplicate\", () => pm.expect(pm.response.json().status === 'duplicate').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "raid.monster_defeated",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"raid.monster_defeated\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidId}}\",\n    \"guildId\": \"{{raidId}}\",\n    \"monsterId\": \"{{raidId}}\",\n    \"totalDamage\": 9000,\n    \"durationSeconds\": 600,\n    \"defeatedAt\": \"2026-09-22T12:30:00.000Z\",\n    \"rewards\": [\n      {\n        \"userId\": \"{{userBId}}\",\n        \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n        \"globalCurrency\": 500,\n        \"xp\": 300,\n        \"damageShare\": 1.0\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', require('uuid').v4());",
+                  "pm.collectionVariables.set('raidId', require('uuid').v4());",
+                  "pm.collectionVariables.set('correlationId', require('uuid').v4());",
+                  "pm.collectionVariables.set('idempotencyKey', pm.collectionVariables.get('raidId'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"applied\", () => pm.expect(pm.response.json().status === 'applied').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: event version this service does not understand",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 2,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', require('uuid').v4());",
+                  "pm.collectionVariables.set('correlationId', require('uuid').v4());",
+                  "pm.collectionVariables.set('idempotencyKey', require('uuid').v4());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 UNSUPPORTED_EVENT_VERSION\", () => {",
+                  "    pm.response.to.have.status(422);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('UNSUPPORTED_EVENT_VERSION');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cleanup and operations",
+      "description": "",
+      "item": [
+        {
+          "name": "Delete a Tamagotchi (user B now owns it)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{tamagotchiUrl}}/api/v1/tamagotchis/{{secondTamagotchiId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{tamagotchiUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,977 @@
+{
+  "info": {
+    "_postman_id": "e0ae5ad6-4bcb-4c79-93c5-fcefe518ab89",
+    "name": "Tamagotchi Go - Monster Raid Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Monster Raid API examples. Setup registers a User Management user and obtains an RS256 token. Lifecycle examples need Guild, Registry, and Tamagotchi fixtures. Admin-only requests and their cancellation-dependent assertion skip when no admin JWT is configured."
+  },
+  "item": [
+    {
+      "name": "Setup (User Management)",
+      "description": "Create a test user and obtain a real RS256 access token from User Management.",
+      "item": [
+        {
+          "name": "Register test user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"{{username}}@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created or 409 already registered', () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in test user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('userToken', pm.response.json().accessToken);",
+                  "const payload = JSON.parse(atob(pm.response.json().accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));",
+                  "pm.collectionVariables.set('userId', payload.sub);",
+                  "pm.test('RS256 access token returned', () => pm.expect(pm.response.json().accessToken).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{monsterRaidUrl}}/healthz",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            },
+            "description": "Expected: 200 and {\"status\":\"ok\"}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Service is healthy', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Raid lifecycle (dependencies required)",
+      "description": "Run in order with Guild, Registry, and Tamagotchi dependencies or mocks. Values must describe an owner/officer, an active definition, and that user’s primary Tamagotchi.",
+      "item": [
+        {
+          "name": "Create raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guildId\": \"{{guildId}}\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids"
+              ]
+            },
+            "description": "Expected: 201. Saves raidId for following requests."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('Active raid is created', () => pm.expect(json.status).to.eql('active'));",
+                  "pm.collectionVariables.set('raidId', json.raidId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get raid",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}"
+              ]
+            },
+            "description": "Expected: 200 for the created raid."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct raid is returned', () => pm.expect(pm.response.json().raidId).to.eql(pm.collectionVariables.get('raidId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List guild raids",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/guilds/{{guildId}}/raids?status=active&limit=20",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds",
+                "{{guildId}}",
+                "raids"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Expected: 200 collection envelope containing the created raid."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Collection envelope is returned', () => { pm.expect(json.items).to.be.an('array'); pm.expect(json.hasMore).to.be.a('boolean'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Join raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryTamagotchiId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants"
+              ]
+            },
+            "description": "Expected: 201 with the pinned primary Tamagotchi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.collectionVariables.get('primaryTamagotchiId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List participants",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants?limit=20",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Expected: 200 collection envelope."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Participant is listed', () => pm.expect(pm.response.json().items).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attack raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "attacks"
+              ]
+            },
+            "description": "Expected: 200. Generates commandId and stores the response for idempotency verification."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Damage is applied', () => pm.expect(json.damageDealt).to.be.above(0));",
+                  "pm.collectionVariables.set('attackSnapshot', JSON.stringify(json));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay same attack command",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "attacks"
+              ]
+            },
+            "description": "Expected: 200 with exactly the original result and no second damage application."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const original = JSON.parse(pm.collectionVariables.get('attackSnapshot'));",
+                  "const replay = pm.response.json();",
+                  "pm.test('Idempotent response is unchanged', () => { pm.expect(replay.commandId).to.eql(original.commandId); pm.expect(replay.monsterHpRemaining).to.eql(original.monsterHpRemaining); pm.expect(replay.yourTotalDamage).to.eql(original.yourTotalDamage); pm.expect(replay.attackedAt).to.eql(original.attackedAt); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/leaderboard?limit=20",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "leaderboard"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Expected: 200 with ranked damage entries."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Leaderboard has ranks', () => pm.expect(pm.response.json().items[0].rank).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leave raid",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants/me",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants",
+                "me"
+              ]
+            },
+            "description": "Expected: 204. Damage history remains stored."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rejoin raid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryTamagotchiId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "participants"
+              ]
+            },
+            "description": "Expected: 201 using the same pinned Tamagotchi; previous damage is retained."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Damage survives rejoin', () => pm.expect(pm.response.json().damageDealt).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel raid as admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Postman state-transition check\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/cancel",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "cancel"
+              ]
+            },
+            "description": "Expected: 200 and status=cancelled. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Raid is cancelled', () => pm.expect(pm.response.json().status).to.eql('cancelled'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject attack after cancellation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/attacks",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{raidId}}",
+                "attacks"
+              ]
+            },
+            "description": "Expected: 409 RAID_NOT_ACTIVE. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();",
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error code is RAID_NOT_ACTIVE', () => pm.expect(pm.response.json().error.code).to.eql('RAID_NOT_ACTIVE'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Errors without dependencies",
+      "description": "These requests are validated before any downstream call and can run with Monster Raid alone.",
+      "item": [
+        {
+          "name": "Reject missing bearer token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guildId\": \"{{guildId}}\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids"
+              ]
+            },
+            "description": "Expected: 401 UNAUTHORIZED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error code is UNAUTHORIZED', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid identifiers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guildId\": \"not-a-uuid\",\n  \"raidDefinitionId\": \"{{raidDefinitionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids"
+              ]
+            },
+            "description": "Expected: 400 INVALID_ID."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is INVALID_ID', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_ID'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject empty cancellation reason",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{exampleRaidId}}/cancel",
+              "host": [
+                "{{monsterRaidUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "raids",
+                "{{exampleRaidId}}",
+                "cancel"
+              ]
+            },
+            "description": "Expected: 400 INVALID_REASON before raid lookup. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code is INVALID_REASON', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_REASON'));",
+                  "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('username')) pm.collectionVariables.set('username', 'raid_' + pm.variables.replaceIn('{{$guid}}').replace(/-/g, '').slice(0, 12));",
+          "if (!pm.collectionVariables.get('password')) pm.collectionVariables.set('password', pm.variables.replaceIn('{{$guid}}') + 'Aa1!');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "username",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "guildId",
+      "value": "2d7c4e91-0a3b-4f8c-91de-6b2a0c5f7e33"
+    },
+    {
+      "key": "raidDefinitionId",
+      "value": "e5a91c37-8b02-4d6f-a1c9-70f3b8d2e514"
+    },
+    {
+      "key": "primaryTamagotchiId",
+      "value": "4a1b2c3d-1111-4111-8111-111111111111"
+    },
+    {
+      "key": "exampleRaidId",
+      "value": "b81f0a63-77de-4f2c-9a10-5c2e7d3b8410"
+    },
+    {
+      "key": "raidId",
+      "value": ""
+    },
+    {
+      "key": "commandId",
+      "value": ""
+    },
+    {
+      "key": "attackSnapshot",
+      "value": ""
+    }
+  ]
+}

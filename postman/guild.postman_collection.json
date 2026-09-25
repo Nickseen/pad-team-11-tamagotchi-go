@@ -1,0 +1,930 @@
+{
+  "info": {
+    "name": "Guild Service",
+    "description": "CRUD and lifecycle requests for the Guild service. Run top-to-bottom with the Collection Runner. Setup (User Management) registers and logs in two real users so every user-authenticated request carries a real RS256 token; internal routes send only X-Service-Token, no user token, per the CPR contract. The invitation flow exercises Guild's real call to User Management's bulk GET /api/v1/users?ids= route.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "ownerName",
+      "value": ""
+    },
+    {
+      "key": "inviteeName",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "runPackageId",
+      "value": ""
+    },
+    {
+      "key": "ownerId",
+      "value": ""
+    },
+    {
+      "key": "inviteeId",
+      "value": ""
+    },
+    {
+      "key": "ownerToken",
+      "value": ""
+    },
+    {
+      "key": "inviteeToken",
+      "value": ""
+    },
+    {
+      "key": "guildId",
+      "value": ""
+    },
+    {
+      "key": "invitationId",
+      "value": ""
+    },
+    {
+      "key": "declineInvitationId",
+      "value": ""
+    },
+    {
+      "key": "shortTag",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runId')) {",
+          "    const runId = Date.now().toString(36);",
+          "    pm.collectionVariables.set('runId', runId);",
+          "    pm.collectionVariables.set('ownerName', 'pad_gd_own_' + runId);",
+          "    pm.collectionVariables.set('inviteeName', 'pad_gd_inv_' + runId);",
+          "    pm.collectionVariables.set('password', 'postman-run-' + runId);",
+          "    pm.collectionVariables.set('runPackageId', pm.variables.replaceIn('{{$guid}}'));",
+          "    pm.collectionVariables.set('shortTag', runId.slice(-4).toUpperCase());",
+          "}",
+          "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup (User Management)",
+      "item": [
+        {
+          "name": "Register the owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('ownerId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{ownerName}}\",\n  \"email\": \"{{ownerName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Register the invitee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('inviteeId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{inviteeName}}\",\n  \"email\": \"{{inviteeName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Log in as the owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('ownerToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{ownerName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Log in as the invitee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('inviteeToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{inviteeName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/login"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('database ok', () => pm.expect(pm.response.json().database).to.eql('ok'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{guildUrl}}/health"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Guilds",
+      "item": [
+        {
+          "name": "Create guild",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('ownerId matches the caller', () => pm.expect(json.ownerId).to.eql(pm.collectionVariables.get('ownerId')));",
+                  "pm.test('memberCount starts at 1', () => pm.expect(json.memberCount).to.eql(1));",
+                  "pm.collectionVariables.set('guildId', json.guildId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ember Wardens {{runId}}\",\n  \"tag\": \"E{{shortTag}}\",\n  \"description\": \"A guild for flame-type trainers\",\n  \"emblemRef\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{guildUrl}}/api/v1/guilds"
+          },
+          "response": []
+        },
+        {
+          "name": "List guilds",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('the created guild is in the list', () => pm.expect(pm.response.json().items.map(g => g.guildId)).to.include(pm.collectionVariables.get('guildId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{guildUrl}}/api/v1/guilds?query={{runId}}",
+              "host": [
+                "{{guildUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guilds"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "{{runId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get guild",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('level starts at 1', () => pm.expect(pm.response.json().level).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update guild (owner/officer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('description updated', () => pm.expect(pm.response.json().description).to.eql('Updated guild description'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated guild description\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - get guild (service token only, for Monster Raid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('guildId matches', () => pm.expect(json.guildId).to.eql(pm.collectionVariables.get('guildId')));",
+                  "pm.test('level is a number', () => pm.expect(json.level).to.be.a('number'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Invitations",
+      "item": [
+        {
+          "name": "Create invitation for a real registered user (owner/officer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('invitedUserId matches the invitee', () => pm.expect(json.invitedUserId).to.eql(pm.collectionVariables.get('inviteeId')));",
+                  "pm.collectionVariables.set('invitationId', json.invitationId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{inviteeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations"
+          },
+          "response": []
+        },
+        {
+          "name": "List guild invitations (owner/officer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('one pending invitation', () => pm.expect(pm.response.json().items.filter(i => i.status === 'pending')).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations"
+          },
+          "response": []
+        },
+        {
+          "name": "List my invitations (invitee)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('the invitation is listed', () => pm.expect(pm.response.json().items.map(i => i.invitationId)).to.include(pm.collectionVariables.get('invitationId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{inviteeToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/users/me/invitations"
+          },
+          "response": []
+        },
+        {
+          "name": "Accept invitation (invitee)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('role is member', () => pm.expect(pm.response.json().role).to.eql('member'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{inviteeToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/invitations/{{invitationId}}/accept"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Membership",
+      "item": [
+        {
+          "name": "List members",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('owner and invitee are both members', () => pm.expect(pm.response.json().items.map(m => m.userId)).to.include.members([pm.collectionVariables.get('ownerId'), pm.collectionVariables.get('inviteeId')]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members"
+          },
+          "response": []
+        },
+        {
+          "name": "Promote member to officer (owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('role is officer', () => pm.expect(pm.response.json().role).to.eql('officer'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"officer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - membership check (service token only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('isMember true', () => pm.expect(json.isMember).to.eql(true));",
+                  "pm.test('role is officer', () => pm.expect(json.role).to.eql('officer'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members/{{inviteeId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - list members, bulk (service token only, for Notification)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('owner and invitee are both members', () => pm.expect(pm.response.json().items.map(m => m.userId)).to.include.members([pm.collectionVariables.get('ownerId'), pm.collectionVariables.get('inviteeId')]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members"
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - list members paginates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('one item on the page', () => pm.expect(pm.response.json().items).to.have.lengthOf(1));",
+                  "pm.test('hasMore true', () => pm.expect(pm.response.json().hasMore).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members?limit=1"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove member (owner/officer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "item": [
+        {
+          "name": "401 - create guild without a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"No Auth Guild {{runId}}\",\n  \"tag\": \"N{{shortTag}}\",\n  \"description\": \"Missing auth header\",\n  \"emblemRef\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{guildUrl}}/api/v1/guilds"
+          },
+          "response": []
+        },
+        {
+          "name": "404 - get unknown guild",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('GUILD_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{guildUrl}}/api/v1/guilds/00000000-0000-4000-8000-000000000000"
+          },
+          "response": []
+        },
+        {
+          "name": "404 - invite an unregistered user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('USER_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{$guid}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations"
+          },
+          "response": []
+        },
+        {
+          "name": "403 - delete guild as a member, not the owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{inviteeToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route without X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members"
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route with a user token but no X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route with wrong X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "definitely-wrong"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "404 - internal get guild, unknown id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('GUILD_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/internal/guilds/00000000-0000-4000-8000-000000000000"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cleanup",
+      "item": [
+        {
+          "name": "Delete guild (owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1118 @@
+{
+  "info": {
+    "name": "Package Registry Service",
+    "description": "CRUD and lifecycle requests for the Package Registry service. Run top-to-bottom with the Collection Runner. Setup (User Management) registers and logs in two real users so every user-authenticated request carries a real RS256 token; internal routes send only X-Service-Token, no user token, per the CPR contract. Admin-only requests are skipped when no registryAdminToken is set, since User Management only issues the user role in Lab 1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "moderatorName",
+      "value": ""
+    },
+    {
+      "key": "otherName",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "runPackageId",
+      "value": ""
+    },
+    {
+      "key": "moderatorId",
+      "value": ""
+    },
+    {
+      "key": "otherId",
+      "value": ""
+    },
+    {
+      "key": "moderatorToken",
+      "value": ""
+    },
+    {
+      "key": "otherToken",
+      "value": ""
+    },
+    {
+      "key": "registryPackageId",
+      "value": ""
+    },
+    {
+      "key": "version",
+      "value": "1.0.0"
+    },
+    {
+      "key": "monsterId",
+      "value": ""
+    },
+    {
+      "key": "raidDefinitionId",
+      "value": ""
+    },
+    {
+      "key": "emptyPackageId",
+      "value": ""
+    },
+    {
+      "key": "registryAdminToken",
+      "value": "",
+      "type": "secret"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runId')) {",
+          "    const runId = Date.now().toString(36);",
+          "    pm.collectionVariables.set('runId', runId);",
+          "    pm.collectionVariables.set('moderatorName', 'pad_pr_mod_' + runId);",
+          "    pm.collectionVariables.set('otherName', 'pad_pr_other_' + runId);",
+          "    pm.collectionVariables.set('password', 'postman-run-' + runId);",
+          "    pm.collectionVariables.set('runPackageId', pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup (User Management)",
+      "item": [
+        {
+          "name": "Register the moderator",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('moderatorId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{moderatorName}}\",\n  \"email\": \"{{moderatorName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Register the other user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('otherId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{otherName}}\",\n  \"email\": \"{{otherName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Log in as the moderator",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('moderatorToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{moderatorName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Log in as the other user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('otherToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{otherName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{userManagementUrl}}/api/v1/auth/login"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('database ok', () => pm.expect(pm.response.json().database).to.eql('ok'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/health"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Packages & Versions",
+      "item": [
+        {
+          "name": "Create package",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('moderatorIds has the caller', () => pm.expect(json.moderatorIds).to.include(pm.collectionVariables.get('moderatorId')));",
+                  "pm.collectionVariables.set('registryPackageId', json.packageId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"dragon-pack-{{runId}}\",\n  \"name\": \"Dragon Pack\",\n  \"description\": \"A Tamagotchi package with fire creatures\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages"
+          },
+          "response": []
+        },
+        {
+          "name": "List packages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('created package is in the list', () => pm.expect(pm.response.json().items.map(p => p.packageId)).to.include(pm.collectionVariables.get('registryPackageId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/packages?limit=100"
+          },
+          "response": []
+        },
+        {
+          "name": "Get package by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('slug matches', () => pm.expect(pm.response.json().slug).to.eql('dragon-pack-' + pm.collectionVariables.get('runId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update package (moderator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status published', () => pm.expect(pm.response.json().status).to.eql('published'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"status\": \"published\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Publish version (moderator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('version echoed', () => pm.expect(pm.response.json().version).to.eql(pm.collectionVariables.get('version')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"{{version}}\",\n  \"statDefinitions\": [\n    { \"key\": \"hunger\", \"label\": \"Hunger\", \"minValue\": 0, \"maxValue\": 100, \"higherIsBetter\": false, \"combatBonus\": { \"threshold\": 80, \"comparison\": \"gte\", \"multiplier\": 1.2 } }\n  ],\n  \"growthRules\": { \"hungerDecayPerHour\": 5 }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions"
+          },
+          "response": []
+        },
+        {
+          "name": "List versions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('one version', () => pm.expect(pm.response.json().items).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions"
+          },
+          "response": []
+        },
+        {
+          "name": "Get version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('one stat definition', () => pm.expect(pm.response.json().statDefinitions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions/{{version}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - get stat definitions (service token only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('hunger key present', () => pm.expect(pm.response.json().items.map(s => s.key)).to.include('hunger'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions"
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - get current version (service token only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('version matches the only published one', () => pm.expect(pm.response.json().version).to.eql(pm.collectionVariables.get('version')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Moderators & Registrations",
+      "item": [
+        {
+          "name": "Register user with package",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{otherId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations"
+          },
+          "response": []
+        },
+        {
+          "name": "List packages a user is registered with",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('the package is listed', () => pm.expect(pm.response.json().items.map(p => p.packageId)).to.include(pm.collectionVariables.get('registryPackageId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/users/{{otherId}}/packages"
+          },
+          "response": []
+        },
+        {
+          "name": "Unregister user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations/{{otherId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin (skipped in the stack \u2014 User Management only issues the user role)",
+      "item": [
+        {
+          "name": "Grant moderator (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registryAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{otherId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators"
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke moderator (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registryAdminToken}}"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators/{{otherId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create monster (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('monsterId', pm.response.json().monsterId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registryAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ash Wyrm\",\n  \"description\": \"A fire-breathing wyrm\",\n  \"spriteRefs\": [\"ash-wyrm-idle.png\"],\n  \"maxHp\": 50000,\n  \"combatType\": \"flame\",\n  \"weaknesses\": [\"water\"],\n  \"resistances\": [\"earth\"],\n  \"specialProperties\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/monsters"
+          },
+          "response": []
+        },
+        {
+          "name": "Update monster (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('maxHp updated', () => pm.expect(pm.response.json().maxHp).to.eql(60000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registryAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"maxHp\": 60000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create raid definition (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('raidDefinitionId', pm.response.json().raidDefinitionId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registryAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monsterId\": \"{{monsterId}}\",\n  \"durationSeconds\": 1800,\n  \"maxParticipants\": 20,\n  \"minGuildLevel\": 1,\n  \"rewardConfig\": { \"globalCurrency\": 500, \"xp\": 300, \"distribution\": \"damage_weighted\" },\n  \"scheduledAt\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/raid-definitions"
+          },
+          "response": []
+        },
+        {
+          "name": "Internal - get raid definition (service token only)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('monster embedded', () => pm.expect(pm.response.json().monster.monsterId).to.eql(pm.collectionVariables.get('monsterId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/internal/raid-definitions/{{raidDefinitionId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Activate raid definition (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status active', () => pm.expect(pm.response.json().status).to.eql('active'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registryAdminToken}}"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/activate"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel raid definition (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status cancelled', () => pm.expect(pm.response.json().status).to.eql('cancelled'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registryAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Testing cancellation flow\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/cancel"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "item": [
+        {
+          "name": "401 - create package without a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"no-auth-pack-{{runId}}\",\n  \"name\": \"No Auth\",\n  \"description\": \"Missing auth header\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages"
+          },
+          "response": []
+        },
+        {
+          "name": "404 - get unknown package",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('PACKAGE_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/packages/00000000-0000-4000-8000-000000000000"
+          },
+          "response": []
+        },
+        {
+          "name": "403 - publish version as non-moderator",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{otherToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"9.9.9\",\n  \"statDefinitions\": [],\n  \"growthRules\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions"
+          },
+          "response": []
+        },
+        {
+          "name": "404 - versions/current with nothing published",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('201 Created (new package)', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.collectionVariables.set('emptyPackageId', json.packageId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"no-version-pack-{{runId}}\",\n  \"name\": \"No Version\",\n  \"description\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{packageRegistryUrl}}/api/v1/packages"
+          },
+          "response": []
+        },
+        {
+          "name": "404 - versions/current, confirm NO_CURRENT_VERSION",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('NO_CURRENT_VERSION'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{emptyPackageId}}/versions/current"
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route without X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route with a user token but no X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+          },
+          "response": []
+        },
+        {
+          "name": "401 - internal route with wrong X-Service-Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "definitely-wrong"
+              }
+            ],
+            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

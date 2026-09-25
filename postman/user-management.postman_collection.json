@@ -1,0 +1,1453 @@
+{
+  "info": {
+    "name": "User Management Service",
+    "description": "Every route of the User Management Service, in run order: registration and login, profiles, the social graph and both currencies. Run the folder from top to bottom \u2014 each request feeds the next through collection variables, and no credential is stored in the collection: the users are registered by the run itself.\n\nSet userManagementUrl and serviceToken in the environment; serviceToken must equal the service's SERVICE_TOKEN.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// One run, one set of fresh users: the collection can be run repeatedly against the",
+          "// same database without colliding on a username or an email address.",
+          "if (!pm.collectionVariables.get('runId')) {",
+          "    const runId = Date.now().toString(36);",
+          "    pm.collectionVariables.set('runId', runId);",
+          "    pm.collectionVariables.set('usernameA', 'pad_a_' + runId);",
+          "    pm.collectionVariables.set('usernameB', 'pad_b_' + runId);",
+          "    pm.collectionVariables.set('usernameC', 'pad_c_' + runId);",
+          "    pm.collectionVariables.set('password', 'postman-run-' + runId);",
+          "    pm.collectionVariables.set('runPackageId', pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "// The contract asks every request to carry a correlation id.",
+          "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "usernameA",
+      "value": ""
+    },
+    {
+      "key": "usernameB",
+      "value": ""
+    },
+    {
+      "key": "usernameC",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "runPackageId",
+      "value": ""
+    },
+    {
+      "key": "userAId",
+      "value": ""
+    },
+    {
+      "key": "userBId",
+      "value": ""
+    },
+    {
+      "key": "userCId",
+      "value": ""
+    },
+    {
+      "key": "tokenA",
+      "value": ""
+    },
+    {
+      "key": "tokenB",
+      "value": ""
+    },
+    {
+      "key": "refreshTokenA",
+      "value": ""
+    },
+    {
+      "key": "requestId",
+      "value": ""
+    },
+    {
+      "key": "commandId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register user A",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('userAId', pm.response.json().userId);",
+                  "pm.test(\"the account starts active\", () => pm.expect(pm.response.json().status).to.eql(\"active\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register user B",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"email\": \"{{usernameB}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('userBId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register user C",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameC}}\",\n  \"email\": \"{{usernameC}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('userCId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register with a username already taken",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"USERNAME_TAKEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"USERNAME_TAKEN\"));",
+                  "pm.test(\"error envelope carries a correlation id and a timestamp\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "    pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register with a password below ten characters",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}_short\",\n  \"email\": \"short_{{usernameA}}@example.com\",\n  \"password\": \"short\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"WEAK_PASSWORD\", () => pm.expect(pm.response.json().error.code).to.eql(\"WEAK_PASSWORD\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register with an invalid email address",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}_mail\",\n  \"email\": \"not-an-address\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"INVALID_EMAIL\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_EMAIL\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as user A",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('tokenA', body.accessToken);",
+                  "pm.collectionVariables.set('refreshTokenA', body.refreshToken);",
+                  "pm.test(\"returns a token pair with a lifetime\", () => {",
+                  "    pm.expect(body.accessToken).to.be.a(\"string\");",
+                  "    pm.expect(body.refreshToken).to.be.a(\"string\");",
+                  "    pm.expect(body.expiresIn).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as user B",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenB', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in with the wrong password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"wrong-password-entirely\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"INVALID_CREDENTIALS\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_CREDENTIALS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as a user who does not exist",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"nobody_{{runId}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"INVALID_CREDENTIALS\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_CREDENTIALS\"));",
+                  "// An unknown user is indistinguishable from a wrong password, by design."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh the token pair",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshTokenA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"the refresh token is rotated\", () => pm.expect(body.refreshToken).to.not.eql(pm.collectionVariables.get(\"refreshTokenA\")));",
+                  "pm.collectionVariables.set('rotatedRefreshToken', pm.collectionVariables.get('refreshTokenA'));",
+                  "pm.collectionVariables.set('refreshTokenA', body.refreshToken);",
+                  "pm.collectionVariables.set('tokenA', body.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reuse the rotated refresh token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{rotatedRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"INVALID_CREDENTIALS\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_CREDENTIALS\"));",
+                  "// Rotation invalidates the token that was presented, so a stolen copy is worthless."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Public signing keys",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/.well-known/jwks.json"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"publishes an RSA key other services validate tokens with\", () => {",
+                  "    const key = pm.response.json().keys[0];",
+                  "    pm.expect(key.kty).to.eql(\"RSA\");",
+                  "    pm.expect(key.alg).to.eql(\"RS256\");",
+                  "    pm.expect(key.kid).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Profiles",
+      "item": [
+        {
+          "name": "Own profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the owner sees their own email address\", () => pm.expect(pm.response.json().email).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Own profile without a token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/users/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update the display name",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Alice of the Flame\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the new name is returned\", () => pm.expect(pm.response.json().displayName).to.eql(\"Alice of the Flame\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read another user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/{{userBId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"another user's email address is withheld\", () => pm.expect(pm.response.json().email == null).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read a user who does not exist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/00000000-0000-4000-8000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"USER_NOT_FOUND\", () => pm.expect(pm.response.json().error.code).to.eql(\"USER_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk resolve users (service)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users?ids={{userAId}},{{userBId}}",
+            "description": "The batched read Guild, Battle and Notification use instead of one call per user."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"both users resolve in one call\", () => pm.expect(pm.response.json().items.length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk resolve without the service token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/users?ids={{userAId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));",
+                  "// Service routes demand the service credential, and a missing one is an authentication failure."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk resolve with a wrong service token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "not-the-configured-token"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users?ids={{userAId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));",
+                  "// The header is compared against the configured SERVICE_TOKEN, not merely required to exist."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Relationships",
+      "item": [
+        {
+          "name": "Send a friend request to user B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUserId\": \"{{userBId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('requestId', pm.response.json().requestId);",
+                  "pm.test(\"the request is pending\", () => pm.expect(pm.response.json().status).to.eql(\"pending\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send the same friend request again",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUserId\": \"{{userBId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"FRIEND_REQUEST_EXISTS\", () => pm.expect(pm.response.json().error.code).to.eql(\"FRIEND_REQUEST_EXISTS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Befriend yourself",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUserId\": \"{{userAId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"SELF_RELATIONSHIP\", () => pm.expect(pm.response.json().error.code).to.eql(\"SELF_RELATIONSHIP\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Incoming requests of user B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests?direction=incoming"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"user A's request is listed\", () => pm.expect(pm.response.json().items.some(r => r.requestId === pm.collectionVariables.get(\"requestId\"))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept the friend request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests/{{requestId}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the request is accepted\", () => pm.expect(pm.response.json().status).to.eql(\"accepted\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept it a second time",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenB}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests/{{requestId}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"FRIEND_REQUEST_NOT_PENDING\", () => pm.expect(pm.response.json().error.code).to.eql(\"FRIEND_REQUEST_NOT_PENDING\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Friends of user A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friends"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"friendship is symmetric\", () => pm.expect(pm.response.json().items.some(u => u.userId === pm.collectionVariables.get(\"userBId\"))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Relationship as a service reads it",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/relationships?userId={{userAId}}&otherUserIds={{userBId}}",
+            "description": "This is the call the Battle Service makes before it accepts a challenge."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"reported as friends\", () => pm.expect(pm.response.json().items[0].relation).to.eql(\"friend\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark user C as an enemy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/enemies",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUserId\": \"{{userCId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"the relation is enemy\", () => pm.expect(pm.response.json().relation).to.eql(\"enemy\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enemies of user A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/enemies"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"user C is listed\", () => pm.expect(pm.response.json().items.some(u => u.userId === pm.collectionVariables.get(\"userCId\"))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove the enemy",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/enemies/{{userCId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove the friend",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/friends/{{userBId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Balances",
+      "item": [
+        {
+          "name": "Own balances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/users/me/balances"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a new account starts at zero\", () => pm.expect(pm.response.json().globalCurrency).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Balances as a service reads them",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Credit a battle reward",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": 250,\n  \"reason\": \"battle_reward\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The Battle Service never writes a balance; it reports the outcome and this route applies it."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the balance is credited\", () => pm.expect(pm.response.json().globalCurrency).to.eql(250));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay the same commandId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": 250,\n  \"reason\": \"battle_reward\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a redelivered command pays out once\", () => pm.expect(pm.response.json().globalCurrency).to.eql(250));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check whether the balance covers an amount",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"250 covers 100\", () => pm.expect(pm.response.json().sufficient).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check an amount beyond the balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the shortfall is reported, not refused\", () => pm.expect(pm.response.json().sufficient).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Debit more than the balance holds",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": -100000,\n  \"reason\": \"battle_loss\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"INSUFFICIENT_FUNDS\", () => pm.expect(pm.response.json().error.code).to.eql(\"INSUFFICIENT_FUNDS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Adjust a local balance without naming the package",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"local\",\n  \"packageId\": null,\n  \"delta\": 10,\n  \"reason\": \"package_reward\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"PACKAGE_REQUIRED\", () => pm.expect(pm.response.json().error.code).to.eql(\"PACKAGE_REQUIRED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Adjust an unknown currency",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"doubloons\",\n  \"packageId\": null,\n  \"delta\": 10,\n  \"reason\": \"typo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 Unprocessable Entity\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"UNKNOWN_CURRENCY\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNKNOWN_CURRENCY\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Session and operations",
+      "item": [
+        {
+          "name": "Log out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshTokenA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh with the token that was logged out",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{userManagementUrl}}/api/v1/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshTokenA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"INVALID_CREDENTIALS\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_CREDENTIALS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{userManagementUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// Outside /api/v1 and outside the contract: the container health check uses it."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{userManagementUrl}}/ready"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the database is reachable\", () => pm.expect(pm.response.json().status).to.eql(\"ready\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
