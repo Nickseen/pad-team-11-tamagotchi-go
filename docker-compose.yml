@@ -171,15 +171,19 @@ services:
       - map-redis-data:/data
 
   map:
-    image: nickseen/tamagotchi-map:1.1.0
+    image: nickseen/tamagotchi-map:2.0.0
     restart: on-failure # a single Redis ping at start-up, no retry
     depends_on:
       map-redis:
         condition: service_healthy
+      user-management:
+        condition: service_started
     environment:
       PORT: 8085
-      MAP_AUTH_TOKENS: ${MAP_AUTH_TOKENS:?set MAP_AUTH_TOKENS in .env}
-      MAP_SERVICE_TOKEN: ${SERVICE_TOKEN}
+      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
+      JWT_ISSUER: user-management
+      JWT_AUDIENCE: tamagotchi-go
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
       MAP_STORAGE: redis
       MAP_REDIS_ADDR: map-redis:6379
       MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}

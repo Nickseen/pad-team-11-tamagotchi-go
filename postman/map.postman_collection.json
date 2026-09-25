@@ -2,10 +2,86 @@
   "info": {
     "_postman_id": "bfd7c342-023a-46b6-b8c3-c81d223db4d1",
     "name": "Tamagotchi Go - Map Service",
-    "description": "Executable examples for every Map HTTP route. Run requests in folder order against a local service. Values come from the accompanying safe environment.",
+    "description": "Executable Map API examples. Setup registers a User Management user and obtains an RS256 token; run folders in order. Set serviceToken in the shared environment.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+    {
+      "name": "Setup (User Management)",
+      "description": "Create a test user and obtain a real RS256 access token from User Management.",
+      "item": [
+        {
+          "name": "Register test user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"{{username}}@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created or 409 already registered', () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in test user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('userToken', pm.response.json().accessToken);",
+                  "const payload = JSON.parse(atob(pm.response.json().accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));",
+                  "pm.collectionVariables.set('userId', payload.sub);",
+                  "pm.test('RS256 access token returned', () => pm.expect(pm.response.json().accessToken).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Health",
       "item": [
@@ -51,7 +127,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               },
               {
@@ -62,7 +138,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": {{mapLatitude}},\n  \"longitude\": {{mapLongitude}},\n  \"accuracyMeters\": {{mapAccuracyMeters}},\n  \"recordedAt\": \"{{mapRecordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"accuracyMeters\": {{accuracyMeters}},\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -88,7 +164,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.collectionVariables.set('mapRecordedAt', new Date().toISOString());"
+                  "pm.collectionVariables.set('recordedAt', new Date().toISOString());"
                 ]
               }
             },
@@ -113,12 +189,12 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{mapRadiusMeters}}",
+              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
               "host": [
                 "{{mapUrl}}"
               ],
@@ -131,7 +207,7 @@
               "query": [
                 {
                   "key": "radiusMeters",
-                  "value": "{{mapRadiusMeters}}"
+                  "value": "{{radiusMeters}}"
                 }
               ]
             },
@@ -157,7 +233,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               }
             ],
@@ -194,18 +270,13 @@
             "method": "GET",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
-                "type": "text"
-              },
-              {
                 "key": "X-Service-Token",
                 "value": "{{serviceToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapUrl}}/api/v1/internal/positions/{{mapUserId}}",
+              "raw": "{{mapUrl}}/api/v1/internal/positions/{{userId}}",
               "host": [
                 "{{mapUrl}}"
               ],
@@ -214,7 +285,7 @@
                 "v1",
                 "internal",
                 "positions",
-                "{{mapUserId}}"
+                "{{userId}}"
               ]
             },
             "description": "Expected: 200. Requires bearer and service tokens."
@@ -226,7 +297,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.collectionVariables.get('mapUserId')));"
+                  "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.collectionVariables.get('userId')));"
                 ]
               }
             }
@@ -239,7 +310,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               }
             ],
@@ -287,7 +358,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{mapRecordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -328,7 +399,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               },
               {
@@ -339,7 +410,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": 91,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{mapRecordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": 91,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{recordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -365,7 +436,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.collectionVariables.set('mapRecordedAt', new Date().toISOString());"
+                  "pm.collectionVariables.set('recordedAt', new Date().toISOString());"
                 ]
               }
             },
@@ -389,7 +460,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               },
               {
@@ -400,7 +471,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{mapExpiredRecordedAt}}\"\n}",
+              "raw": "{\n  \"latitude\": 47.0245,\n  \"longitude\": 28.8323,\n  \"accuracyMeters\": 8.5,\n  \"recordedAt\": \"{{expiredRecordedAt}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -426,7 +497,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.collectionVariables.set('mapExpiredRecordedAt', new Date(Date.now() - 10 * 60 * 1000).toISOString());"
+                  "pm.collectionVariables.set('expiredRecordedAt', new Date(Date.now() - 10 * 60 * 1000).toISOString());"
                 ]
               }
             },
@@ -450,7 +521,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               }
             ],
@@ -494,18 +565,13 @@
             "method": "GET",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
-                "type": "text"
-              },
-              {
                 "key": "X-Service-Token",
                 "value": "invalid-local-token",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapUrl}}/api/v1/internal/positions/{{mapUserId}}",
+              "raw": "{{mapUrl}}/api/v1/internal/positions/{{userId}}",
               "host": [
                 "{{mapUrl}}"
               ],
@@ -514,10 +580,10 @@
                 "v1",
                 "internal",
                 "positions",
-                "{{mapUserId}}"
+                "{{userId}}"
               ]
             },
-            "description": "Expected: 401 INVALID_SERVICE_TOKEN."
+            "description": "Expected: 401 UNAUTHORIZED."
           },
           "event": [
             {
@@ -526,7 +592,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 401', () => pm.response.to.have.status(401));",
-                  "pm.test('Error code is INVALID_SERVICE_TOKEN', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_SERVICE_TOKEN'));",
+                  "pm.test('Error code is UNAUTHORIZED', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));",
                   "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
                 ]
               }
@@ -540,12 +606,12 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{mapUserToken}}",
+                "value": "Bearer {{userToken}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{mapRadiusMeters}}",
+              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
               "host": [
                 "{{mapUrl}}"
               ],
@@ -558,7 +624,7 @@
               "query": [
                 {
                   "key": "radiusMeters",
-                  "value": "{{mapRadiusMeters}}"
+                  "value": "{{radiusMeters}}"
                 }
               ]
             },
@@ -581,33 +647,57 @@
       ]
     }
   ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('username')) pm.collectionVariables.set('username', 'map_' + pm.variables.replaceIn('{{$guid}}').replace(/-/g, '').slice(0, 12));",
+          "if (!pm.collectionVariables.get('password')) pm.collectionVariables.set('password', pm.variables.replaceIn('{{$guid}}') + 'Aa1!');"
+        ]
+      }
+    }
+  ],
   "variable": [
     {
-      "key": "mapUserId",
-      "value": "9f1c2b7e-3b2a-4c1d-9f31-2a7c5d0e4b11"
-    },
-    {
-      "key": "mapLatitude",
-      "value": "47.0245"
-    },
-    {
-      "key": "mapLongitude",
-      "value": "28.8323"
-    },
-    {
-      "key": "mapAccuracyMeters",
-      "value": "8.5"
-    },
-    {
-      "key": "mapRadiusMeters",
-      "value": "500"
-    },
-    {
-      "key": "mapRecordedAt",
+      "key": "username",
       "value": ""
     },
     {
-      "key": "mapExpiredRecordedAt",
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "latitude",
+      "value": "47.0245"
+    },
+    {
+      "key": "longitude",
+      "value": "28.8323"
+    },
+    {
+      "key": "accuracyMeters",
+      "value": "8.5"
+    },
+    {
+      "key": "radiusMeters",
+      "value": "500"
+    },
+    {
+      "key": "recordedAt",
+      "value": ""
+    },
+    {
+      "key": "expiredRecordedAt",
       "value": ""
     }
   ]
