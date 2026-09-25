@@ -1407,13 +1407,13 @@ environment the values from your `.env`:
 With the defaults, every service except Guild answers its cross-service calls from in-process
 mocks. Guild calls User Management for real: its Postman collection checks that inviting an
 unregistered user is refused with `404`, which only the real User Management can answer. Raid's
-admin-only Postman requests additionally need an admin JWT; its lifecycle uses the configured
-mock guild, raid definition, and primary Tamagotchi IDs. Switching a service to
-live mode makes it call its neighbours for real. In Lab 1 this works for Map → User Management, for
-Monster Raid → Guild and Package Registry, and for Battle → Tamagotchi and Monster Raid → Tamagotchi
-with `X-Service-Token` alone since Tamagotchi 2.1.0. The currently published Raid 2.0.0 image
-does not include the later Guild-level client fix from Raid `main`; live Raid → Guild requires a
-new Raid image built from that commit. Guild → User Management also works with
+admin-only Postman requests, including the assertion after cancellation, skip when no admin JWT
+is supplied; its lifecycle uses the configured mock guild, raid definition, and primary
+Tamagotchi IDs. Switching a service to live mode makes it call its neighbours for real. In Lab 1,
+Map → User Management and Battle → Tamagotchi use live calls. Raid 2.0.0 still reads guild level
+from a user route, so live Raid → Guild requires a later Raid release with the internal Guild
+route fix. Live Raid → Tamagotchi requires Tamagotchi 2.1.0 service authentication. Guild → User
+Management also works with
 `X-Service-Token` alone since Guild 2.0.1: it calls the service route `GET /api/v1/users?ids=…`
 instead of the user route `GET /api/v1/users/{userId}` it used before.
 
@@ -1443,8 +1443,9 @@ placeholders only. Do not commit exported environments containing real tokens or
 2. In Postman, import `postman/tamagotchi-go.postman_environment.json`.
 3. Import the collection files you want to run and select **Tamagotchi Go (local)**.
 4. Set the environment's **Current value** for every credential placeholder used by the selected
-   collection. For Raid's admin requests, set its collection variable `adminToken` to a User
-   Management admin JWT. Keep current values local and do not export them back into the repository.
+   collection. Raid's admin requests are skipped by default; to exercise them, set its collection
+   variable `adminToken` to a User Management admin JWT. Keep current values local and do not
+   export them back into the repository.
 5. Run a collection with the Collection Runner in its saved order. Collection-scoped variables
    hold scenario identifiers and generated values, so one service cannot overwrite another
    service's state.
@@ -1453,8 +1454,10 @@ Map's setup folder registers and logs in a user through User Management, then st
 access token in a collection variable. Set the shared environment's `serviceToken` to the stack's
 `SERVICE_TOKEN` for its internal route. Monster Raid's setup folder also registers and logs in a
 User Management user, then stores the RS256 token in a collection variable. User Management only
-issues the `user` role in this stack, so Raid requests requiring `admin` are skipped unless you
-set the Raid collection's `adminToken` to a real admin JWT.
+issues the `user` role in this stack, so Raid requests requiring `admin` and the cancellation
+dependent assertion are skipped unless you set the Raid collection's `adminToken` to a real admin
+JWT. The empty-reason validation request also skips: with only a user token it would return 401
+before validating the reason.
 
 ### Run with Newman
 

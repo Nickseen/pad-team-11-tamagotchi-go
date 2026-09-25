@@ -3,7 +3,7 @@
     "_postman_id": "e0ae5ad6-4bcb-4c79-93c5-fcefe518ab89",
     "name": "Tamagotchi Go - Monster Raid Service",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Monster Raid API examples. Setup registers a User Management user and obtains an RS256 token. Lifecycle examples need Guild, Registry, and Tamagotchi fixtures."
+    "description": "Monster Raid API examples. Setup registers a User Management user and obtains an RS256 token. Lifecycle examples need Guild, Registry, and Tamagotchi fixtures. Admin-only requests and their cancellation-dependent assertion skip when no admin JWT is configured."
   },
   "item": [
     {
@@ -653,9 +653,18 @@
                 "cancel"
               ]
             },
-            "description": "Expected: 200 and status=cancelled."
+            "description": "Expected: 200 and status=cancelled. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -706,7 +715,7 @@
                 "attacks"
               ]
             },
-            "description": "Expected: 409 RAID_NOT_ACTIVE."
+            "description": "Expected: 409 RAID_NOT_ACTIVE. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
           },
           "event": [
             {
@@ -714,6 +723,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();",
                   "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
@@ -874,9 +884,18 @@
                 "cancel"
               ]
             },
-            "description": "Expected: 400 INVALID_REASON before raid lookup."
+            "description": "Expected: 400 INVALID_REASON before raid lookup. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -924,7 +943,7 @@
     },
     {
       "key": "adminToken",
-      "value": "SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN"
+      "value": ""
     },
     {
       "key": "guildId",
