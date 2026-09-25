@@ -1410,10 +1410,13 @@ unregistered user is refused with `404`, which only the real User Management can
 admin-only Postman requests, including the assertion after cancellation, skip when no admin JWT
 is supplied; its lifecycle uses the configured mock guild, raid definition, and primary
 Tamagotchi IDs. Switching a service to live mode makes it call its neighbours for real. In Lab 1,
-Map → User Management and Battle → Tamagotchi use live calls. Raid 2.0.0 still reads guild level
-from a user route, so live Raid → Guild requires a later Raid release with the internal Guild
-route fix. Live Raid → Tamagotchi requires Tamagotchi 2.1.0 service authentication. Guild → User
-Management also works with
+Map → User Management and Battle → Tamagotchi use live calls. Raid 2.0.0 reads guild level from
+`GET /api/v1/guilds/{guildId}`; this returned `200` in a live stack check, as did Raid's internal
+Guild membership call. The communication contract specifies the internal Guild route for the level
+read, so Raid still needs a later image for contract alignment. Creating a complete raid in live
+mode also needs an active Registry raid definition, which cannot currently be created through the
+stack because User Management does not issue admin JWTs. Live Raid → Tamagotchi requires
+Tamagotchi 2.1.0 service authentication. Guild → User Management also works with
 `X-Service-Token` alone since Guild 2.0.1: it calls the service route `GET /api/v1/users?ids=…`
 instead of the user route `GET /api/v1/users/{userId}` it used before.
 
