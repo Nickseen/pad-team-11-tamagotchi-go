@@ -242,6 +242,60 @@ across the system, every endpoint each service exposes, the payload transferred 
 with its format and types, and the response returned. Anything not listed here is not part of the
 contract and may not be relied upon by another service.
 
+### Lab 1 implementation audit
+
+The tables below describe the target contract. The team Compose pins the following published
+images; this audit separates verified Lab 1 behaviour from contract features still planned. It is
+based on the shared Postman collections, the owners' release/PR reports, and the Map and Monster
+Raid implementations. It does not certify uninspected private source code.
+
+| Service | Compose image | Implemented or exercised in Lab 1 | Still planned or requiring alignment |
+| ------- | ------------- | --------------------------------- | ------------------------------------- |
+| User Management | `amzavladislav/tamagotchi-user-management:1.1.0` | REST, PostgreSQL, RS256/JWKS issuer; its Postman collection creates users and obtains JWTs | Admin JWT issuance for the default stack; RabbitMQ publishing |
+| Tamagotchi | `crislp/tamagotchi-tamagotchi:2.1.0` | REST, PostgreSQL, RS256/JWKS, internal primary and secondary lookups, direct event intake for tests | RabbitMQ consumer integration; confirm every response and mock against the tables below |
+| Package Registry | `gabimiric/tamagotchi-package-registry:2.0.1` | REST, PostgreSQL, RS256/JWKS, service-authenticated current-version lookup | RabbitMQ publishing and versioned migrations; admin workflows need an admin JWT |
+| Battle | `amzavladislav/tamagotchi-battle:1.1.0` | REST, PostgreSQL, RS256/JWKS, dependency mocks; rejects non-empty boosts | Adopt the new Registry and Tamagotchi internal lookups; Redis match cache and RabbitMQ publishing |
+| Map | `nickseen/tamagotchi-map:2.0.0` | REST, Redis positions with TTL, RS256/JWKS, live User Management lookup | WebSocket updates and RabbitMQ publishing |
+| Notification | `crislp/tamagotchi-notification:2.1.0` | REST, PostgreSQL, RS256/JWKS, direct event intake for tests | RabbitMQ consumption and live delivery/fan-out confirmation |
+| Guild | `gabimiric/tamagotchi-guild:2.0.1` | REST, PostgreSQL, RS256/JWKS, internal guild/member reads, live User Management bulk lookup | WebSocket chat, Redis Pub/Sub, RabbitMQ events and versioned migrations |
+| Monster Raid | `nickseen/tamagotchi-monster-raid:2.0.0` | REST, PostgreSQL, RS256/JWKS, service-authenticated membership check, dependency mocks | Internal Guild level lookup in a later image; Redis counters, WebSocket and RabbitMQ publishing |
+
+The Compose stack uses local HTTP. TLS, broker delivery and WebSocket behaviour in the tables
+below are target contracts, not evidence that the Lab 1 images provide them. The shared Postman
+collections cover all eight HTTP APIs, but passing a collection with mocked dependencies does not
+prove its live inter-service path. Owner confirmation is still needed for uninspected mock payloads
+and remaining live paths.
+
+#### Compatibility and open alignment work
+
+1. **Admin flows:** User Management issues the `user` role in the default stack. Registry raid
+   definition creation and Raid cancellation require `admin`, so those Postman requests skip without
+   a separately provisioned admin JWT. A full live raid lifecycle cannot be claimed from the
+   default Compose run. The team must agree on a safe test-admin provisioning path.
+2. **Guild HTTP:** Guild 2.0.1 allows its public guild reads without a user JWT, although the
+   endpoint table marks them as authenticated. Its malformed UUID validation can return FastAPI's
+   `422 { "detail": [...] }` before checking `X-Service-Token`; the target is the shared error
+   envelope after authentication. Guild timestamps can have six fractional digits instead of the
+   specified three. These are service fixes or explicit compatibility decisions, not evidence that
+   the target contract has been implemented.
+3. **Battle dependencies:** Battle 1.1.0 must move from the public Package `latestVersion` read to
+   the Registry internal current-version route, and use Tamagotchi's internal primary/secondary
+   checks. Its dependency mocks should preserve the agreed bulk Tamagotchi fields
+   (`tamagotchiId`, `ownerId`, `originPackageId`, `combatType`, `level`, `stats`), type advantage
+   `{ "multiplier": number }`, Registry stat-definition `combatBonus` fields, and User Management
+   relationships `{ "items": [{ "userId": UUID, "relation": string }] }`.
+4. **Raid dependencies:** The published Raid 2.0.0 image reads guild level through public
+   `GET /api/v1/guilds/{guildId}`. The target is the Guild 2.0.1 internal route with
+   `X-Service-Token`; the Raid client change exists in its private main branch but needs a new
+   published image and CPR pin before the live contract is aligned. Guild currently reports
+   `level: 1` for every guild, so definitions requiring a higher guild level cannot start. Raid's
+   current mock damage formula is provisional: `level × 10`, multiplied by `1.5` for weakness or
+   `0.5` for resistance.
+5. **Cross-service verification:** Map → User Management, Guild → User Management and Raid → Guild
+   membership/guild read have live stack evidence. Tamagotchi's and Notification's direct event
+   adapters have Postman coverage. Other live caller/callee combinations and the remaining owners'
+   mock payloads require owner sign-off before #55 can be considered fully verified.
+
 ### Transport and conventions
 
 | Concern | Rule |
@@ -318,6 +372,19 @@ Every non-2xx response from every service has exactly this shape:
 
 `code` is a stable `SCREAMING_SNAKE_CASE` string and is part of the contract; `message` is
 human-readable and is not. `details` is an object or `null`.
+
+The common error codes are `VALIDATION_FAILED` (invalid request), `UNAUTHORIZED` (missing or
+invalid user or service credential), `FORBIDDEN` (authenticated caller lacks permission),
+`INTERNAL_ERROR` (unexpected server failure), and `DEPENDENCY_UNAVAILABLE` (required downstream
+service unavailable). Service-specific codes remain stable within each major API version. The
+shared collections exercise, among others, `NO_PRIMARY_TAMAGOTCHI`, `TAMAGOTCHI_NOT_OWNED`,
+`UNSUPPORTED_EVENT_VERSION`, `NO_CURRENT_VERSION`, `BOOSTS_NOT_SUPPORTED`, `POSITION_EXPIRED`,
+`GUILD_NOT_FOUND`, and `RAID_NOT_ACTIVE`; these examples are not an exhaustive catalogue.
+
+Lab 1 exception to resolve: malformed input can still produce FastAPI's `422` body
+`{ "detail": [...] }` in Guild before service authentication, instead of this envelope. Guild
+also emits some timestamps with microsecond precision. Clients should tolerate the extra
+fractional digits, while service owners align new responses with the envelope and timestamp rule.
 
 | Status | Meaning in this system |
 | ------ | ---------------------- |
@@ -574,6 +641,7 @@ damage calculation; it is the reason the route is batched rather than one call p
 | `PUT /api/v1/tamagotchis/{tamagotchiId}/stats` | user | `stats` `Stats`, `expectedVersion` integer | `200` → `{ "stats": Stats, "statsVersion": integer }`; `409 STALE_STATS_VERSION` on a concurrent write |
 | `POST /api/v1/internal/tamagotchis/{tamagotchiId}/xp` | service | `commandId` `UUID`, `amount` integer (≥ 0), `source` string | `200` → `{ "tamagotchiId": UUID, "level": integer, "xp": integer, "leveledUp": boolean }` |
 | `POST /api/v1/internal/tamagotchis/{tamagotchiId}/transfer-owner` | service | `commandId` `UUID`, `newOwnerId` `UUID`, `battleId` `UUID` | `200` → `Tamagotchi`; publishes `tamagotchi.owner_transferred` |
+| `POST /api/v1/internal/events` | service | event envelope defined below; Lab 1 direct-delivery test adapter | `200` → `{ "status": "applied" \| "duplicate" }` in the shared collection; `422 UNSUPPORTED_EVENT_VERSION` |
 
 Battle calls the two internal lookups before a match: the first confirms which creature a player fields as primary, the second whether a player may field a creature acquired as a secondary. The holding check answers `isHeld: false` for a creature that exists but is not held, and `404` only when the creature itself is unknown, so a missing reference is not confused with a missing creature.
 
@@ -798,11 +866,12 @@ match, so a mid-battle stat edit cannot change the arithmetic retroactively:
 | `GET /api/v1/combat-types/advantage` | Tamagotchi | The type multiplier for each attacking pair |
 | `GET /api/v1/internal/relationships` | User Management | Rejects a challenge between users who are neither friends nor within proximity range |
 
-Every call carries `X-Service-Token` and no user token. The current version is read from the
-Package resource because the versions collection is listed oldest first; a dedicated internal
-current-version route on Package Registry will replace it. Verifying that the primary is the
-caller's *selected* primary, and that the caller holds the secondary, needs internal Tamagotchi
-routes that do not exist yet; until then Battle checks only that the caller owns the primary.
+Every call carries `X-Service-Token` and no user token. Battle 1.1.0 reads `latestVersion` from the
+public Package resource and checks ownership of the primary, but does not yet verify the selected
+primary or secondary holding. Package Registry 2.0.1 already exposes
+`GET /api/v1/internal/packages/{packageId}/versions/current`, and Tamagotchi 2.1.0 exposes the two
+internal holding lookups above. A later Battle release must switch to those service routes; until
+then its live behaviour is narrower than the target contract.
 
 In Lab 1 Battle stores everything in PostgreSQL. The Redis match cache and RabbitMQ publishing are
 planned: events are written to the service log at their real publication points.
@@ -919,6 +988,7 @@ service.
 | `POST /api/v1/notifications/read-all` | user | — | `200` → `{ "updated": integer }` |
 | `GET /api/v1/notifications/preferences` | user | — | `200` → `{ "items": [{ "category": string, "push": boolean, "quietHours": { "from": "22:00", "to": "08:00" } \| null }] }` |
 | `PUT /api/v1/notifications/preferences` | user | `items` array as above | `200` → the stored preferences |
+| `POST /api/v1/internal/events` | service | event envelope defined below; Lab 1 direct-delivery test adapter | `200` → `{ "status": "applied" \| "duplicate" \| "ignored" }`; `422 UNSUPPORTED_EVENT_VERSION` |
 
 ##### Delivery matrix
 
@@ -1020,9 +1090,9 @@ event-driven.
 | `POST /api/v1/invitations/{invitationId}/accept` | user | path `invitationId` `UUID` | `200` → `Membership`; publishes `guild.member_joined` |
 | `POST /api/v1/invitations/{invitationId}/decline` | user | path `invitationId` `UUID` | `200` → `Invitation` with `status: "declined"` |
 
-Before creating an invitation the service calls `GET /api/v1/users/{userId}` on User Management to
-confirm the invitee exists; a missing user is rejected with `404 USER_NOT_FOUND` rather than stored
-as a dangling reference.
+Before creating an invitation Guild 2.0.1 calls the service-authenticated
+`GET /api/v1/users?ids=…` on User Management to confirm the invitee exists; a missing user is
+rejected with `404 USER_NOT_FOUND` rather than stored as a dangling reference.
 
 ##### Chat history and WebSocket — `GET /api/v1/guilds/{guildId}/chat`
 
@@ -1146,6 +1216,12 @@ XP, both keyed on `raidId`.
 All events go through a single durable topic exchange, `tamagotchi.events`. Routing keys are
 `<domain>.<fact>`, always past tense — an event states something that already happened and is never
 a request for someone to act.
+
+This is the target broker contract. The Lab 1 Compose stack has no RabbitMQ service. Its
+Tamagotchi and Notification Postman collections deliver sample envelopes through their
+`POST /api/v1/internal/events` test adapters; that verifies handler behaviour, not broker
+publication, consumption, retries or dead-lettering. The other owners report typed events or log
+publication points, with broker wiring still planned.
 
 #### Envelope
 
