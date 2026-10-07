@@ -22,3 +22,6 @@
 [submodule "services/notification"]
 	path = services/notification
 	url = git@github.com:CyberMoonie/tamagotchi-notification.git
+[submodule "services/gateway"]
+	path = services/gateway
+	url = git@github.com:Nickseen/tamagotchi-gateway.git
