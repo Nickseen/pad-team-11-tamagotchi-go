@@ -302,6 +302,7 @@ and remaining live paths.
 | ------- | ---- |
 | Synchronous transport | HTTP/1.1 with TLS; `Content-Type: application/json; charset=utf-8` in both directions |
 | Path prefix | `/api/v1` on every service; the major number changes only on an incompatible change |
+| Gateway ingress | Every client-to-service and service-to-service REST call uses `/<serviceSlug>/api/v1/...` on Gateway; Gateway removes only `/<serviceSlug>` before forwarding |
 | Internal-only routes | Prefixed `/api/v1/internal`; reachable from the service network, never from clients |
 | Live channels | WebSocket, JSON text frames, one JSON object per frame |
 | Asynchronous transport | RabbitMQ topic exchange `tamagotchi.events`, durable queues, at-least-once delivery |
@@ -327,10 +328,10 @@ These names are used in every payload table below.
 
 ### Authentication and authorization
 
-Clients authenticate against User Management and receive a signed JWT. Every other service
-validates that token **locally** using the public keys published at
-`GET /api/v1/.well-known/jwks.json`, so a request never costs an extra round trip to User
-Management. Token claims:
+Clients authenticate against User Management through Gateway and receive a signed JWT. Gateway is
+the only component that validates a client access token in the Lab 2 target architecture. It uses
+the User Management keys published at `GET /api/v1/.well-known/jwks.json`, caches a known key for at
+most five minutes, and refetches immediately when a token contains an unknown `kid`. Token claims:
 
 ```json
 {
@@ -345,14 +346,145 @@ Management. Token claims:
 }
 ```
 
-Client requests carry `Authorization: Bearer <accessToken>`. Service-to-service calls carry
-`X-Service-Token`, the credential identifying the calling service, and no user token. Routes marked
-`service` below — every route under `/api/v1/internal`, plus the few service routes outside it such
-as `GET /api/v1/users` and `GET /api/v1/combat-types/advantage` — are authorised by that header
-alone: the callee compares it against its own configured `SERVICE_TOKEN` (one value for the whole
-stack), never merely checks that it is present, and answers a missing or wrong value with
-`401 UNAUTHORIZED`. Every request also carries `X-Correlation-Id: UUID`, which is propagated through
-synchronous calls and copied into any event the request produces.
+Client requests carry `Authorization: Bearer <accessToken>` only as far as Gateway. Gateway validates
+the RS256 signature, `kid`, `iss`, `aud`, `exp`, `sub`, `roles` and `packageId` when present, then
+removes `Authorization` before forwarding. A downstream service must never accept a client JWT from
+Gateway or use a forwarded JWT as its authority.
+
+Service-to-service calls carry `X-Service-Token`, the shared credential configured as
+`SERVICE_TOKEN`, and no user token. Gateway compares the value against its configured secret before
+routing a service request. Routes marked `service` below — every route under `/api/v1/internal`, plus
+the few service routes outside it such as `GET /api/v1/users` and
+`GET /api/v1/combat-types/advantage` — remain authorised by that credential. A missing or wrong value
+returns `401 UNAUTHORIZED`. Every request also carries `X-Correlation-Id: UUID`, which Gateway
+validates or generates, propagates through synchronous calls and copies into any resulting event.
+
+#### Gateway addresses and route mapping
+
+Clients use `http://localhost:8080` in the local stack. Containers use
+`GATEWAY_URL=http://gateway:8080`. The canonical proxy URL is:
+
+```text
+<gatewayBase>/<serviceSlug><downstreamPath>
+```
+
+`downstreamPath` starts with `/api/v1`. Gateway removes exactly `/<serviceSlug>` and forwards the
+method, remaining path, query and body without semantic rewriting. For example:
+
+```text
+POST http://localhost:8080/battle/api/v1/battles
+GET  http://gateway:8080/user-management/api/v1/internal/relationships?userId=...&otherUserIds=...
+```
+
+| Service slug | Compose target | Target URL environment variable |
+| ------------ | -------------- | ------------------------------- |
+| `user-management` | `http://user-management:8081` | `USER_MANAGEMENT_URL` |
+| `tamagotchi` | `http://tamagotchi:8082` | `TAMAGOTCHI_URL` |
+| `package-registry` | `http://package-registry:8083` | `PACKAGE_REGISTRY_URL` |
+| `battle` | `http://battle:8084` | `BATTLE_URL` |
+| `map` | `http://map:8085` | `MAP_URL` |
+| `notification` | `http://notification:8086` | `NOTIFICATION_URL` |
+| `guild` | `http://guild:8087` | `GUILD_URL` |
+| `monster-raid` | `http://monster-raid:8088` | `MONSTER_RAID_URL` |
+
+Gateway rejects an unknown slug with `404 ROUTE_NOT_FOUND`. It never discovers a destination from a
+client-supplied host, URL or forwarding header. Client-originated requests cannot target a
+downstream path beginning `/api/v1/internal`; attempts return `403 INTERNAL_ROUTE_FORBIDDEN` before
+any service call. Service requests may target those paths only after `X-Service-Token` validation.
+
+Health probes and Gateway's direct JWKS bootstrap call to User Management are control-plane
+exceptions to proxy routing. Domain requests have no direct-service fallback: if Gateway is
+unavailable, callers return an error rather than bypassing its authentication and routing policy.
+
+#### Trusted downstream context
+
+Gateway strips every inbound header in the table below before applying its own value. Downstream
+services trust identity fields only when `X-Gateway-Token` exactly matches their configured
+`GATEWAY_TOKEN`; comparison is constant-time. Application routes reject a missing or invalid
+Gateway token with `401 UNAUTHORIZED`. Health endpoints are exempt. The service network exposes
+only Gateway to clients, but network isolation is not a substitute for this check.
+
+| Header | Set by Gateway | Downstream rule |
+| ------ | -------------- | --------------- |
+| `Authorization` | never | Always removed; downstream services reject or ignore it and never use it for authorization |
+| `X-Gateway-Token` | `GATEWAY_TOKEN` | Proves that the trusted context was produced by Gateway; never accepted from a client |
+| `X-Authenticated-User-Id` | validated JWT `sub` | Lowercase UUID; omitted on public and service-only requests |
+| `X-Authenticated-Roles` | validated JWT `roles`, sorted and comma-separated | Omitted when no client identity exists; services enforce endpoint roles from this value |
+| `X-Authenticated-Package-Id` | validated JWT `packageId` | Optional lowercase UUID; omitted when the claim is absent |
+| `X-Service-Token` | configured `SERVICE_TOKEN` after Gateway validates the caller's copy | Present only on service-authorised calls; downstream still compares the exact value |
+| `X-Correlation-Id` | validated inbound UUID or a generated UUID | Required on every forwarded request and every error envelope |
+| `X-Request-Deadline` | absolute RFC 3339 UTC timestamp with millisecond precision | Services use the earlier of this deadline and their own task timeout |
+
+Public routes such as registration and login receive `X-Gateway-Token` and correlation/deadline
+headers but no authenticated user headers. A service-to-service request receives the Gateway and
+service tokens but no user headers. A client cannot turn a public request into a service request by
+supplying `X-Service-Token`; Gateway removes it at public ingress.
+
+#### WebSocket negotiation and direct connection
+
+Gateway negotiates live channels but does not proxy their traffic. An authenticated client calls:
+
+```http
+POST /api/v1/gateway/websocket-tickets
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "channel": "guild.chat",
+  "resourceId": "1e79f9d0-46bb-4336-9496-4389a5af093d"
+}
+```
+
+`channel` is one of `map.stream`, `guild.chat` or `raid.feed`. `resourceId` is `null` for
+`map.stream`, a `guildId` for `guild.chat`, and a `raidId` for `raid.feed`. Gateway checks the user's
+role or membership required by the target channel and returns `201 Created`:
+
+```json
+{
+  "url": "wss://guild.example/api/v1/guilds/1e79f9d0-46bb-4336-9496-4389a5af093d/chat?ticket=<signed-ticket>",
+  "expiresAt": "2026-10-07T18:42:31.482Z"
+}
+```
+
+The URL comes from `MAP_WS_PUBLIC_URL`, `GUILD_WS_PUBLIC_URL` or `MONSTER_RAID_WS_PUBLIC_URL`.
+The ticket is an RS256 JWT issued by `tamagotchi-gateway`, valid for at most 60 seconds and carrying
+`sub`, `roles`, `aud` (`map`, `guild` or `monster-raid`), `resourceId`, `iat`, `exp` and `jti`.
+Map, Guild and Monster Raid validate it using Gateway's internal JWKS endpoint at
+`GATEWAY_JWKS_URL=http://gateway:8080/api/v1/gateway/.well-known/jwks.json`. The query-string ticket
+must not be logged. Once upgraded, frames travel directly between client and service. Reconnection
+requires a new ticket; expiration does not terminate an already established connection.
+
+Errors are `400 VALIDATION_FAILED` for an invalid channel/resource pair, `401 UNAUTHORIZED` for a
+missing or invalid access token, `403 FORBIDDEN` when the user cannot join the resource, and
+`503 DEPENDENCY_UNAVAILABLE` when authorization data or the configured public WebSocket URL is
+unavailable.
+
+#### Deadlines and concurrent-task limits
+
+Gateway requires positive `REQUEST_TIMEOUT_MS` and `MAX_IN_FLIGHT_REQUESTS` values. Each service
+requires positive `TASK_TIMEOUT_MS` and `MAX_CONCURRENT_TASKS` values chosen and documented by its
+owner. Map, Guild and Monster Raid additionally configure `MAX_WEBSOCKET_CONNECTIONS`; an upgraded
+connection no longer occupies an HTTP in-flight slot.
+
+Gateway overwrites `X-Request-Deadline` with the absolute end-to-end deadline. A service stops work
+when the earlier of that deadline and its local task timeout is reached. Cancellation releases the
+concurrency slot and propagates to cancellable dependency work. Neither Gateway nor a service
+automatically retries a state-changing request; callers retry only with the command idempotency
+rules defined below.
+
+| Condition | Status and code | Additional rule |
+| --------- | --------------- | --------------- |
+| Gateway HTTP limit reached | `429 CONCURRENCY_LIMIT_EXCEEDED` | Include `Retry-After` |
+| Service task limit reached | `429 CONCURRENCY_LIMIT_EXCEEDED` | Include `Retry-After` and do not begin domain work |
+| Gateway deadline reached while awaiting a service | `504 GATEWAY_TIMEOUT` | Cancel the downstream request when possible |
+| Service-local task deadline reached first | `503 TASK_TIMEOUT` | Roll back uncommitted work and include `Retry-After` |
+| WebSocket connection limit reached | `429 CONCURRENCY_LIMIT_EXCEEDED` | Reject before upgrade and include `Retry-After` |
+
+All listed errors use the shared envelope. A timed-out or rejected command must not publish a success
+event, acknowledge an unapplied broker message, duplicate a balance/reward, or leave a partially
+committed transition.
 
 ### Error envelope
 
@@ -374,10 +506,12 @@ Every non-2xx response from every service has exactly this shape:
 human-readable and is not. `details` is an object or `null`.
 
 The common error codes are `VALIDATION_FAILED` (invalid request), `UNAUTHORIZED` (missing or
-invalid user or service credential), `FORBIDDEN` (authenticated caller lacks permission),
-`INTERNAL_ERROR` (unexpected server failure), and `DEPENDENCY_UNAVAILABLE` (required downstream
-service unavailable). Service-specific codes remain stable within each major API version. The
-shared collections exercise, among others, `NO_PRIMARY_TAMAGOTCHI`, `TAMAGOTCHI_NOT_OWNED`,
+invalid user, Gateway or service credential), `FORBIDDEN` (authenticated caller lacks permission),
+`INTERNAL_ERROR` (unexpected server failure), `DEPENDENCY_UNAVAILABLE` (required downstream
+service unavailable), `ROUTE_NOT_FOUND`, `INTERNAL_ROUTE_FORBIDDEN`,
+`CONCURRENCY_LIMIT_EXCEEDED`, `TASK_TIMEOUT` and `GATEWAY_TIMEOUT`. Service-specific codes remain
+stable within each major API version. The shared collections exercise, among others,
+`NO_PRIMARY_TAMAGOTCHI`, `TAMAGOTCHI_NOT_OWNED`,
 `UNSUPPORTED_EVENT_VERSION`, `NO_CURRENT_VERSION`, `BOOSTS_NOT_SUPPORTED`, `POSITION_EXPIRED`,
 `GUILD_NOT_FOUND`, and `RAID_NOT_ACTIVE`; these examples are not an exhaustive catalogue.
 
@@ -394,9 +528,10 @@ fractional digits, while service owners align new responses with the envelope an
 | `404 Not Found` | The addressed resource does not exist or is not visible to the caller |
 | `409 Conflict` | The request contradicts current state, e.g. joining a finished raid |
 | `422 Unprocessable Entity` | Schema-valid but domain-invalid, e.g. an unknown `CombatType` |
-| `429 Too Many Requests` | Rate limit exceeded; `Retry-After` is set |
+| `429 Too Many Requests` | Rate or configured concurrency limit exceeded; `Retry-After` is set |
 | `500 Internal Server Error` | Unexpected failure; the correlation id is required when reporting it |
 | `503 Service Unavailable` | A required downstream dependency is unreachable |
+| `504 Gateway Timeout` | Gateway's end-to-end deadline expired while waiting for a downstream service |
 
 ### Collections and pagination
 
@@ -473,8 +608,8 @@ the request.
 
 Every endpoint below is listed with the data it transfers in each direction. Request bodies are
 JSON unless the row says otherwise; path and query parameters are marked as such. `Auth` is `—` for
-public routes, `user` for a client JWT, `role` for a JWT carrying that role, and `service` for the
-internal routes that additionally require `X-Service-Token`.
+public routes, `user` for Gateway-authenticated user context, `role` for that context carrying the
+required role, and `service` for calls routed by Gateway after `X-Service-Token` validation.
 
 Resource objects are defined once per service and referenced by name from the endpoint tables. A
 response cell naming an object means that object is the entire response body; `[Object]` means a
