@@ -171,6 +171,7 @@ services:
       - map-redis-data:/data
 
   map:
+    # Lab 1 runtime pin; Map 2.1.0 requires the unreleased Gateway.
     image: nickseen/tamagotchi-map:2.0.0
     restart: on-failure # a single Redis ping at start-up, no retry
     depends_on:
@@ -278,6 +279,7 @@ services:
       - raid-redis-data:/data
 
   monster-raid:
+    # Lab 1 runtime pin; Raid 2.1.0 requires the unreleased Gateway.
     image: nickseen/tamagotchi-monster-raid:2.0.0
     restart: on-failure
     depends_on:

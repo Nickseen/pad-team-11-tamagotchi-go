@@ -275,6 +275,16 @@ Raid implementations. It does not certify uninspected private source code.
 | Guild | `gabimiric/tamagotchi-guild:2.0.1` | REST, PostgreSQL, RS256/JWKS, internal guild/member reads, live User Management bulk lookup | WebSocket chat, Redis Pub/Sub, RabbitMQ events and versioned migrations |
 | Monster Raid | `nickseen/tamagotchi-monster-raid:2.0.0` | REST, PostgreSQL, RS256/JWKS, service-authenticated membership check, dependency mocks | Internal Guild level lookup in a later image; Redis counters, WebSocket and RabbitMQ publishing |
 
+Map and Monster Raid `2.1.0` have since been released, and their CPR submodules point to the
+reviewed `main` commits for those releases. Map `2.1.0` adds the direct live-location WebSocket,
+Gateway-authenticated REST context, Gateway-routed relationship reads, Redis proximity cooldown,
+and RabbitMQ proximity publication. Monster Raid `2.1.0` adds the direct raid feed,
+Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. These are published
+service capabilities, **not features of the Lab 1 Compose stack above**: that stack still pins
+`2.0.0` for both services until a runnable Gateway is available. The Lab 2 REST/WebSocket
+verification assets are in each service submodule's `postman/` directory; the shared `postman/`
+collections below continue to target this Lab 1 Compose stack.
+
 The Compose stack uses local HTTP. TLS, broker delivery and WebSocket behaviour in the tables
 below are target contracts, not evidence that the Lab 1 images provide them. The shared Postman
 collections cover all eight HTTP APIs, but passing a collection with mocked dependencies does not
@@ -299,10 +309,10 @@ and remaining live paths.
    (`tamagotchiId`, `ownerId`, `originPackageId`, `combatType`, `level`, `stats`), type advantage
    `{ "multiplier": number }`, Registry stat-definition `combatBonus` fields, and User Management
    relationships `{ "items": [{ "userId": UUID, "relation": string }] }`.
-4. **Raid dependencies:** The published Raid 2.0.0 image reads guild level through public
-   `GET /api/v1/guilds/{guildId}`. The target is the Guild 2.0.1 internal route with
-   `X-Service-Token`; the Raid client change exists in its private main branch but needs a new
-   published image and CPR pin before the live contract is aligned. Guild currently reports
+4. **Raid dependencies:** The Compose-pinned Raid 2.0.0 image reads guild level through public
+   `GET /api/v1/guilds/{guildId}`. Published Raid 2.1.0 uses Guild's internal route with
+   `X-Service-Token`, routed through Gateway. The team Compose cannot select this image until
+   Gateway is implemented and configured. Guild currently reports
    `level: 1` for every guild, so definitions requiring a higher guild level cannot start. Raid's
    current mock damage formula is provisional: `level × 10`, multiplied by `1.5` for weakness or
    `0.5` for resistance.
@@ -1541,6 +1551,19 @@ same Compose file runs on Intel, AMD and Apple Silicon machines.
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild) | `2.0.1` | 8087 | PostgreSQL |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid) | `2.0.0` | 8088 | PostgreSQL and Redis |
 
+The following Lab 2 images are published for amd64 and arm64, with CPR source submodules at the
+corresponding reviewed `main` commits:
+
+| Service | Published image | CPR submodule commit |
+| ------- | --------------- | -------------------- |
+| Map | [`nickseen/tamagotchi-map:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `5f3f26b` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `a8cf2c9` |
+
+The first table lists the images actually selected by `docker-compose.yml`. Both remain on
+`2.0.0` because `2.1.0` requires the Lab 2 Gateway's trusted headers and WebSocket signing keys.
+Gateway currently has no runnable release image, so changing only the two Compose image tags
+would break client requests.
+
 The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:
 version 18 moved the data directory, so the volumes below would silently stop persisting.
 
@@ -1648,13 +1671,13 @@ unregistered user is refused with `404`, which only the real User Management can
 admin-only Postman requests, including the assertion after cancellation, skip when no admin JWT
 is supplied; its lifecycle uses the configured mock guild, raid definition, and primary
 Tamagotchi IDs. Switching a service to live mode makes it call its neighbours for real. In Lab 1,
-Map → User Management and Battle → Tamagotchi use live calls. Raid 2.0.0 reads guild level from
-`GET /api/v1/guilds/{guildId}`; this returned `200` in a live stack check, as did Raid's internal
-Guild membership call. The communication contract specifies the internal Guild route for the level
-read, so Raid still needs a later image for contract alignment. Creating a complete raid in live
-mode also needs an active Registry raid definition, which cannot currently be created through the
-stack because User Management does not issue admin JWTs. Live Raid → Tamagotchi requires
-Tamagotchi 2.1.0 service authentication. Guild → User Management also works with
+Map → User Management and Battle → Tamagotchi use live calls. The Compose-pinned Raid 2.0.0 image
+reads guild level from `GET /api/v1/guilds/{guildId}`; this returned `200` in a live stack check,
+as did Raid's internal Guild membership call. Published Raid 2.1.0 uses the contracted internal
+Guild route through Gateway, but the shared Compose stack has not switched to it. Creating a
+complete raid in live mode also needs an active Registry raid definition, which cannot currently be
+created through the stack because User Management does not issue admin JWTs. Live Raid → Tamagotchi
+requires Tamagotchi 2.1.0 service authentication. Guild → User Management also works with
 `X-Service-Token` alone since Guild 2.0.1: it calls the service route `GET /api/v1/users?ids=…`
 instead of the user route `GET /api/v1/users/{userId}` it used before.
 
