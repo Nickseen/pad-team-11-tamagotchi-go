@@ -22,8 +22,9 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 
 ## Service Boundaries
 
-Eight microservices. Each one owns a single slice of state and is the **only** writer of that slice;
-everything else reads it through an API or reacts to its events.
+Eight domain microservices own the business state. The API Gateway is a ninth, stateless service
+that provides the client entry point. Each domain service owns a single slice of state and is the
+**only** writer of that slice; everything else reads it through an API or reacts to its events.
 
 | # | Service          | Owns (single source of truth)                                                              | Explicitly does **not** own                               |
 | - | ---------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
@@ -134,6 +135,15 @@ and raid status. A raid fails when its timer expires.
 Because the whole guild hits one counter concurrently, HP decrements must be atomic, and reward
 distribution must fire exactly once per raid.
 
+### 9. API Gateway
+
+The Gateway is the single public HTTP entry point for clients and owns no domain data. It will route
+requests to the eight domain services while their existing ownership boundaries remain unchanged.
+
+For Lab 2, the private repository, collaboration workflow and CPR submodule are established first.
+Runtime implementation begins later using JavaScript, the language that was banned from the original
+service set. Routing behaviour is introduced in subsequent work.
+
 ---
 
 ## Architecture Diagram
@@ -158,7 +168,7 @@ redelivered event cannot hand over the same creature twice.
 
 ## Technologies and Communication Patterns
 
-The implementation deliberately uses exactly **two languages: Go and Python**. Go is assigned to
+The Lab 1 implementation deliberately uses exactly **two languages: Go and Python**. Go is assigned to
 the services whose load is dominated by concurrent requests, timers or latency-sensitive state
 transitions. Python with FastAPI is assigned to data-oriented services where flexible JSON models,
 validation and third-party SDK integration matter more than raw throughput. Splitting the services
@@ -201,12 +211,17 @@ language or a unique stack for every service.
 | **Notification** | **Python 3**, FastAPI, Pydantic, PostgreSQL; Firebase Admin SDK | Primarily a RabbitMQ subscriber. It consumes social, proximity, battle, creature, guild and raid events and calls Firebase Cloud Messaging; REST is limited to device-token and preference management. | Notification delivery is I/O-bound, and Python has a maintained Firebase Admin SDK plus rapid integration code. Broker queues absorb Firebase latency and outages. The cost is eventual delivery and Python's lower CPU throughput, neither of which is critical because notifications do not decide domain outcomes. |
 | **Guild** | **Python 3**, FastAPI, Pydantic, PostgreSQL | REST/JSON for guild, membership, role and invitation CRUD. WebSocket rooms carry live chat. Synchronous REST validates users through User Management; publishes `GuildInvitation` and membership-change events. | Most work is validated CRUD, for which FastAPI and Pydantic minimize boilerplate; its built-in WebSocket support covers chat without another stack. Each process needs a broker-backed fan-out when scaled horizontally, so RabbitMQ carries room messages between instances while PostgreSQL keeps chat history. |
 | **Package Registry** | **Python 3**, FastAPI, Pydantic, PostgreSQL JSONB | REST/JSON/OpenAPI for package versions, stat definitions and monster/raid definitions. Publishes versioned configuration-change events so consumers can invalidate caches. | Definitions vary between third-party packages, making Pydantic discriminated models and JSONB more adaptable than rigid Go structs. That flexibility can hide incompatible changes, so definitions are immutable by version and validated on write; runtime services request an explicit version rather than silently taking the latest one. |
+| **API Gateway** | **JavaScript**, stateless | Planned single HTTP entry point for clients; routing is added after the repository setup. | It centralizes the external boundary without becoming a second owner of domain data. JavaScript satisfies the Lab 2 requirement to use the language banned from the original service set. |
 
-The language choice follows the workload rather than organizational convenience: **Go** owns the
+The original service language choice follows the workload rather than organizational convenience: **Go** owns the
 hot concurrent paths (identity traffic, battles, geolocation and raid counters), while
 **Python/FastAPI** owns flexible schemas, CRUD-heavy domains and Firebase integration. REST/JSON is
 the common synchronous boundary, RabbitMQ carries durable cross-domain facts, and WebSockets are
 used only when continuous client updates justify their connection-management cost.
+
+Lab 2 adds the stateless API Gateway in **JavaScript**, the language deliberately excluded from the
+original eight services. Its implementation and runtime communication are introduced after the
+repository setup.
 
 ### Persistent connections
 
