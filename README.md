@@ -1072,8 +1072,13 @@ normal path is the stream below.
 
 ##### WebSocket — `GET /api/v1/map/stream`
 
-Upgrade carries `Authorization: Bearer <accessToken>`. The server closes with `4401` on an invalid
-token and `4429` when the client exceeds one location frame per second.
+Clients first negotiate `map.stream` with Gateway, then connect directly to the returned URL with
+its short-lived `ticket` query parameter. The upgrade does not carry `Authorization`. Map validates
+the Gateway signature, `aud=map`, subject, expiry and `resourceId=null` before upgrading. It returns
+`401 UNAUTHORIZED` for an invalid ticket and `429 CONCURRENCY_LIMIT_EXCEEDED` when its socket limit
+is full. Once connected, it closes with `4429` when the client exceeds one location frame per second.
+An invalid location frame returns `map.error` without closing the connection. Reconnection requires
+a fresh Gateway ticket; tickets must not be logged.
 
 Client → server:
 
@@ -1347,7 +1352,14 @@ drives HP to zero wins the transition and publishes the terminal event; every la
 
 ##### WebSocket — `GET /api/v1/raids/{raidId}/feed`
 
-Server-push only; the client sends nothing but heartbeats. A non-participant is closed with `4403`.
+Clients first negotiate `raid.feed` with Gateway, then connect directly to the returned URL with
+its short-lived `ticket` query parameter. The upgrade does not carry `Authorization`. Raid validates
+the Gateway signature, `aud=monster-raid`, subject, expiry and matching `resourceId` before
+upgrading. It returns `401 UNAUTHORIZED` for an invalid ticket, `403 FORBIDDEN` if the ticket's
+subject is no longer a raid participant, and `429 CONCURRENCY_LIMIT_EXCEEDED` when its socket limit
+is full. The feed is server-push only; the client sends `raid.ping` heartbeats. Malformed or other
+client frames close the socket with `4400`. Reconnection requires a fresh ticket; tickets must not
+be logged.
 
 | `type` | Payload | Sent when |
 | ------ | ------- | --------- |
