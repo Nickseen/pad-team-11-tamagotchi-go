@@ -295,6 +295,18 @@ holding checks. Neither needs WebSocket or SSE. These too are **not features of 
 stack**, which still pins `1.1.0` for both until the Gateway cutover; Battle's Lab 2 Postman
 collection is in its submodule's `postman/` directory.
 
+Guild and Package Registry `2.1.0` have since been released the same way, with their CPR submodules
+at the reviewed `main` commits. Both trust only the Gateway's context, ignore `Authorization`, check
+credentials before input validation, and enforce `TASK_TIMEOUT_MS` (3000 ms) and
+`MAX_CONCURRENT_TASKS` with `503 TASK_TIMEOUT` and `429 CONCURRENCY_LIMIT_EXCEEDED`; framework
+errors use the shared envelope with millisecond timestamps. Guild calls User Management through
+`GATEWAY_URL` and adds the direct Guild Chat WebSocket with single-use Gateway tickets, Redis
+fan-out across instances and `MAX_WEBSOCKET_CONNECTIONS`. Package Registry makes no outbound call
+and needs no WebSocket or SSE. These too are **not features of the Lab 1 Compose stack**, which
+still pins `2.0.1` for both until the Gateway cutover. Their Lab 2 Postman collections are in this
+repository's `postman/` directory (`guild-lab2`, `package-registry-lab2`), and Guild's WebSocket
+verification script is in its submodule's `scripts/` directory.
+
 The Compose stack uses local HTTP. TLS, broker delivery and WebSocket behaviour in the tables
 below are target contracts, not evidence that the Lab 1 images provide them. The shared Postman
 collections cover all eight HTTP APIs, but passing a collection with mocked dependencies does not
@@ -1591,13 +1603,16 @@ corresponding reviewed `main` commits:
 | Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `a8cf2c9` |
 | User Management | [`amzavladislav/tamagotchi-user-management:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `e2421fa` |
 | Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
+| Guild | [`gabimiric/tamagotchi-guild:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `dec0223` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `15fbabe` |
 
-User Management and Battle publish through CI: a merge to their `main` pushes `<VERSION>` and
-`latest` and tags the commit `v<VERSION>`, and refuses a version that is already published.
+User Management, Battle, Guild and Package Registry publish through CI: a merge to their `main`
+pushes `<VERSION>` and `latest` and tags the commit `v<VERSION>`, and refuses a version that is
+already published.
 
-The first table lists the images actually selected by `docker-compose.yml`. The four services above
+The first table lists the images actually selected by `docker-compose.yml`. The six services above
 remain on their Lab 1 tags because their Lab 2 images require the Gateway's trusted headers, and
-Map and Raid also its WebSocket signing keys. Gateway currently has no runnable release image, so
+Map, Raid and Guild also its WebSocket signing keys. Gateway currently has no runnable release image, so
 changing only these Compose image tags would break client requests.
 
 The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:

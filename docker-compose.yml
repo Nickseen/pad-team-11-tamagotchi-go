@@ -113,6 +113,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
 
   package-registry:
+    # Lab 1 runtime pin; Package Registry 2.1.0 requires the Gateway's trusted headers.
     image: gabimiric/tamagotchi-package-registry:2.0.1
     restart: on-failure
     depends_on:
@@ -240,6 +241,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U guild -d guild"]
 
   guild:
+    # Lab 1 runtime pin; Guild 2.1.0 requires the Gateway's trusted headers and WebSocket signing keys.
     image: gabimiric/tamagotchi-guild:2.0.1
     restart: on-failure
     depends_on:
