@@ -137,12 +137,15 @@ distribution must fire exactly once per raid.
 
 ### 9. API Gateway
 
-The Gateway is the single public HTTP entry point for clients and owns no domain data. It will route
-requests to the eight domain services while their existing ownership boundaries remain unchanged.
+The Gateway is the single public HTTP entry point for clients and owns no domain data. It routes
+every client-to-service and service-to-service REST request to the eight domain services, whose
+ownership boundaries remain unchanged.
 
-For Lab 2, the private repository, collaboration workflow and CPR submodule are established first.
-Runtime implementation begins later using JavaScript, the language that was banned from the original
-service set. Routing behaviour is introduced in subsequent work.
+It is the only component that validates client access tokens: it removes `Authorization` and
+forwards a trusted identity context instead. It negotiates the three WebSocket channels with
+short-lived tickets and then stays out of their traffic, and it bounds every request with a
+deadline and an in-flight limit. It is written in JavaScript, the language banned from the original
+service set.
 
 ---
 
@@ -211,7 +214,7 @@ language or a unique stack for every service.
 | **Notification** | **Python 3**, FastAPI, Pydantic, PostgreSQL; Firebase Admin SDK | Primarily a RabbitMQ subscriber. It consumes social, proximity, battle, creature, guild and raid events and calls Firebase Cloud Messaging; REST is limited to device-token and preference management. | Notification delivery is I/O-bound, and Python has a maintained Firebase Admin SDK plus rapid integration code. Broker queues absorb Firebase latency and outages. The cost is eventual delivery and Python's lower CPU throughput, neither of which is critical because notifications do not decide domain outcomes. |
 | **Guild** | **Python 3**, FastAPI, Pydantic, PostgreSQL | REST/JSON for guild, membership, role and invitation CRUD. WebSocket rooms carry live chat. Synchronous REST validates users through User Management; publishes `GuildInvitation` and membership-change events. | Most work is validated CRUD, for which FastAPI and Pydantic minimize boilerplate; its built-in WebSocket support covers chat without another stack. Each process needs a broker-backed fan-out when scaled horizontally, so RabbitMQ carries room messages between instances while PostgreSQL keeps chat history. |
 | **Package Registry** | **Python 3**, FastAPI, Pydantic, PostgreSQL JSONB | REST/JSON/OpenAPI for package versions, stat definitions and monster/raid definitions. Publishes versioned configuration-change events so consumers can invalidate caches. | Definitions vary between third-party packages, making Pydantic discriminated models and JSONB more adaptable than rigid Go structs. That flexibility can hide incompatible changes, so definitions are immutable by version and validated on write; runtime services request an explicit version rather than silently taking the latest one. |
-| **API Gateway** | **JavaScript**, stateless | Planned single HTTP entry point for clients; routing is added after the repository setup. | It centralizes the external boundary without becoming a second owner of domain data. JavaScript satisfies the Lab 2 requirement to use the language banned from the original service set. |
+| **API Gateway** | **JavaScript** (Node.js), stateless | Single HTTP entry point: routes `/<serviceSlug>/api/v1/...` for clients and services, validates RS256 access tokens against User Management's keys and forwards the trusted context, signs WebSocket tickets for direct connections to Map, Guild and Monster Raid. | It centralizes the external boundary without becoming a second owner of domain data. JavaScript satisfies the Lab 2 requirement to use the language banned from the original service set. |
 
 The original service language choice follows the workload rather than organizational convenience: **Go** owns the
 hot concurrent paths (identity traffic, battles, geolocation and raid counters), while
@@ -220,8 +223,8 @@ the common synchronous boundary, RabbitMQ carries durable cross-domain facts, an
 used only when continuous client updates justify their connection-management cost.
 
 Lab 2 adds the stateless API Gateway in **JavaScript**, the language deliberately excluded from the
-original eight services. Its implementation and runtime communication are introduced after the
-repository setup.
+original eight services. Every REST call now passes through it, and the services trust only the
+context it forwards.
 
 ### Persistent connections
 
@@ -259,12 +262,13 @@ contract and may not be relied upon by another service.
 
 ### Lab 1 implementation audit
 
-The tables below describe the target contract. The team Compose pins the following published
-images; this audit separates verified Lab 1 behaviour from contract features still planned. It is
-based on the shared Postman collections, the owners' release/PR reports, and the Map and Monster
-Raid implementations. It does not certify uninspected private source code.
+The tables below describe the target contract. This audit recorded what the Lab 1 images delivered
+against it and which contract features were still planned. It is based on the shared Postman
+collections, the owners' release/PR reports, and the Map and Monster Raid implementations. It does
+not certify uninspected private source code. Since the Gateway cutover the team Compose runs the
+Lab 2 images described after the table and listed under [Running the Stack](#running-the-stack).
 
-| Service | Compose image | Implemented or exercised in Lab 1 | Still planned or requiring alignment |
+| Service | Lab 1 image | Implemented or exercised in Lab 1 | Still planned or requiring alignment |
 | ------- | ------------- | --------------------------------- | ------------------------------------- |
 | User Management | `amzavladislav/tamagotchi-user-management:1.1.0` | REST, PostgreSQL, RS256/JWKS issuer; its Postman collection creates users and obtains JWTs | Admin JWT issuance for the default stack; RabbitMQ publishing |
 | Tamagotchi | `crislp/tamagotchi-tamagotchi:2.1.0` | REST, PostgreSQL, RS256/JWKS, internal primary and secondary lookups, direct event intake for tests | RabbitMQ consumer integration; confirm every response and mock against the tables below |
@@ -275,18 +279,12 @@ Raid implementations. It does not certify uninspected private source code.
 | Guild | `gabimiric/tamagotchi-guild:2.0.1` | REST, PostgreSQL, RS256/JWKS, internal guild/member reads, live User Management bulk lookup | WebSocket chat, Redis Pub/Sub, RabbitMQ events and versioned migrations |
 | Monster Raid | `nickseen/tamagotchi-monster-raid:2.0.0` | REST, PostgreSQL, RS256/JWKS, service-authenticated membership check, dependency mocks | Internal Guild level lookup in a later image; Redis counters, WebSocket and RabbitMQ publishing |
 
-Map and Monster Raid have since released newer Lab 2 images, and their CPR submodules point to
-reviewed `main` commits for the published versions listed below. Map `2.1.0` adds the direct
-live-location WebSocket, Gateway-authenticated REST context, Gateway-routed relationship reads,
-Redis proximity cooldown,
-and RabbitMQ proximity publication. Monster Raid `2.1.0` adds the direct raid feed,
+Map and Monster Raid have since released Lab 2 images, and their CPR submodules point to reviewed
+`main` commits for the published versions listed below. Map `2.1.0` adds the direct live-location
+WebSocket, Gateway-authenticated REST context, Gateway-routed relationship reads, Redis proximity
+cooldown and RabbitMQ proximity publication. Monster Raid `2.1.0` adds the direct raid feed,
 Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. Raid `2.1.1` also
-adds the internal participant lookup required for Gateway WebSocket tickets. These are published
-service capabilities, **not features of the Lab 1 Compose stack above**: that stack still pins
-`2.0.0` for both services until a runnable Gateway is available. The Lab 2 REST/WebSocket
-verification collections for Map and Raid replace their earlier collections under the existing
-filenames in this repository's `postman/` directory. They require the Gateway stack; the other
-shared collections continue to target this Lab 1 Compose stack.
+adds the internal participant lookup required for Gateway WebSocket tickets.
 
 User Management and Battle `2.0.0` have since been released the same way, with their CPR submodules
 at the reviewed `main` commits. Both trust only the Gateway's context (`X-Gateway-Token` and the
@@ -294,9 +292,8 @@ forwarded identity), ignore `Authorization`, and enforce `TASK_TIMEOUT_MS` and
 `MAX_CONCURRENT_TASKS` with `503 TASK_TIMEOUT` and `429 CONCURRENCY_LIMIT_EXCEEDED`. User
 Management exempts its JWKS for Gateway's bootstrap; Battle calls all three dependencies through
 `GATEWAY_URL`, reads Registry's `versions/current` and performs Tamagotchi's primary and secondary
-holding checks. Neither needs WebSocket or SSE. These too are **not features of the Lab 1 Compose
-stack**, which still pins `1.1.0` for both until the Gateway cutover; Battle's Lab 2 Postman
-collection is in its submodule's `postman/` directory.
+holding checks. Battle `2.0.1` authorizes an acceptance before resolving the lineups, so a refused
+acceptance calls no other service. Neither needs WebSocket or SSE.
 
 Guild and Package Registry `2.1.0` have since been released the same way, with their CPR submodules
 at the reviewed `main` commits. Both trust only the Gateway's context, ignore `Authorization`, check
@@ -305,10 +302,8 @@ credentials before input validation, and enforce `TASK_TIMEOUT_MS` (3000 ms) and
 errors use the shared envelope with millisecond timestamps. Guild calls User Management through
 `GATEWAY_URL` and adds the direct Guild Chat WebSocket with single-use Gateway tickets, Redis
 fan-out across instances and `MAX_WEBSOCKET_CONNECTIONS`. Package Registry makes no outbound call
-and needs no WebSocket or SSE. These too are **not features of the Lab 1 Compose stack**, which
-still pins `2.0.1` for both until the Gateway cutover. Their Lab 2 Postman collections are in this
-repository's `postman/` directory (`guild-lab2`, `package-registry-lab2`), and Guild's WebSocket
-verification script is in its submodule's `scripts/` directory.
+and needs no WebSocket or SSE. Guild's WebSocket verification script is in its submodule's
+`scripts/` directory.
 
 Tamagotchi and Notification `2.2.0` have since been released the same way, with their CPR
 submodules at the reviewed `main` commits. Both trust only the Gateway's context (`X-Gateway-Token`
@@ -316,14 +311,18 @@ and the forwarded identity), ignore `Authorization`, and enforce `TASK_TIMEOUT_M
 `MAX_CONCURRENT_TASKS` (10) with `503 TASK_TIMEOUT` and `429 CONCURRENCY_LIMIT_EXCEEDED`; a request
 that times out commits nothing. Tamagotchi calls no other service; Notification asks Guild for a
 guild's members through `GATEWAY_URL`, waiting no longer than the request's deadline. Neither needs
-WebSocket or SSE. These too are **not features of the Lab 1 Compose stack**, which still pins
-`2.1.0` for both until the Gateway cutover.
+WebSocket or SSE.
 
-The Compose stack uses local HTTP. TLS, broker delivery and WebSocket behaviour in the tables
-below are target contracts, not evidence that the Lab 1 images provide them. The shared Postman
-collections cover all eight HTTP APIs, but passing a collection with mocked dependencies does not
-prove its live inter-service path. Owner confirmation is still needed for uninspected mock payloads
-and remaining live paths.
+The API Gateway `2.0.0` completes the set: it is the single HTTP entry point, validates access
+tokens, forwards the trusted context, negotiates the three WebSocket channels and enforces
+`REQUEST_TIMEOUT_MS` and `MAX_IN_FLIGHT_REQUESTS`. The team Compose runs all nine Lab 2 images behind
+it, and every shared Postman collection in [`postman/`](postman/) goes through it.
+
+The Compose stack uses local HTTP, and it has no RabbitMQ yet: TLS and broker delivery in the tables
+below are target contracts, not evidence that the images provide them. The shared Postman
+collections cover all eight HTTP APIs through Gateway, but passing a collection with mocked
+dependencies does not prove its live inter-service path; the live paths with stack evidence are
+listed in item 5 below.
 
 #### Compatibility and open alignment work
 
@@ -338,25 +337,30 @@ and remaining live paths.
    specified three. These are service fixes or explicit compatibility decisions, not evidence that
    the target contract has been implemented. Guild 2.1.0 resolves all three — every client route
    requires Gateway identity, malformed input returns `400 VALIDATION_FAILED` in the shared envelope
-   after authentication, and timestamps carry three fractional digits. Like the other Lab 2
-   images, it takes effect in this Compose stack at the Gateway cutover.
-3. **Battle dependencies:** Battle 1.1.0 must move from the public Package `latestVersion` read to
-   the Registry internal current-version route, and use Tamagotchi's internal primary/secondary
-   checks; the published Battle 2.0.0 does both, through Gateway. Its dependency mocks should preserve the agreed bulk Tamagotchi fields
+   after authentication, and timestamps carry three fractional digits; it is the image the Compose
+   stack runs.
+3. **Battle dependencies:** Battle 1.1.0 read the public Package `latestVersion` and skipped the
+   holding checks. Battle 2.0.0 and later, which the Compose stack runs, use the Registry internal
+   current-version route and Tamagotchi's internal primary/secondary checks, through Gateway, and
+   run live by default. Its dependency mocks preserve the agreed bulk Tamagotchi fields
    (`tamagotchiId`, `ownerId`, `originPackageId`, `combatType`, `level`, `stats`), type advantage
    `{ "multiplier": number }`, Registry stat-definition `combatBonus` fields, and User Management
    relationships `{ "items": [{ "userId": UUID, "relation": string }] }`.
-4. **Raid dependencies:** The Compose-pinned Raid 2.0.0 image reads guild level through public
-   `GET /api/v1/guilds/{guildId}`. Published Raid 2.1.1 uses Guild's internal route with
-   `X-Service-Token`, routed through Gateway. The team Compose cannot select this image until
-   Gateway is implemented and configured. Guild currently reports
+4. **Raid dependencies:** Raid 2.0.0 read guild level through public `GET /api/v1/guilds/{guildId}`.
+   Raid 2.1.1, which the Compose stack runs, uses Guild's internal route with `X-Service-Token`
+   through Gateway. Its live mode still needs an admin-created raid definition (item 1), so the
+   stack starts Raid with its dependencies mocked. Guild currently reports
    `level: 1` for every guild, so definitions requiring a higher guild level cannot start. Raid's
    current mock damage formula is provisional: `level × 10`, multiplied by `1.5` for weakness or
    `0.5` for resistance.
-5. **Cross-service verification:** Map → User Management, Guild → User Management and Raid → Guild
-   membership/guild read have live stack evidence. Tamagotchi's and Notification's direct event
-   adapters have Postman coverage. Other live caller/callee combinations and the remaining owners'
-   mock payloads require owner sign-off before #55 can be considered fully verified.
+5. **Cross-service verification:** in the Lab 2 stack every call below went through Gateway with
+   live evidence: Map → User Management relationships; Guild → User Management bulk lookup;
+   Notification → Guild members; Battle → Tamagotchi creatures, primary and secondary lookups and
+   type advantage, Package Registry current version and stat definitions, and User Management
+   relationships, in a battle fought to a knockout; Gateway → Raid participant check and
+   Gateway → Guild membership check for WebSocket tickets. Tamagotchi's and Notification's direct
+   event adapters have Postman coverage. Raid → Guild, Registry and Tamagotchi in live mode remain
+   unverified until item 1 is resolved.
 
 ### Transport and conventions
 
@@ -1101,8 +1105,7 @@ cancelled when Battle's task deadline passes. Any non-success answer, including 
 `503` or `504`, is reported as `503 DEPENDENCY_UNAVAILABLE` and changes no battle state; a missing
 creature is `404 TAMAGOTCHI_NOT_FOUND`. A primary that is not the player's current primary, or a
 player without one, is refused with `422 TAMAGOTCHI_NOT_PRIMARY`; a secondary the player does not
-hold (`isHeld: false`) is refused with `403 TAMAGOTCHI_NOT_HELD`. The compose-pinned Battle 1.1.0
-still reads the public Package resource and does not perform the two holding checks.
+hold (`isHeld: false`) is refused with `403 TAMAGOTCHI_NOT_HELD`.
 
 In Lab 1 Battle stores everything in PostgreSQL. The Redis match cache and RabbitMQ publishing are
 planned: events are written to the service log at their real publication points.
@@ -1491,7 +1494,7 @@ All events go through a single durable topic exchange, `tamagotchi.events`. Rout
 `<domain>.<fact>`, always past tense — an event states something that already happened and is never
 a request for someone to act.
 
-This is the target broker contract. The Lab 1 Compose stack has no RabbitMQ service. Its
+This is the target broker contract. The Compose stack has no RabbitMQ service yet. Its
 Tamagotchi and Notification Postman collections deliver sample envelopes through their
 `POST /api/v1/internal/events` test adapters; that verifies handler behaviour, not broker
 publication, consumption, retries or dead-lettering. The other owners report typed events or log
@@ -1634,49 +1637,34 @@ Delivery rules, uniform across every consumer:
 ## Running the Stack
 
 The whole ecosystem runs from the images published on Docker Hub. The repository root holds
-[`docker-compose.yml`](docker-compose.yml), which starts all eight services and the stores each one
-owns — 17 containers — without building anything locally.
+[`docker-compose.yml`](docker-compose.yml), which starts the API Gateway, the eight services and the
+stores each one owns — 19 containers — without building anything locally. Clients reach the system
+only through the Gateway on `http://localhost:8080`; the services call each other through it too.
 
 ### Docker Hub images
 
 Every repository is public and every tag is published for `linux/amd64` and `linux/arm64`, so the
-same Compose file runs on Intel, AMD and Apple Silicon machines.
+same Compose file runs on Intel, AMD and Apple Silicon machines. These are the Lab 2 images the
+Compose file runs; the CPR submodules point at the reviewed `main` commits of the same releases.
 
-| Service | Image | Tag | Port | Store |
-| ------- | ----- | --- | ---- | ----- |
-| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management) | `1.1.0` | 8081 | PostgreSQL |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi) | `2.1.0` | 8082 | PostgreSQL |
-| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry) | `2.0.1` | 8083 | PostgreSQL |
-| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle) | `1.1.0` | 8084 | PostgreSQL |
-| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map) | `2.0.0` | 8085 | Redis |
-| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification) | `2.1.0` | 8086 | PostgreSQL |
-| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild) | `2.0.1` | 8087 | PostgreSQL |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid) | `2.0.0` | 8088 | PostgreSQL and Redis |
+| Service | Image | Tag | Host port | Store | CPR submodule commit |
+| ------- | ----- | --- | --------- | ----- | -------------------- |
+| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `2.0.0` | 8080 | — | `ef71c2c` |
+| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `2.0.0` | — | PostgreSQL | `e2421fa` |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `2.2.0` | — | PostgreSQL | `88686bd` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `2.1.0` | — | PostgreSQL | `15fbabe` |
+| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `2.0.1` | — | PostgreSQL | `a955e55` |
+| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `2.1.1` | 8085 (WebSocket) | Redis | `9f7083f` |
+| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `2.2.0` | — | PostgreSQL | `24dacd1` |
+| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `2.1.0` | 8087 (WebSocket) | PostgreSQL and Redis | `dec0223` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `2.1.1` | 8088 (WebSocket) | PostgreSQL and Redis | `64652f6` |
 
-The following Lab 2 images are published for amd64 and arm64, with CPR source submodules at the
-corresponding reviewed `main` commits:
-
-| Service | Published image | CPR submodule commit |
-| ------- | --------------- | -------------------- |
-| Map | [`nickseen/tamagotchi-map:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `9f7083f` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `64652f6` |
-| User Management | [`amzavladislav/tamagotchi-user-management:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `e2421fa` |
-| Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
-| Guild | [`gabimiric/tamagotchi-guild:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `dec0223` |
-| Package Registry | [`gabimiric/tamagotchi-package-registry:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `15fbabe` |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi:2.2.0`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `88686bd` |
-| Notification | [`crislp/tamagotchi-notification:2.2.0`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `24dacd1` |
-
-User Management, Battle, Guild and Package Registry publish through CI: a merge to their `main`
-pushes `<VERSION>` and `latest` and tags the commit `v<VERSION>`, and refuses a version that is
-already published. Tamagotchi and Notification publish through CI as well: a merge to their `main`
-pushes the `service_version` from `app/config.py` and `latest`, and refuses a version that is
-already published; the release commit is tagged `v<version>` by hand.
-
-The first table lists the images actually selected by `docker-compose.yml`. The eight services above
-remain on their Lab 1 tags because their Lab 2 images require the Gateway's trusted headers, and
-Map, Raid and Guild also its WebSocket signing keys. Gateway currently has no runnable release image, so
-changing only these Compose image tags would break client requests.
+Every image is published by its repository's CI on a merge to `main`, which pushes the version and
+`latest` and refuses a version that is already published. User Management, Battle, Guild and Package
+Registry read the version from `VERSION` and Gateway from `package.json`, and their CI tags the
+commit `v<version>`. Tamagotchi and Notification read the `service_version` in `app/config.py`, and
+their release commit is tagged `v<version>` by hand. The Lab 1 images stay on Docker Hub under their
+`1.x` and `2.0.x` tags; the [Lab 1 implementation audit](#lab-1-implementation-audit) records them.
 
 The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:
 version 18 moved the data directory, so the volumes below would silently stop persisting.
@@ -1684,8 +1672,9 @@ version 18 moved the data directory, so the volumes below would silently stop pe
 ### Prerequisites
 
 - Docker with Compose v2 — Docker Desktop, or Docker Engine with the `docker compose` plugin.
-- Host ports `8081` to `8088` free. Only the services publish ports; the databases stay on the
-  Compose network.
+- Host ports `8080`, `8085`, `8087` and `8088` free. Only the Gateway and the three WebSocket
+  services publish a port: clients open the live map, guild chat and raid feed directly, with a
+  ticket the Gateway issues. Every other service and every store stays on the Compose network.
 - No local toolchain: nothing is compiled.
 
 ### Configure
@@ -1696,28 +1685,40 @@ is missing.
 
 ```sh
 cp .env.example .env
-openssl rand -hex 16    # one way to produce each secret
+openssl rand -hex 32    # one way to produce each secret
 ```
 
 | Variable | Used by | Value |
 | -------- | ------- | ----- |
-| `SERVICE_TOKEN` | User Management, Battle, Map, Monster Raid, Tamagotchi, Notification, Package Registry, Guild | Shared credential sent as `X-Service-Token` on internal calls. One value for the whole stack: a caller's token is compared against the callee's |
+| `GATEWAY_TOKEN` | Gateway and all eight services | Sent by the Gateway as `X-Gateway-Token`; services trust identity headers only when it matches. At least 16 characters |
+| `SERVICE_TOKEN` | Gateway and all eight services | Sent as `X-Service-Token` on service-to-service calls; the Gateway and the callee both compare it. At least 16 characters |
 | `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
-| `MAP_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Monster Raid | Redis passwords |
+| `MAP_REDIS_PASSWORD`, `GUILD_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Guild, Monster Raid | Redis passwords |
 
-Four variables are not secrets. They are commented out in `.env.example`, and each one switches one
-service between mocked neighbours and real calls:
+The other variables are not secrets. They are commented out in `.env.example`; four switch one
+service between mocked neighbours and real calls through the Gateway, and three set the WebSocket
+addresses the Gateway returns to clients:
 
 | Variable | Mocked | Real | Default |
 | -------- | ------ | ---- | ------- |
-| `BATTLE_DEPENDENCY_MODE` | `mock` | `live` | `mock` |
+| `BATTLE_DEPENDENCY_MODE` | `mock` | `live` | `live` |
 | `GUILD_USER_MANAGEMENT_MODE` | `mock` | `real` | `real` |
-| `MAP_RELATIONSHIP_MODE` | `mock` | `http` | `mock` |
+| `MAP_RELATIONSHIP_MODE` | `mock` | `http` | `http` |
 | `RAID_DEPENDENCY_MODE` | `mock` | `http` | `mock` |
+| `MAP_WS_PUBLIC_URL`, `GUILD_WS_PUBLIC_URL`, `MONSTER_RAID_WS_PUBLIC_URL` | | | `ws://localhost:8085`, `:8087`, `:8088` |
 
-Every other setting, such as service URLs, database names and ports, is fixed in the Compose file.
-The services reach each other by their Compose names, which are the hostnames the communication
-contract uses.
+Every other setting, such as service URLs, database names and limits, is fixed in the Compose file.
+The services reach each other through `GATEWAY_URL=http://gateway:8080`, and the Gateway reaches
+them by their Compose names, which are the hostnames the communication contract uses. Each service
+stops a request after `TASK_TIMEOUT_MS=3000`, below the Gateway's `REQUEST_TIMEOUT_MS=5000`, so a
+service's `503 TASK_TIMEOUT` reaches the client before the Gateway would answer `504`:
+
+| Service | `MAX_CONCURRENT_TASKS` | `MAX_WEBSOCKET_CONNECTIONS` |
+| ------- | ---------------------- | --------------------------- |
+| API Gateway | `MAX_IN_FLIGHT_REQUESTS=100` | — |
+| User Management, Battle, Map, Monster Raid | `50` | Map and Raid: `100` |
+| Tamagotchi, Notification | `10` | — |
+| Package Registry, Guild | `64` | Guild: `100` |
 
 ### Start
 
@@ -1726,27 +1727,33 @@ docker compose up -d
 docker compose ps
 ```
 
-The first start pulls about 450 MB of compressed images. The databases become healthy first; the
-services that do not retry their database connection wait for that health check, and restart on
-failure as a fallback. Once the images are pulled, a cold start takes about 15 seconds. Every
-container except User Management and Battle then reports `healthy`: those two images are distroless
-and carry no shell to run a health check with, so they retry their database connection themselves.
+The first start pulls about 520 MB of compressed images. The databases and Redis become healthy
+first; the services that do not retry their database connection wait for that health check, and
+restart on failure as a fallback. Once the images are pulled, a cold start takes about 20 seconds.
+Every container except User Management and Battle then reports `healthy`: those two images are
+distroless and carry no shell to run a health check with, so they retry their database connection
+themselves.
 
-To check each service, request its health route:
-
-| Service | Health route |
-| ------- | ------------ |
-| User Management, Tamagotchi, Package Registry, Battle, Notification, Guild | `http://localhost:<port>/health` |
-| Map, Monster Raid | `http://localhost:<port>/healthz` |
+The published ports answer health probes directly; the other services' health shows in
+`docker compose ps`:
 
 ```sh
-curl localhost:8081/health    # {"status":"ok"}
+curl localhost:8080/health     # {"status":"ok","service":"gateway","version":"2.0.0"}
+curl localhost:8085/healthz    # Map; Monster Raid on 8088, Guild's /health on 8087
+```
+
+A first request through the Gateway:
+
+```sh
+curl -X POST localhost:8080/user-management/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"ember_keeper","email":"ember@example.com","password":"correct horse battery","packageId":"1d4e9a02-8c77-4a1e-b6f0-77c3b1d9e402"}'
 ```
 
 ### Data and volumes
 
-Every store keeps its data in a named volume, so `docker compose down` followed by `up` loses
-nothing. `docker compose down -v` deletes the volumes and starts everything empty.
+Every durable store keeps its data in a named volume, so `docker compose down` followed by `up`
+loses nothing. `docker compose down -v` deletes the volumes and starts everything empty.
 
 | Volume | Store |
 | ------ | ----- |
@@ -1760,6 +1767,9 @@ nothing. `docker compose down -v` deletes the volumes and starts everything empt
 | `raid-data` | Monster Raid database |
 | `raid-redis-data` | Monster Raid Redis, append-only |
 
+Guild's Redis keeps no volume: it carries chat fan-out between Guild instances and single-use
+WebSocket ticket claims, both transient, while chat history lives in Guild's database.
+
 Every service creates its own schema on start-up, so an empty database is all it needs. No seed
 script is needed either: the Postman collections create everything they use. The SQL schemas are
 published in [`db/`](db/) for reference. Do not mount them as initialisation scripts; the
@@ -1767,76 +1777,65 @@ published in [`db/`](db/) for reference. Do not mount them as initialisation scr
 
 ### Test with Postman
 
-The [Postman Collections](#postman-collections) below run against this stack. Give the shared
-environment the values from your `.env`:
-
-| Environment variable | Value from `.env` |
-| -------------------- | ----------------- |
-| `serviceToken` | `SERVICE_TOKEN` |
-| Map collection `userToken` | Generated by its User Management setup folder; no static Map token is needed |
-| Raid collection `userToken` | Generated by its User Management setup folder |
-| Raid collection `adminToken` | Optional User Management access token with the `admin` role; admin-only checks skip when it is unset |
+The [Postman Collections](#postman-collections) below run against this stack, every request through
+the Gateway. Give the shared environment's `serviceToken` the `SERVICE_TOKEN` from your `.env`.
 
 ### Mock and live modes
 
-With the defaults, every service except Guild answers its cross-service calls from in-process
-mocks. Guild calls User Management for real: its Postman collection checks that inviting an
-unregistered user is refused with `404`, which only the real User Management can answer. Raid's
-admin-only Postman requests, including the assertion after cancellation, skip when no admin JWT
-is supplied; its lifecycle uses the configured mock guild, raid definition, and primary
-Tamagotchi IDs. Switching a service to live mode makes it call its neighbours for real. In Lab 1,
-Map → User Management and Battle → Tamagotchi use live calls. The Compose-pinned Raid 2.0.0 image
-reads guild level from `GET /api/v1/guilds/{guildId}`; this returned `200` in a live stack check,
-as did Raid's internal Guild membership call. Published Raid 2.1.1 uses the contracted internal
-Guild route through Gateway, but the shared Compose stack has not switched to it. Creating a
-complete raid in live mode also needs an active Registry raid definition, which cannot currently be
-created through the stack because User Management does not issue admin JWTs. Live Raid → Tamagotchi
-requires Tamagotchi 2.1.0 service authentication. Guild → User Management also works with
-`X-Service-Token` alone since Guild 2.0.1: it calls the service route `GET /api/v1/users?ids=…`
-instead of the user route `GET /api/v1/users/{userId}` it used before.
+With the defaults, Battle, Map and Guild call their neighbours for real through the Gateway, and
+Notification always reads guild members from Guild the same way. Battle's Postman collection
+prepares real data for it: a package with published stat definitions, players registered with it,
+their primary creatures in Tamagotchi and a secondary lent through Tamagotchi's service route.
+
+Monster Raid starts with its neighbours mocked. A real raid needs an active raid definition from
+the Registry, and creating one requires the `admin` role, which User Management does not issue in
+this stack (see [item 1](#compatibility-and-open-alignment-work)). In mock mode the raid lifecycle
+uses the fixture guild, raid definition and primary Tamagotchi in Raid's collection variables;
+Raid's internal participant check for `raid.feed` tickets runs through the Gateway either way.
+Setting a `*_MODE` variable to its mocked value makes that service answer from in-process mocks,
+which keeps it runnable on its own.
 
 ---
 
 ## Postman Collections
 
-The [`postman/`](postman/) directory contains one collection for every service. Map, Monster Raid,
-Tamagotchi and Notification now target the Lab 2 Gateway stack; the other four service collections
-target the Lab 1 stack.
-The committed environment contains localhost URLs and non-working credential placeholders only.
-Do not commit exported environments containing real tokens or secrets.
+The [`postman/`](postman/) directory contains one collection for every service and one shared
+environment. Every collection calls its service through the Gateway at
+`{{gatewayUrl}}/<serviceSlug>/api/v1/...`: user requests carry a Bearer token, which the Gateway
+validates and replaces with its trusted headers, and service requests carry only
+`X-Service-Token`. Each setup folder registers and logs in its own users, so no credential is
+stored in a collection. The committed environment contains localhost URLs and non-working
+credential placeholders only. Do not commit exported environments containing real tokens or
+secrets.
 
-| Service | Collection | Base URL variable |
-| ------- | ---------- | ----------------- |
-| User Management | `user-management.postman_collection.json` | `userManagementUrl` |
-| Tamagotchi (Lab 2) | `tamagotchi.postman_collection.json` | `gatewayUrl` |
-| Package Registry | `package-registry.postman_collection.json` | `packageRegistryUrl` |
-| Battle | `battle.postman_collection.json` | `battleUrl` |
-| Map (Lab 2) | `map.postman_collection.json` | `gatewayUrl` |
-| Notification (Lab 2) | `notification.postman_collection.json` | `gatewayUrl` |
-| Guild | `guild.postman_collection.json` | `guildUrl` |
-| Monster Raid (Lab 2) | `monster-raid.postman_collection.json` | `gatewayUrl` |
+| Service | Collection | Covers beyond its own routes |
+| ------- | ---------- | ---------------------------- |
+| User Management | `user-management.postman_collection.json` | `403 INTERNAL_ROUTE_FORBIDDEN` for clients, also through an escaped path; forged identity headers replaced by the token's |
+| Tamagotchi | `tamagotchi.postman_collection.json` | Service routes with `X-Service-Token`; Gateway errors |
+| Package Registry | `package-registry.postman_collection.json` | Packages created by any user; admin requests skipped without `registryAdminToken` |
+| Battle | `battle.postman_collection.json` | Real data set up in Package Registry and Tamagotchi through the Gateway; the lineup checks Battle makes with Tamagotchi |
+| Map | `map.postman_collection.json` | Map → User Management relationships; `map.stream` ticket negotiation |
+| Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
+| Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history |
+| Monster Raid | `monster-raid.postman_collection.json` | `raid.feed` ticket negotiation with the participant check; admin requests skipped without `adminToken` |
+
+The environment `tamagotchi-go.postman_environment.json` defines `gatewayUrl`
+(`http://localhost:8080`), `guildUrl` for Guild's health probe, `packageId` for test-user
+registration, `serviceToken` as a placeholder and `battleDependencyMode`, which must match Battle's
+`DEPENDENCY_MODE` (`live` by default).
 
 ### Import and configure
 
-1. Start the required services and their databases. The four Lab 1 collections use host ports
-   `8081`, `8083`, `8084` and `8087`; Map, Raid, Tamagotchi and Notification need the Lab 2 Gateway
-   at `http://localhost:8080`.
+1. Start the stack as described in [Running the Stack](#running-the-stack).
 2. In Postman, import `postman/tamagotchi-go.postman_environment.json`.
 3. Import the collection files you want to run and select **Tamagotchi Go (local)**.
-4. Set the environment's **Current value** for every credential placeholder used by the selected
-   collection. Raid's admin requests are skipped by default; to exercise them, set its collection
-   variable `adminToken` to a User Management admin JWT. Keep current values local and do not
-   export them back into the repository.
+4. Set the environment's **Current value** of `serviceToken` to the stack's `SERVICE_TOKEN`. Raid's
+   and Package Registry's admin requests are skipped by default; to exercise them, set Raid's
+   collection variable `adminToken` or Registry's `registryAdminToken` to a User Management admin
+   JWT. Keep current values local and do not export them back into the repository.
 5. Run a collection with the Collection Runner in its saved order. Collection-scoped variables
    hold scenario identifiers and generated values, so one service cannot overwrite another
-   service's state.
-
-Map, Raid, Tamagotchi and Notification register and log in through Gateway's User Management route,
-storing each access token in collection variables. Notification's raid check creates a guild through
-Gateway, so Guild must run as well. Set the environment's `serviceToken` to the stack's `SERVICE_TOKEN`
-for internal-route checks. Raid requests requiring `admin` and the cancellation-dependent assertion
-skip unless you set its collection variable `adminToken` to a real admin JWT. The empty-reason
-validation request also skips because a user token is rejected before its reason is validated.
+   service's state, and every collection can be run repeatedly.
 
 ### Run with Newman
 
@@ -1844,51 +1843,20 @@ Install Newman or run it through `npx`. Pass the shared environment and supply t
 at runtime so it does not need to be written to the JSON file:
 
 ```sh
-npx newman run postman/map.postman_collection.json \
-  -e postman/tamagotchi-go.postman_environment.json \
-  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
-
-npx newman run postman/monster-raid.postman_collection.json \
-  -e postman/tamagotchi-go.postman_environment.json \
-  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
-```
-
-Run dependency services first when exercising integration folders; mock scenarios use the
-configuration documented in the corresponding service repository.
-
-### Lab 2 collections through Gateway
-
-The Map, Raid, Tamagotchi and Notification collections above target Gateway. Guild and Package Registry retain separate
-Lab 2 collections alongside their Lab 1 versions. User-facing requests pass through Gateway with
-a Bearer token; service-context internal checks use `X-Service-Token`:
-
-| Collection | Covers |
-| ---------- | ------ |
-| `guild-lab2.postman_collection.json` | User Management setup, guilds, invitations (Guild → Gateway → User Management), membership, internal routes with `X-Service-Token`, `guild.chat` ticket negotiation and chat history, Gateway errors such as `403 INTERNAL_ROUTE_FORBIDDEN` |
-| `package-registry-lab2.postman_collection.json` | User Management setup, packages and versions, registrations, internal definition routes with `X-Service-Token`, admin requests (skipped without `registryAdminToken`), Gateway errors |
-
-Use the same `tamagotchi-go.postman_environment.json`: it defines `gatewayUrl`
-(`http://localhost:8080`), direct `guildUrl` and `packageRegistryUrl` for their health checks,
-`serviceToken` as a non-working placeholder, and `packageId` for Map/Raid test-user
-registration. Set the local `serviceToken` value to the running stack's `SERVICE_TOKEN` for
-internal-route checks; never commit or export real credentials. These collections need a running
-Gateway, User Management 2.0.0 and the corresponding Lab 2 service images:
-
-```sh
-npx newman run postman/guild-lab2.postman_collection.json \
-  -e postman/tamagotchi-go.postman_environment.json \
-  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+for service in user-management tamagotchi package-registry battle map notification guild monster-raid; do
+  npx newman run "postman/$service.postman_collection.json" \
+    -e postman/tamagotchi-go.postman_environment.json \
+    --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+done
 ```
 
 WebSocket frames cannot run in the Collection Runner. The negotiation requests store fresh direct
-socket URLs as `guildChatUrl`, `mapStreamUrl` and `raidFeedUrl`. Open the Map or Raid URL in a
-separate Postman WebSocket request promptly (tickets expire within 60 seconds), without an
-`Authorization` header: Map expects a `location.update` frame and returns `map.snapshot`;
-Raid sends `raid.snapshot` and accepts `raid.ping` heartbeats. The Guild repository's
-`scripts/ws_chat_client.py "<url>"` walks through its chat contract. Map and Raid's lifecycle
-folders use the fixture IDs in their collection variables; Raid's admin checks skip unless a real
-admin JWT is supplied. In live dependency mode, provide actual Guild, Registry and Tamagotchi
-fixtures before running Raid's lifecycle.
+socket URLs as `mapStreamUrl`, `guildChatUrl` and `raidFeedUrl`. Open one in a separate Postman
+WebSocket request promptly (tickets expire within 60 seconds and Guild accepts each ticket once),
+without an `Authorization` header: Map sends `map.snapshot` and answers `map.ping` with `map.pong`;
+Guild sends `chat.history` and echoes a `chat.send` as `chat.message`; Raid sends `raid.snapshot`
+and answers `raid.ping`. The Guild repository's `scripts/ws_chat_client.py "<url>"` walks through
+its chat contract.
 
 ---
 
