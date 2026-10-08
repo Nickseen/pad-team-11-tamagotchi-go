@@ -467,8 +467,7 @@ Content-Type: application/json
 role or membership required by the target channel. For `raid.feed`, Gateway calls Raid's
 `GET /api/v1/internal/raids/{raidId}/participants/{userId}` with the validated JWT subject as
 `userId` and its configured `X-Gateway-Token` and `X-Service-Token`. It issues a ticket only when
-Raid returns
-`{ "isParticipant": true }`; `false` becomes `403 FORBIDDEN`. Gateway never trusts a client-supplied
+Raid returns `{ "isParticipant": true }`; `false` becomes `403 FORBIDDEN`. Gateway never trusts a client-supplied
 `userId` for this check. It then returns `201 Created`:
 
 ```json
@@ -490,6 +489,8 @@ Errors are `400 VALIDATION_FAILED` for an invalid channel/resource pair, `401 UN
 missing or invalid access token, `403 FORBIDDEN` when the user cannot join the resource, and
 `503 DEPENDENCY_UNAVAILABLE` when authorization data or the configured public WebSocket URL is
 unavailable.
+For `raid.feed`, Gateway also maps Raid's `404 RAID_NOT_FOUND` to `403 FORBIDDEN` so ticket requests
+do not reveal whether a raid ID exists.
 
 #### Deadlines and concurrent-task limits
 
