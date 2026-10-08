@@ -84,6 +84,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U tamagotchi -d tamagotchi"]
 
   tamagotchi:
+    # Lab 1 runtime pin; Tamagotchi 2.2.0 requires the Gateway's trusted headers.
     image: crislp/tamagotchi-tamagotchi:2.1.0
     restart: on-failure
     depends_on:
@@ -212,6 +213,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U notification -d notification"]
 
   notification:
+    # Lab 1 runtime pin; Notification 2.2.0 requires the Gateway's trusted headers.
     image: crislp/tamagotchi-notification:2.1.0
     restart: on-failure
     depends_on:
