@@ -1,9 +1,8 @@
 {
   "info": {
-    "_postman_id": "e0ae5ad6-4bcb-4c79-93c5-fcefe518ab89",
-    "name": "Tamagotchi Go - Monster Raid Service",
+    "name": "Monster Raid Service (Lab 2, through Gateway)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Monster Raid API examples. Setup registers a User Management user and obtains an RS256 token. Lifecycle examples need Guild, Registry, and Tamagotchi fixtures. Admin-only requests and their cancellation-dependent assertion skip when no admin JWT is configured."
+    "description": "Run in saved order against the Lab 2 stack. User Management registration and all REST requests go through Gateway. The raid lifecycle uses the configured mock Guild/Registry/Tamagotchi IDs unless real fixtures are provided. The raid.feed ticket returns a direct WebSocket URL; open it separately in Postman. Admin-only requests skip without a real admin JWT. Do not commit a real service token or ticket."
   },
   "item": [
     {
@@ -20,7 +19,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"{{username}}@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
@@ -53,7 +52,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -83,23 +82,15 @@
       ]
     },
     {
-      "name": "Health",
+      "name": "Gateway health",
       "item": [
         {
-          "name": "Health check",
+          "name": "Gateway health",
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{monsterRaidUrl}}/healthz",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "healthz"
-              ]
-            },
-            "description": "Expected: 200 and {\"status\":\"ok\"}."
+            "url": "{{gatewayUrl}}/health",
+            "description": "Gateway liveness. Service health is monitored by Compose."
           },
           "event": [
             {
@@ -107,8 +98,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Service is healthy', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                  "pm.test('Gateway returns 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
@@ -145,17 +135,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids",
             "description": "Expected: 201. Saves raidId for following requests."
           },
           "event": [
@@ -184,18 +164,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}",
             "description": "Expected: 200 for the created raid."
           },
           "event": [
@@ -222,29 +191,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/guilds/{{guildId}}/raids?status=active&limit=20",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "guilds",
-                "{{guildId}}",
-                "raids"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "active"
-                },
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/guilds/{{guildId}}/raids?status=active&limit=20",
             "description": "Expected: 200 collection envelope containing the created raid."
           },
           "event": [
@@ -256,6 +203,46 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
                   "const json = pm.response.json();",
                   "pm.test('Collection envelope is returned', () => { pm.expect(json.items).to.be.an('array'); pm.expect(json.hasMore).to.be.a('boolean'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 - non-participant cannot get raid.feed ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"raid.feed\",\n  \"resourceId\": \"{{raidId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The creator has not joined the raid yet."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 FORBIDDEN', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN'));"
                 ]
               }
             }
@@ -286,19 +273,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "participants"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/participants",
             "description": "Expected: 201 with the pinned primary Tamagotchi."
           },
           "event": [
@@ -315,6 +290,72 @@
           ]
         },
         {
+          "name": "Internal - participant eligibility",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('current participant', () => pm.expect(pm.response.json().isParticipant).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negotiate raid.feed ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"channel\":\"raid.feed\",\"resourceId\":\"{{raidId}}\"}"
+            },
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "description": "Open raidFeedUrl separately as a Postman WebSocket request. Expect raid.snapshot on connect; request a fresh ticket to reconnect."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('direct WebSocket URL', () => { pm.expect(json.url).to.match(/^wss?:\\/\\//); pm.expect(json.url).to.include('/api/v1/raids/'); pm.expect(json.url).to.not.include('/monster-raid/api/'); pm.expect(json.url).to.not.include('/map/api/'); });",
+                  "pm.test('ticket expires within 60 s', () => { const ttl = new Date(json.expiresAt).getTime() - Date.now(); pm.expect(ttl).to.be.within(-5000, 65000); });",
+                  "pm.collectionVariables.set('raidFeedUrl', json.url);",
+                  "pm.test('URL matches raid', () => pm.expect(pm.response.json().url).to.include('/raids/' + pm.collectionVariables.get('raidId') + '/feed?ticket='));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "List participants",
           "request": {
             "method": "GET",
@@ -325,25 +366,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants?limit=20",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "participants"
-              ],
-              "query": [
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/participants?limit=20",
             "description": "Expected: 200 collection envelope."
           },
           "event": [
@@ -384,19 +407,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/attacks",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "attacks"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/attacks",
             "description": "Expected: 200. Generates commandId and stores the response for idempotency verification."
           },
           "event": [
@@ -448,19 +459,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/attacks",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "attacks"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/attacks",
             "description": "Expected: 200 with exactly the original result and no second damage application."
           },
           "event": [
@@ -489,25 +488,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/leaderboard?limit=20",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "leaderboard"
-              ],
-              "query": [
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/leaderboard?limit=20",
             "description": "Expected: 200 with ranked damage entries."
           },
           "event": [
@@ -534,20 +515,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants/me",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "participants",
-                "me"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/participants/me",
             "description": "Expected: 204. Damage history remains stored."
           },
           "event": [
@@ -557,6 +525,32 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Internal - former participant is ineligible",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('no longer a participant', () => pm.expect(pm.response.json().isParticipant).to.eql(false));"
                 ]
               }
             }
@@ -587,19 +581,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/participants",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "participants"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/participants",
             "description": "Expected: 201 using the same pinned Tamagotchi; previous damage is retained."
           },
           "event": [
@@ -640,31 +622,10 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/cancel",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "cancel"
-              ]
-            },
-            "description": "Expected: 200 and status=cancelled. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/cancel",
+            "description": "Expected: 200 and status=cancelled."
           },
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
@@ -702,20 +663,8 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{raidId}}/attacks",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{raidId}}",
-                "attacks"
-              ]
-            },
-            "description": "Expected: 409 RAID_NOT_ACTIVE. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}/attacks",
+            "description": "Expected: 409 RAID_NOT_ACTIVE."
           },
           "event": [
             {
@@ -723,7 +672,6 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();",
                   "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
@@ -736,6 +684,146 @@
                   "pm.test('Status is 409', () => pm.response.to.have.status(409));",
                   "pm.test('Error code is RAID_NOT_ACTIVE', () => pm.expect(pm.response.json().error.code).to.eql('RAID_NOT_ACTIVE'));",
                   "pm.test('Error envelope has correlationId', () => pm.expect(pm.response.json().correlationId).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Raid feed ticket errors",
+      "description": "Gateway rejects invalid, absent and unauthorized ticket requests.",
+      "item": [
+        {
+          "name": "400 - raid.feed needs a raidId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"raid.feed\",\n  \"resourceId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 VALIDATION_FAILED', () => pm.response.to.have.status(400));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - ticket without access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"raid.feed\",\n  \"resourceId\": \"{{raidId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 UNAUTHORIZED', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 - unknown raid is concealed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"raid.feed\",\n  \"resourceId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 FORBIDDEN', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 - client cannot call internal participant route",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 INTERNAL_ROUTE_FORBIDDEN', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN'));"
                 ]
               }
             }
@@ -767,17 +855,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids",
             "description": "Expected: 401 UNAUTHORIZED."
           },
           "event": [
@@ -819,17 +897,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids"
-              ]
-            },
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids",
             "description": "Expected: 400 INVALID_ID."
           },
           "event": [
@@ -871,31 +939,10 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{monsterRaidUrl}}/api/v1/raids/{{exampleRaidId}}/cancel",
-              "host": [
-                "{{monsterRaidUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "raids",
-                "{{exampleRaidId}}",
-                "cancel"
-              ]
-            },
-            "description": "Expected: 400 INVALID_REASON before raid lookup. Skipped when adminToken is unset because User Management does not issue admin tokens in the team stack."
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{exampleRaidId}}/cancel",
+            "description": "Expected: 400 INVALID_REASON before raid lookup."
           },
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
@@ -971,6 +1018,10 @@
     },
     {
       "key": "attackSnapshot",
+      "value": ""
+    },
+    {
+      "key": "raidFeedUrl",
       "value": ""
     }
   ]
