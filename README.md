@@ -1825,6 +1825,32 @@ Use the same command form for another service by changing the collection filenam
 services first when exercising a collection's integration folders; independently runnable mock
 scenarios use the mock configuration documented in the corresponding service repository.
 
+### Lab 2 collections for Guild and Package Registry
+
+Guild and Package Registry keep their Lab 2 collections here rather than in their submodules. They
+sit next to the Lab 1 collections above, which stay unchanged, and send every domain request through
+Gateway with a Bearer token:
+
+| Collection | Covers |
+| ---------- | ------ |
+| `guild-lab2.postman_collection.json` | User Management setup, guilds, invitations (Guild → Gateway → User Management), membership, internal routes with `X-Service-Token`, `guild.chat` ticket negotiation and chat history, Gateway errors such as `403 INTERNAL_ROUTE_FORBIDDEN` |
+| `package-registry-lab2.postman_collection.json` | User Management setup, packages and versions, registrations, internal definition routes with `X-Service-Token`, admin requests (skipped without `registryAdminToken`), Gateway errors |
+
+Use them with `tamagotchi-go-lab2.postman_environment.json`, which defines `gatewayUrl`
+(`http://localhost:8080`), the direct `guildUrl` and `packageRegistryUrl` used only for `/health`,
+and `serviceToken`. They need a running Gateway with User Management 2.0.0, Guild 2.1.0 and Package
+Registry 2.1.0 behind it, so they run once the Compose stack switches to the Lab 2 images:
+
+```sh
+npx newman run postman/guild-lab2.postman_collection.json \
+  -e postman/tamagotchi-go-lab2.postman_environment.json \
+  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+```
+
+WebSocket frames cannot run in the Collection Runner. The Guild collection's negotiation folder
+stores the returned socket URL as `guildChatUrl`; `scripts/ws_chat_client.py "<url>"` in the Guild
+repository walks through the chat contract with it.
+
 ---
 
 ## Open Boundary Decisions
