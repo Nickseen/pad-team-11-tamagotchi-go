@@ -80,6 +80,14 @@
     {
       "key": "requestId",
       "value": ""
+    },
+    {
+      "key": "guildId",
+      "value": ""
+    },
+    {
+      "key": "guildTag",
+      "value": ""
     }
   ],
   "item": [
@@ -799,6 +807,54 @@
           ]
         },
         {
+          "name": "A real guild for the raid (Guild, through the Gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Notification check {{guildTag}}\",\n  \"tag\": \"{{guildTag}}\",\n  \"description\": \"Created by the Notification collection; user A is its owner and only member.\",\n  \"emblemRef\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A tag of 2 to 5 characters, different on every run.",
+                  "pm.collectionVariables.set('guildTag', 'N' + Math.random().toString(36).slice(2, 6).toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('guildId', pm.response.json().guildId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "raid.started: every guild member is notified",
           "request": {
             "method": "POST",
@@ -811,7 +867,7 @@
             "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"raid.started\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidId}}\",\n    \"guildId\": \"{{raidId}}\",\n    \"monsterId\": \"{{raidId}}\",\n    \"expiresAt\": \"2026-09-22T13:00:00.000Z\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"raid.started\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidId}}\",\n    \"guildId\": \"{{guildId}}\",\n    \"monsterId\": \"{{raidId}}\",\n    \"expiresAt\": \"2026-09-22T13:00:00.000Z\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -839,6 +895,34 @@
                 "exec": [
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
                   "pm.test(\"applied\", () => pm.expect(pm.response.json().status === 'applied').to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User A, the guild's only member, got the raid notification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications?category=raid_started"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// Only this run's raid counts, so the collection can be run again on the same stack.",
+                  "const mine = pm.response.json().items.filter((n) => n.data.raidId === pm.collectionVariables.get('raidId')",
+                  "    && n.data.guildId === pm.collectionVariables.get('guildId'));",
+                  "pm.test(\"exactly one notification for this raid\", () => pm.expect(mine.length).to.eql(1));"
                 ]
               }
             }
