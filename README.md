@@ -1929,9 +1929,24 @@ failed check, coverage below the threshold or missing tests for changed behaviou
 Each microservice is versioned independently using **Semantic Versioning** in the form
 `MAJOR.MINOR.PATCH`:
 
-- **MAJOR** changes an API or event contract incompatibly;
+- **MAJOR** starts the team's agreed release line for a new lab or changes an API or event contract
+  incompatibly;
 - **MINOR** adds backward-compatible functionality;
 - **PATCH** contains backward-compatible fixes.
+
+The Lab 2 release line is `2.x.y`; the next lab starts at `3.0.0` for each service when its
+next-lab work is ready. Within a lab, a compatible feature increments `x` and resets `y` to
+zero (for example, `2.1.0` → `2.2.0`); a fix or hotfix increments `y` (for example,
+`2.1.0` → `2.1.1`). Each service chooses and documents its own release version, so its minor
+and patch numbers do not have to match those of other services. Commits do not change the
+version automatically.
+
+The service owner updates the version in that service's declared version source through a
+reviewed PR to `dev` before cutting `release/v<major>.<minor>.<patch>`. The release branch
+then carries the same version into `main`; a hotfix from `main` is synchronized back into
+`dev`. The Git tag and Docker Hub image tag for a release use the chosen version. Services
+may store it differently (for example, Map and Monster Raid use `VERSION`, while Gateway
+uses `package.json`), but the release version must be unambiguous.
 
 Stable releases are tagged `v<major>.<minor>.<patch>` in the corresponding service repository, for
 example `v1.4.2`. Release candidates may use a suffix such as `v2.0.0-rc.1`. Published tags are
