@@ -1,19 +1,22 @@
-# The whole Tamagotchi Go ecosystem: eight services and the stores each one owns, run from the
-# images published on Docker Hub. Nothing here is built locally.
+# The whole Tamagotchi Go ecosystem behind the API Gateway: the Gateway, the eight services and the
+# stores each one owns, run from the Lab 2 images published on Docker Hub. Nothing is built locally.
 #
 #   cp .env.example .env    # replace every CHANGE_ME
 #   docker compose up -d
 #
-# Every service reaches the others by its compose name — the same hostnames the communication
-# contract uses — and publishes its port on localhost for Postman. Databases are internal only.
+# Clients reach the system only through the Gateway on localhost:8080, as /<service>/api/v1/...;
+# services call each other through it too, at http://gateway:8080. Map, Guild and Monster Raid also
+# publish their ports, because clients open their WebSockets directly with a ticket the Gateway
+# issues. No other service and no store is reachable from the host.
 #
 # Each service owns its own store with its own credentials; no service can reach another's. Every
 # store keeps its data in a named volume, so `docker compose down` followed by `up` loses nothing.
 # `docker compose down -v` is the command that deletes the data.
 #
-# Dependency modes: every service except Guild starts with its cross-service calls mocked. Guild calls
-# User Management for real, which works in Lab 1 and is what Guild's Postman collection checks. Each
-# *_MODE variable in .env switches one service between mocked and real neighbours.
+# Dependency modes: Battle, Map and Guild call their neighbours for real through the Gateway, and
+# Notification asks Guild for members the same way. Monster Raid starts with its neighbours mocked,
+# because a real raid needs an admin-created raid definition and User Management issues no admin
+# role. Each *_MODE variable in .env switches one service between mocked and real neighbours.
 
 x-postgres: &postgres
   image: postgres:17-alpine # 18 moved the data directory; the volume path below is 17's
@@ -41,7 +44,43 @@ x-python-healthcheck: &python-healthcheck
   retries: 6
   start_period: 10s
 
+# Every service trusts only the context the Gateway forwards and stops a request after
+# TASK_TIMEOUT_MS (CPR README, "Trusted downstream context" and "Deadlines and concurrent-task
+# limits"). Each service sets its own MAX_CONCURRENT_TASKS, chosen by its owner.
+x-gateway-context: &gateway-context
+  GATEWAY_TOKEN: ${GATEWAY_TOKEN:?set GATEWAY_TOKEN in .env}
+  SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+  TASK_TIMEOUT_MS: 3000
+
 services:
+  # --- API Gateway -----------------------------------------------------------------------------
+  gateway:
+    image: nickseen/tamagotchi-gateway:2.0.0 # its image declares the /health check
+    restart: unless-stopped
+    depends_on:
+      user-management:
+        condition: service_started # access tokens are validated against its published keys
+    environment:
+      USER_MANAGEMENT_URL: http://user-management:8081
+      TAMAGOTCHI_URL: http://tamagotchi:8082
+      PACKAGE_REGISTRY_URL: http://package-registry:8083
+      BATTLE_URL: http://battle:8084
+      MAP_URL: http://map:8085
+      NOTIFICATION_URL: http://notification:8086
+      GUILD_URL: http://guild:8087
+      MONSTER_RAID_URL: http://monster-raid:8088
+      # Returned to clients in WebSocket tickets, so they must be reachable from the client's host.
+      MAP_WS_PUBLIC_URL: ${MAP_WS_PUBLIC_URL:-ws://localhost:8085}
+      GUILD_WS_PUBLIC_URL: ${GUILD_WS_PUBLIC_URL:-ws://localhost:8087}
+      MONSTER_RAID_WS_PUBLIC_URL: ${MONSTER_RAID_WS_PUBLIC_URL:-ws://localhost:8088}
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN:?set GATEWAY_TOKEN in .env}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+      # Above the services' 3000 ms, so their 503 TASK_TIMEOUT arrives before the Gateway's 504.
+      REQUEST_TIMEOUT_MS: 5000
+      MAX_IN_FLIGHT_REQUESTS: 100
+    ports:
+      - "8080:8080"
+
   # --- User Management -------------------------------------------------------------------------
   user-management-db:
     <<: *postgres
@@ -56,19 +95,17 @@ services:
       test: ["CMD-SHELL", "pg_isready -U usermgmt -d usermgmt"]
 
   user-management:
-    # Lab 1 runtime pin; User Management 2.0.0 requires the Gateway's trusted headers.
-    image: amzavladislav/tamagotchi-user-management:1.1.0
+    image: amzavladislav/tamagotchi-user-management:2.0.0
     restart: unless-stopped
     depends_on:
       user-management-db:
         condition: service_healthy
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 50
       DATABASE_URL: postgres://usermgmt:${USERMGMT_DB_PASSWORD}@user-management-db:5432/usermgmt?sslmode=disable
-      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
       JWT_ISSUER: user-management
       JWT_AUDIENCE: tamagotchi-go
-    ports:
-      - "8081:8081"
 
   # --- Tamagotchi ------------------------------------------------------------------------------
   tamagotchi-db:
@@ -84,21 +121,18 @@ services:
       test: ["CMD-SHELL", "pg_isready -U tamagotchi -d tamagotchi"]
 
   tamagotchi:
-    # Lab 1 runtime pin; Tamagotchi 2.2.0 requires the Gateway's trusted headers.
-    image: crislp/tamagotchi-tamagotchi:2.1.0
+    image: crislp/tamagotchi-tamagotchi:2.2.0
     restart: on-failure
     depends_on:
       tamagotchi-db:
         condition: service_healthy
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 10
       DATABASE_URL: postgresql+psycopg://tamagotchi:${TAMAGOTCHI_DB_PASSWORD}@tamagotchi-db:5432/tamagotchi
-      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
-      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
-    ports:
-      - "8082:8082"
 
   # --- Package Registry ------------------------------------------------------------------------
   package-registry-db:
@@ -114,23 +148,18 @@ services:
       test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
 
   package-registry:
-    # Lab 1 runtime pin; Package Registry 2.1.0 requires the Gateway's trusted headers.
-    image: gabimiric/tamagotchi-package-registry:2.0.1
+    image: gabimiric/tamagotchi-package-registry:2.1.0
     restart: on-failure
     depends_on:
       package-registry-db:
         condition: service_healthy
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 64
       DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@package-registry-db:5432/registry
-      SERVICE_TOKEN: ${SERVICE_TOKEN}
-      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
-      JWT_ISSUER: user-management
-      JWT_AUDIENCE: tamagotchi-go
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"]
-    ports:
-      - "8083:8083"
 
   # --- Battle ----------------------------------------------------------------------------------
   battle-db:
@@ -146,24 +175,18 @@ services:
       test: ["CMD-SHELL", "pg_isready -U battle -d battle"]
 
   battle:
-    # Lab 1 runtime pin; Battle 2.0.0 requires the Gateway's trusted headers and GATEWAY_URL.
-    image: amzavladislav/tamagotchi-battle:1.1.0
+    image: amzavladislav/tamagotchi-battle:2.0.1
     restart: unless-stopped
     depends_on:
       battle-db:
         condition: service_healthy
-      user-management:
-        condition: service_started # access tokens are validated against its published keys
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 50
       DATABASE_URL: postgres://battle:${BATTLE_DB_PASSWORD}@battle-db:5432/battle?sslmode=disable
-      SERVICE_TOKEN: ${SERVICE_TOKEN}
-      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
-      DEPENDENCY_MODE: ${BATTLE_DEPENDENCY_MODE:-mock}
-      TAMAGOTCHI_URL: http://tamagotchi:8082
-      PACKAGE_REGISTRY_URL: http://package-registry:8083
-      USER_MANAGEMENT_URL: http://user-management:8081
-    ports:
-      - "8084:8084"
+      # live calls Tamagotchi, Package Registry and User Management through the Gateway only.
+      DEPENDENCY_MODE: ${BATTLE_DEPENDENCY_MODE:-live}
+      GATEWAY_URL: http://gateway:8080
 
   # --- Map -------------------------------------------------------------------------------------
   map-redis:
@@ -175,29 +198,26 @@ services:
       - map-redis-data:/data
 
   map:
-    # Lab 1 runtime pin; Map 2.1.0 requires the unreleased Gateway.
-    image: nickseen/tamagotchi-map:2.0.0
+    image: nickseen/tamagotchi-map:2.1.1 # its image declares the /healthz check
     restart: on-failure # a single Redis ping at start-up, no retry
     depends_on:
       map-redis:
         condition: service_healthy
-      user-management:
-        condition: service_started
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 50
+      MAX_WEBSOCKET_CONNECTIONS: 100
       PORT: 8085
-      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
-      JWT_ISSUER: user-management
-      JWT_AUDIENCE: tamagotchi-go
-      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+      GATEWAY_URL: http://gateway:8080
+      GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
       MAP_STORAGE: redis
       MAP_REDIS_ADDR: map-redis:6379
       MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
       MAP_REDIS_DB: 0
-      MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-mock}
-      MAP_USER_MANAGEMENT_URL: http://user-management:8081
-      MAP_MOCK_RELATIONSHIP_FAILURE: "false"
+      MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-http}
+      MAP_EVENTS_MODE: disabled # the stack has no RabbitMQ yet
     ports:
-      - "8085:8085"
+      - "8085:8085" # direct live-map WebSocket
 
   # --- Notification ----------------------------------------------------------------------------
   notification-db:
@@ -213,21 +233,19 @@ services:
       test: ["CMD-SHELL", "pg_isready -U notification -d notification"]
 
   notification:
-    # Lab 1 runtime pin; Notification 2.2.0 requires the Gateway's trusted headers.
-    image: crislp/tamagotchi-notification:2.1.0
+    image: crislp/tamagotchi-notification:2.2.0
     restart: on-failure
     depends_on:
       notification-db:
         condition: service_healthy
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 10
       DATABASE_URL: postgresql+psycopg://notification:${NOTIFICATION_DB_PASSWORD}@notification-db:5432/notification
-      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
-      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
+      GATEWAY_URL: http://gateway:8080 # guild members are read from Guild through it
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
-    ports:
-      - "8086:8086"
 
   # --- Guild -----------------------------------------------------------------------------------
   guild-db:
@@ -242,26 +260,37 @@ services:
       <<: *postgres-healthcheck
       test: ["CMD-SHELL", "pg_isready -U guild -d guild"]
 
+  # Chat fan-out across Guild instances and single-use WebSocket ticket claims. Both are transient,
+  # so this store keeps no volume; chat history is in PostgreSQL.
+  guild-redis:
+    <<: *redis
+    command: ["redis-server", "--requirepass", "${GUILD_REDIS_PASSWORD:?set GUILD_REDIS_PASSWORD in .env}"]
+    environment:
+      REDISCLI_AUTH: ${GUILD_REDIS_PASSWORD}
+
   guild:
-    # Lab 1 runtime pin; Guild 2.1.0 requires the Gateway's trusted headers and WebSocket signing keys.
-    image: gabimiric/tamagotchi-guild:2.0.1
+    image: gabimiric/tamagotchi-guild:2.1.0
     restart: on-failure
     depends_on:
       guild-db:
         condition: service_healthy
+      guild-redis:
+        condition: service_healthy
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 64
+      MAX_WEBSOCKET_CONNECTIONS: 100
       DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
       USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-real}
-      USER_MANAGEMENT_URL: http://user-management:8081
-      SERVICE_TOKEN: ${SERVICE_TOKEN}
-      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
-      JWT_ISSUER: user-management
-      JWT_AUDIENCE: tamagotchi-go
+      GATEWAY_URL: http://gateway:8080
+      GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
+      CHAT_BROKER: redis
+      REDIS_URL: redis://:${GUILD_REDIS_PASSWORD}@guild-redis:6379/0
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8087/health')"]
     ports:
-      - "8087:8087"
+      - "8087:8087" # direct Guild Chat WebSocket
 
   # --- Monster Raid ----------------------------------------------------------------------------
   monster-raid-db:
@@ -285,22 +314,18 @@ services:
       - raid-redis-data:/data
 
   monster-raid:
-    # Lab 1 runtime pin; Raid 2.1.0 requires the unreleased Gateway.
-    image: nickseen/tamagotchi-monster-raid:2.0.0
+    image: nickseen/tamagotchi-monster-raid:2.1.1 # its image declares the /healthz check
     restart: on-failure
     depends_on:
       monster-raid-db:
         condition: service_healthy
       monster-raid-redis:
         condition: service_healthy
-      user-management:
-        condition: service_started
     environment:
+      <<: *gateway-context
+      MAX_CONCURRENT_TASKS: 50
+      MAX_WEBSOCKET_CONNECTIONS: 100
       RAID_ADDR: ":8088"
-      JWKS_URL: http://user-management:8081/api/v1/.well-known/jwks.json
-      JWT_ISSUER: user-management
-      JWT_AUDIENCE: tamagotchi-go
-      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
       RAID_STORAGE: postgres-redis
       DATABASE_URL: postgres://raid:${RAID_DB_PASSWORD}@monster-raid-db:5432/raid?sslmode=disable
       RAID_REDIS_ADDR: monster-raid-redis:6379
@@ -308,11 +333,10 @@ services:
       RAID_REDIS_DB: 0
       RAID_DEPENDENCY_MODE: ${RAID_DEPENDENCY_MODE:-mock}
       RAID_MOCK_FAILURE: "false"
-      RAID_GUILD_URL: http://guild:8087
-      RAID_REGISTRY_URL: http://package-registry:8083
-      RAID_TAMAGOTCHI_URL: http://tamagotchi:8082
+      GATEWAY_URL: http://gateway:8080
+      GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
     ports:
-      - "8088:8088"
+      - "8088:8088" # direct raid-feed WebSocket
 
 volumes:
   usermgmt-data:

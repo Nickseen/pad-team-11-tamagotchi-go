@@ -627,6 +627,15 @@
           },
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -672,6 +681,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();",
                   "pm.collectionVariables.set('commandId', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
@@ -943,6 +953,15 @@
             "description": "Expected: 400 INVALID_REASON before raid lookup."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const adminToken = pm.collectionVariables.get('adminToken'); if (!adminToken || adminToken === 'SET_TO_A_USER_MANAGEMENT_ADMIN_ACCESS_TOKEN') pm.execution.skipRequest();"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
