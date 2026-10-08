@@ -309,6 +309,15 @@ still pins `2.0.1` for both until the Gateway cutover. Their Lab 2 Postman colle
 repository's `postman/` directory (`guild-lab2`, `package-registry-lab2`), and Guild's WebSocket
 verification script is in its submodule's `scripts/` directory.
 
+Tamagotchi and Notification `2.2.0` have since been released the same way, with their CPR
+submodules at the reviewed `main` commits. Both trust only the Gateway's context (`X-Gateway-Token`
+and the forwarded identity), ignore `Authorization`, and enforce `TASK_TIMEOUT_MS` (3000 ms) and
+`MAX_CONCURRENT_TASKS` (10) with `503 TASK_TIMEOUT` and `429 CONCURRENCY_LIMIT_EXCEEDED`; a request
+that times out commits nothing. Tamagotchi calls no other service; Notification asks Guild for a
+guild's members through `GATEWAY_URL`, waiting no longer than the request's deadline. Neither needs
+WebSocket or SSE. These too are **not features of the Lab 1 Compose stack**, which still pins
+`2.1.0` for both until the Gateway cutover.
+
 The Compose stack uses local HTTP. TLS, broker delivery and WebSocket behaviour in the tables
 below are target contracts, not evidence that the Lab 1 images provide them. The shared Postman
 collections cover all eight HTTP APIs, but passing a collection with mocked dependencies does not
@@ -1654,12 +1663,16 @@ corresponding reviewed `main` commits:
 | Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
 | Guild | [`gabimiric/tamagotchi-guild:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `dec0223` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `15fbabe` |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi:2.2.0`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `88686bd` |
+| Notification | [`crislp/tamagotchi-notification:2.2.0`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `24dacd1` |
 
 User Management, Battle, Guild and Package Registry publish through CI: a merge to their `main`
 pushes `<VERSION>` and `latest` and tags the commit `v<VERSION>`, and refuses a version that is
-already published.
+already published. Tamagotchi and Notification publish through CI as well: a merge to their `main`
+pushes the `service_version` from `app/config.py` and `latest`, and refuses a version that is
+already published; the release commit is tagged `v<version>` by hand.
 
-The first table lists the images actually selected by `docker-compose.yml`. The six services above
+The first table lists the images actually selected by `docker-compose.yml`. The eight services above
 remain on their Lab 1 tags because their Lab 2 images require the Gateway's trusted headers, and
 Map, Raid and Guild also its WebSocket signing keys. Gateway currently has no runnable release image, so
 changing only these Compose image tags would break client requests.
