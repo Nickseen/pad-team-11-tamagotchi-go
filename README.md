@@ -1648,7 +1648,7 @@ corresponding reviewed `main` commits:
 
 | Service | Published image | CPR submodule commit |
 | ------- | --------------- | -------------------- |
-| Map | [`nickseen/tamagotchi-map:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `5f3f26b` |
+| Map | [`nickseen/tamagotchi-map:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `9f7083f` |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `64652f6` |
 | User Management | [`amzavladislav/tamagotchi-user-management:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `e2421fa` |
 | Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
