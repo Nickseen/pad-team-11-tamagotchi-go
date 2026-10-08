@@ -275,11 +275,13 @@ Raid implementations. It does not certify uninspected private source code.
 | Guild | `gabimiric/tamagotchi-guild:2.0.1` | REST, PostgreSQL, RS256/JWKS, internal guild/member reads, live User Management bulk lookup | WebSocket chat, Redis Pub/Sub, RabbitMQ events and versioned migrations |
 | Monster Raid | `nickseen/tamagotchi-monster-raid:2.0.0` | REST, PostgreSQL, RS256/JWKS, service-authenticated membership check, dependency mocks | Internal Guild level lookup in a later image; Redis counters, WebSocket and RabbitMQ publishing |
 
-Map and Monster Raid `2.1.0` have since been released, and their CPR submodules point to the
-reviewed `main` commits for those releases. Map `2.1.0` adds the direct live-location WebSocket,
-Gateway-authenticated REST context, Gateway-routed relationship reads, Redis proximity cooldown,
+Map and Monster Raid have since released newer Lab 2 images, and their CPR submodules point to
+reviewed `main` commits for the published versions listed below. Map `2.1.0` adds the direct
+live-location WebSocket, Gateway-authenticated REST context, Gateway-routed relationship reads,
+Redis proximity cooldown,
 and RabbitMQ proximity publication. Monster Raid `2.1.0` adds the direct raid feed,
-Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. These are published
+Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. Raid `2.1.1` also
+adds the internal participant lookup required for Gateway WebSocket tickets. These are published
 service capabilities, **not features of the Lab 1 Compose stack above**: that stack still pins
 `2.0.0` for both services until a runnable Gateway is available. The Lab 2 REST/WebSocket
 verification assets are in each service submodule's `postman/` directory; the shared `postman/`
@@ -320,7 +322,7 @@ and remaining live paths.
    `{ "multiplier": number }`, Registry stat-definition `combatBonus` fields, and User Management
    relationships `{ "items": [{ "userId": UUID, "relation": string }] }`.
 4. **Raid dependencies:** The Compose-pinned Raid 2.0.0 image reads guild level through public
-   `GET /api/v1/guilds/{guildId}`. Published Raid 2.1.0 uses Guild's internal route with
+   `GET /api/v1/guilds/{guildId}`. Published Raid 2.1.1 uses Guild's internal route with
    `X-Service-Token`, routed through Gateway. The team Compose cannot select this image until
    Gateway is implemented and configured. Guild currently reports
    `level: 1` for every guild, so definitions requiring a higher guild level cannot start. Raid's
@@ -1588,7 +1590,7 @@ corresponding reviewed `main` commits:
 | Service | Published image | CPR submodule commit |
 | ------- | --------------- | -------------------- |
 | Map | [`nickseen/tamagotchi-map:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `5f3f26b` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `a8cf2c9` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `64652f6` |
 | User Management | [`amzavladislav/tamagotchi-user-management:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `e2421fa` |
 | Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
 
@@ -1709,7 +1711,7 @@ is supplied; its lifecycle uses the configured mock guild, raid definition, and 
 Tamagotchi IDs. Switching a service to live mode makes it call its neighbours for real. In Lab 1,
 Map → User Management and Battle → Tamagotchi use live calls. The Compose-pinned Raid 2.0.0 image
 reads guild level from `GET /api/v1/guilds/{guildId}`; this returned `200` in a live stack check,
-as did Raid's internal Guild membership call. Published Raid 2.1.0 uses the contracted internal
+as did Raid's internal Guild membership call. Published Raid 2.1.1 uses the contracted internal
 Guild route through Gateway, but the shared Compose stack has not switched to it. Creating a
 complete raid in live mode also needs an active Registry raid definition, which cannot currently be
 created through the stack because User Management does not issue admin JWTs. Live Raid → Tamagotchi
