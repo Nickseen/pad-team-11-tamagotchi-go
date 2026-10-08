@@ -1799,26 +1799,28 @@ instead of the user route `GET /api/v1/users/{userId}` it used before.
 
 ## Postman Collections
 
-The [`postman/`](postman/) directory contains one collection for every service. Map and Monster
-Raid now target the Lab 2 Gateway stack; the other six service collections target the Lab 1 stack.
+The [`postman/`](postman/) directory contains one collection for every service. Map, Monster Raid,
+Tamagotchi and Notification now target the Lab 2 Gateway stack; the other four service collections
+target the Lab 1 stack.
 The committed environment contains localhost URLs and non-working credential placeholders only.
 Do not commit exported environments containing real tokens or secrets.
 
 | Service | Collection | Base URL variable |
 | ------- | ---------- | ----------------- |
 | User Management | `user-management.postman_collection.json` | `userManagementUrl` |
-| Tamagotchi | `tamagotchi.postman_collection.json` | `tamagotchiUrl` |
+| Tamagotchi (Lab 2) | `tamagotchi.postman_collection.json` | `gatewayUrl` |
 | Package Registry | `package-registry.postman_collection.json` | `packageRegistryUrl` |
 | Battle | `battle.postman_collection.json` | `battleUrl` |
 | Map (Lab 2) | `map.postman_collection.json` | `gatewayUrl` |
-| Notification | `notification.postman_collection.json` | `notificationUrl` |
+| Notification (Lab 2) | `notification.postman_collection.json` | `gatewayUrl` |
 | Guild | `guild.postman_collection.json` | `guildUrl` |
 | Monster Raid (Lab 2) | `monster-raid.postman_collection.json` | `gatewayUrl` |
 
 ### Import and configure
 
-1. Start the required services and their databases. The six Lab 1 collections use host ports
-   `8081` through `8088`; Map and Raid need the Lab 2 Gateway at `http://localhost:8080`.
+1. Start the required services and their databases. The four Lab 1 collections use host ports
+   `8081`, `8083`, `8084` and `8087`; Map, Raid, Tamagotchi and Notification need the Lab 2 Gateway
+   at `http://localhost:8080`.
 2. In Postman, import `postman/tamagotchi-go.postman_environment.json`.
 3. Import the collection files you want to run and select **Tamagotchi Go (local)**.
 4. Set the environment's **Current value** for every credential placeholder used by the selected
@@ -1829,8 +1831,9 @@ Do not commit exported environments containing real tokens or secrets.
    hold scenario identifiers and generated values, so one service cannot overwrite another
    service's state.
 
-Map and Raid register and log in through Gateway's User Management route, storing each access token
-in collection variables. Set the environment's `serviceToken` to the stack's `SERVICE_TOKEN`
+Map, Raid, Tamagotchi and Notification register and log in through Gateway's User Management route,
+storing each access token in collection variables. Notification's raid check creates a guild through
+Gateway, so Guild must run as well. Set the environment's `serviceToken` to the stack's `SERVICE_TOKEN`
 for internal-route checks. Raid requests requiring `admin` and the cancellation-dependent assertion
 skip unless you set its collection variable `adminToken` to a real admin JWT. The empty-reason
 validation request also skips because a user token is rejected before its reason is validated.
@@ -1855,7 +1858,7 @@ configuration documented in the corresponding service repository.
 
 ### Lab 2 collections through Gateway
 
-The Map and Raid collections above target Gateway. Guild and Package Registry retain separate
+The Map, Raid, Tamagotchi and Notification collections above target Gateway. Guild and Package Registry retain separate
 Lab 2 collections alongside their Lab 1 versions. User-facing requests pass through Gateway with
 a Bearer token; service-context internal checks use `X-Service-Token`:
 
