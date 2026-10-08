@@ -56,6 +56,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U usermgmt -d usermgmt"]
 
   user-management:
+    # Lab 1 runtime pin; User Management 2.0.0 requires the Gateway's trusted headers.
     image: amzavladislav/tamagotchi-user-management:1.1.0
     restart: unless-stopped
     depends_on:
@@ -143,6 +144,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U battle -d battle"]
 
   battle:
+    # Lab 1 runtime pin; Battle 2.0.0 requires the Gateway's trusted headers and GATEWAY_URL.
     image: amzavladislav/tamagotchi-battle:1.1.0
     restart: unless-stopped
     depends_on:
