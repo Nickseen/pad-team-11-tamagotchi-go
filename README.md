@@ -285,6 +285,16 @@ service capabilities, **not features of the Lab 1 Compose stack above**: that st
 verification assets are in each service submodule's `postman/` directory; the shared `postman/`
 collections below continue to target this Lab 1 Compose stack.
 
+User Management and Battle `2.0.0` have since been released the same way, with their CPR submodules
+at the reviewed `main` commits. Both trust only the Gateway's context (`X-Gateway-Token` and the
+forwarded identity), ignore `Authorization`, and enforce `TASK_TIMEOUT_MS` and
+`MAX_CONCURRENT_TASKS` with `503 TASK_TIMEOUT` and `429 CONCURRENCY_LIMIT_EXCEEDED`. User
+Management exempts its JWKS for Gateway's bootstrap; Battle calls all three dependencies through
+`GATEWAY_URL`, reads Registry's `versions/current` and performs Tamagotchi's primary and secondary
+holding checks. Neither needs WebSocket or SSE. These too are **not features of the Lab 1 Compose
+stack**, which still pins `1.1.0` for both until the Gateway cutover; Battle's Lab 2 Postman
+collection is in its submodule's `postman/` directory.
+
 The Compose stack uses local HTTP. TLS, broker delivery and WebSocket behaviour in the tables
 below are target contracts, not evidence that the Lab 1 images provide them. The shared Postman
 collections cover all eight HTTP APIs, but passing a collection with mocked dependencies does not
@@ -305,7 +315,7 @@ and remaining live paths.
    the target contract has been implemented.
 3. **Battle dependencies:** Battle 1.1.0 must move from the public Package `latestVersion` read to
    the Registry internal current-version route, and use Tamagotchi's internal primary/secondary
-   checks. Its dependency mocks should preserve the agreed bulk Tamagotchi fields
+   checks; the published Battle 2.0.0 does both, through Gateway. Its dependency mocks should preserve the agreed bulk Tamagotchi fields
    (`tamagotchiId`, `ownerId`, `originPackageId`, `combatType`, `level`, `stats`), type advantage
    `{ "multiplier": number }`, Registry stat-definition `combatBonus` fields, and User Management
    relationships `{ "items": [{ "userId": UUID, "relation": string }] }`.
@@ -1579,11 +1589,16 @@ corresponding reviewed `main` commits:
 | ------- | --------------- | -------------------- |
 | Map | [`nickseen/tamagotchi-map:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `5f3f26b` |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `a8cf2c9` |
+| User Management | [`amzavladislav/tamagotchi-user-management:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `e2421fa` |
+| Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
 
-The first table lists the images actually selected by `docker-compose.yml`. Both remain on
-`2.0.0` because `2.1.0` requires the Lab 2 Gateway's trusted headers and WebSocket signing keys.
-Gateway currently has no runnable release image, so changing only the two Compose image tags
-would break client requests.
+User Management and Battle publish through CI: a merge to their `main` pushes `<VERSION>` and
+`latest` and tags the commit `v<VERSION>`, and refuses a version that is already published.
+
+The first table lists the images actually selected by `docker-compose.yml`. The four services above
+remain on their Lab 1 tags because their Lab 2 images require the Gateway's trusted headers, and
+Map and Raid also its WebSocket signing keys. Gateway currently has no runnable release image, so
+changing only these Compose image tags would break client requests.
 
 The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:
 version 18 moved the data directory, so the volumes below would silently stop persisting.
