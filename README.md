@@ -280,7 +280,8 @@ reviewed `main` commits for the published versions listed below. Map `2.1.0` add
 live-location WebSocket, Gateway-authenticated REST context, Gateway-routed relationship reads,
 Redis proximity cooldown,
 and RabbitMQ proximity publication. Monster Raid `2.1.0` adds the direct raid feed,
-Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. These are published
+Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. Raid `2.1.1` also
+adds the internal participant lookup required for Gateway WebSocket tickets. These are published
 service capabilities, **not features of the Lab 1 Compose stack above**: that stack still pins
 `2.0.0` for both services until a runnable Gateway is available. The Lab 2 REST/WebSocket
 verification assets are in each service submodule's `postman/` directory; the shared `postman/`
@@ -295,6 +296,18 @@ Management exempts its JWKS for Gateway's bootstrap; Battle calls all three depe
 holding checks. Neither needs WebSocket or SSE. These too are **not features of the Lab 1 Compose
 stack**, which still pins `1.1.0` for both until the Gateway cutover; Battle's Lab 2 Postman
 collection is in its submodule's `postman/` directory.
+
+Guild and Package Registry `2.1.0` have since been released the same way, with their CPR submodules
+at the reviewed `main` commits. Both trust only the Gateway's context, ignore `Authorization`, check
+credentials before input validation, and enforce `TASK_TIMEOUT_MS` (3000 ms) and
+`MAX_CONCURRENT_TASKS` with `503 TASK_TIMEOUT` and `429 CONCURRENCY_LIMIT_EXCEEDED`; framework
+errors use the shared envelope with millisecond timestamps. Guild calls User Management through
+`GATEWAY_URL` and adds the direct Guild Chat WebSocket with single-use Gateway tickets, Redis
+fan-out across instances and `MAX_WEBSOCKET_CONNECTIONS`. Package Registry makes no outbound call
+and needs no WebSocket or SSE. These too are **not features of the Lab 1 Compose stack**, which
+still pins `2.0.1` for both until the Gateway cutover. Their Lab 2 Postman collections are in this
+repository's `postman/` directory (`guild-lab2`, `package-registry-lab2`), and Guild's WebSocket
+verification script is in its submodule's `scripts/` directory.
 
 The Compose stack uses local HTTP. TLS, broker delivery and WebSocket behaviour in the tables
 below are target contracts, not evidence that the Lab 1 images provide them. The shared Postman
@@ -313,7 +326,10 @@ and remaining live paths.
    `422 { "detail": [...] }` before checking `X-Service-Token`; the target is the shared error
    envelope after authentication. Guild timestamps can have six fractional digits instead of the
    specified three. These are service fixes or explicit compatibility decisions, not evidence that
-   the target contract has been implemented.
+   the target contract has been implemented. Guild 2.1.0 resolves all three — every client route
+   requires Gateway identity, malformed input returns `400 VALIDATION_FAILED` in the shared envelope
+   after authentication, and timestamps carry three fractional digits. Like the other Lab 2
+   images, it takes effect in this Compose stack at the Gateway cutover.
 3. **Battle dependencies:** Battle 1.1.0 must move from the public Package `latestVersion` read to
    the Registry internal current-version route, and use Tamagotchi's internal primary/secondary
    checks; the published Battle 2.0.0 does both, through Gateway. Its dependency mocks should preserve the agreed bulk Tamagotchi fields
@@ -321,7 +337,7 @@ and remaining live paths.
    `{ "multiplier": number }`, Registry stat-definition `combatBonus` fields, and User Management
    relationships `{ "items": [{ "userId": UUID, "relation": string }] }`.
 4. **Raid dependencies:** The Compose-pinned Raid 2.0.0 image reads guild level through public
-   `GET /api/v1/guilds/{guildId}`. Published Raid 2.1.0 uses Guild's internal route with
+   `GET /api/v1/guilds/{guildId}`. Published Raid 2.1.1 uses Guild's internal route with
    `X-Service-Token`, routed through Gateway. The team Compose cannot select this image until
    Gateway is implemented and configured. Guild currently reports
    `level: 1` for every guild, so definitions requiring a higher guild level cannot start. Raid's
@@ -481,7 +497,14 @@ role or membership required by the target channel. For `raid.feed`, Gateway call
 `GET /api/v1/internal/raids/{raidId}/participants/{userId}` with the validated JWT subject as
 `userId` and its configured `X-Gateway-Token` and `X-Service-Token`. It issues a ticket only when
 Raid returns `{ "isParticipant": true }`; `false` becomes `403 FORBIDDEN`. Gateway never trusts a client-supplied
-`userId` for this check. It then returns `201 Created`:
+`userId` for this check. For `guild.chat`, Gateway calls Guild's
+`GET /api/v1/internal/guilds/{guildId}/members/{userId}` the same way, with the validated JWT subject
+and both tokens, and issues a ticket only when Guild returns `{ "isMember": true }`; `false` becomes
+`403 FORBIDDEN`. Guild answers `isMember: false` rather than `404` for an unknown guild, so the check
+does not reveal which guilds exist, and Guild checks membership again at upgrade time. `map.stream`
+needs no check beyond a valid access token. When Guild or Raid cannot be reached, or answers with any
+other status or without the expected boolean, Gateway returns `503 DEPENDENCY_UNAVAILABLE`. It then
+returns `201 Created`:
 
 ```json
 {
@@ -563,6 +586,8 @@ Lab 1 exception to resolve: malformed input can still produce FastAPI's `422` bo
 `{ "detail": [...] }` in Guild before service authentication, instead of this envelope. Guild
 also emits some timestamps with microsecond precision. Clients should tolerate the extra
 fractional digits, while service owners align new responses with the envelope and timestamp rule.
+Guild 2.1.0 and Package Registry 2.1.0 return this envelope for validation, routing and unexpected
+errors too, with millisecond timestamps.
 
 | Status | Meaning in this system |
 | ------ | ---------------------- |
@@ -620,7 +645,7 @@ boundary in exactly one of two ways: a synchronous REST read, or an asynchronous
 | Battle | PostgreSQL `battle` | `battles`, `battle_turns`, `battle_participants`, `processed_commands` | Redis: `battle:{battleId}:state`, TTL 1 h |
 | Map | Redis (authoritative for positions) | `geo:users` (GEO set), `loc:{userId}` hash, TTL 5 min | PostgreSQL `map` for `proximity_audit` only |
 | Notification | PostgreSQL `notification` | `devices`, `preferences`, `notifications`, `processed_events` | — |
-| Guild | PostgreSQL `guild` | `guilds`, `memberships`, `invitations`, `chat_messages` | Redis Pub/Sub `guild:{guildId}:chat` for cross-instance fan-out |
+| Guild | PostgreSQL `guild` | `guilds`, `memberships`, `invitations`, `chat_messages` | Redis Pub/Sub `guild:{guildId}:chat` for cross-instance fan-out; `guild:ws-ticket:{jti}`, TTL until ticket expiry, for single-use tickets |
 | Monster Raid | PostgreSQL `raid` | `raids`, `raid_participants`, `damage_log`, `processed_commands` | Redis: `raid:{raidId}:hp` counter, `raid:{raidId}:timer` |
 
 **Duplicated data is a cached projection, never a second source of truth.** Where a service keeps a
@@ -904,7 +929,7 @@ Battle and Monster Raid read this instead of hard-coding the table, so the ring 
 
 | Method and path | Auth | Request | Response |
 | --------------- | ---- | ------- | -------- |
-| `POST /api/v1/packages` | role `moderator` | `slug` string, `name` string, `description` string | `201` → `Package` |
+| `POST /api/v1/packages` | user | `slug` string, `name` string, `description` string | `201` → `Package`; the caller becomes its first moderator |
 | `GET /api/v1/packages` | user | query `status`, `limit`, `cursor` | `200` → `[Package]` |
 | `GET /api/v1/packages/{packageId}` | user | path `packageId` `UUID` | `200` → `Package` |
 | `PATCH /api/v1/packages/{packageId}` | role `moderator` | `name`, `description`, `status` | `200` → `Package` |
@@ -920,6 +945,17 @@ immutable and callers request an explicit `version`, so a package cannot change 
 underneath a battle that is already running. `versions/current` resolves the package's
 `latestVersion` server-side, so Battle does not have to read it off the paginated versions list
 (which is oldest first) to find it.
+
+`role moderator` on the Registry routes is package-scoped: the caller must be listed in that
+package's `moderatorIds`, whatever global roles Gateway forwards. Any authenticated user may create a
+package and becomes its first moderator; admins, identified by `admin` in `X-Authenticated-Roles`,
+grant and revoke further moderators. User Management issues only the `user` role in the default
+stack, so requiring a global `moderator` role here would make package creation impossible.
+
+Package Registry needs no WebSocket or SSE channel: its data is configuration that changes only
+through immutable, versioned publications, read on demand and announced by
+`registry.package_version_published`. It also makes no outbound service call, so it has no
+`GATEWAY_URL`; any future outbound call must use the Gateway route.
 
 ##### Moderators and registrations
 
@@ -1280,9 +1316,12 @@ event-driven.
 | `POST /api/v1/invitations/{invitationId}/accept` | user | path `invitationId` `UUID` | `200` → `Membership`; publishes `guild.member_joined` |
 | `POST /api/v1/invitations/{invitationId}/decline` | user | path `invitationId` `UUID` | `200` → `Invitation` with `status: "declined"` |
 
-Before creating an invitation Guild 2.0.1 calls the service-authenticated
-`GET /api/v1/users?ids=…` on User Management to confirm the invitee exists; a missing user is
-rejected with `404 USER_NOT_FOUND` rather than stored as a dangling reference.
+Before creating an invitation Guild calls the service-authenticated `GET /api/v1/users?ids=…` on
+User Management to confirm the invitee exists; a missing user is rejected with
+`404 USER_NOT_FOUND` rather than stored as a dangling reference. Since Guild 2.1.0 the call goes
+through Gateway as `GET <GATEWAY_URL>/user-management/api/v1/users?ids=…` with `X-Service-Token`,
+`X-Correlation-Id` and the remaining `X-Request-Deadline`; any non-`200` answer or an unreachable
+Gateway is reported as `503 DEPENDENCY_UNAVAILABLE`, with no direct-service fallback.
 
 ##### Chat history and WebSocket — `GET /api/v1/guilds/{guildId}/chat`
 
@@ -1290,9 +1329,23 @@ rejected with `404 USER_NOT_FOUND` rather than stored as a dangling reference.
 | --------------- | ---- | ------- | -------- |
 | `GET /api/v1/guilds/{guildId}/messages` | member | query `limit`, `cursor` | `200` → `[ChatMessage]`, newest first |
 
-The socket upgrade requires a member JWT; a non-member is closed with `4403`. Because several
-FastAPI instances can serve the same guild, a message is written to PostgreSQL and republished on
-the Redis channel `guild:{guildId}:chat`, from which every instance fans it out to its own sockets.
+Clients first negotiate `guild.chat` with Gateway, then connect directly to the returned URL with
+its short-lived `ticket` query parameter. The upgrade does not carry `Authorization`. Guild
+validates the Gateway signature, `aud=guild`, subject, expiry, `jti` and matching `resourceId`
+before upgrading, and accepts each ticket once — the `jti` is claimed in Redis, so a ticket cannot be
+replayed against another instance. It returns `401 UNAUTHORIZED` for a missing, invalid or reused
+ticket, `403 FORBIDDEN` if the guild no longer exists or the ticket's subject is no longer a member,
+`429 CONCURRENCY_LIMIT_EXCEEDED` when its socket or task limit is full, and
+`503 DEPENDENCY_UNAVAILABLE` when Gateway's JWKS or Redis cannot be reached. Refusals are plain HTTP
+responses in the shared error envelope. Reconnection requires a fresh Gateway ticket; tickets must not
+be logged.
+
+Because several FastAPI instances can serve the same guild, a message is written to PostgreSQL
+first and then republished on the Redis channel `guild:{guildId}:chat`, from which every instance
+fans it out to its own sockets.
+
+Every frame is a JSON text object whose `type` names it; the payload fields below sit next to
+`type`, e.g. `{ "type": "chat.send", "clientMessageId": "…", "body": "Hello" }`.
 
 Client → server:
 
@@ -1306,15 +1359,22 @@ Server → client:
 
 | `type` | Payload | Sent when |
 | ------ | ------- | --------- |
-| `chat.history` | `{ "items": [ChatMessage] }` | Immediately after the socket opens — the last 50 messages |
-| `chat.message` | `ChatMessage` | Any member sends a message |
+| `chat.history` | `{ "items": [ChatMessage] }` | Immediately after the socket opens — the last 50 messages, newest first |
+| `chat.message` | `ChatMessage` | Any member sends a message, including the sender |
 | `chat.typing` | `{ "userId": UUID, "isTyping": boolean }` | Another member starts or stops typing |
-| `chat.presence` | `{ "userId": UUID, "state": "online" \| "offline" }` | A member connects or disconnects |
-| `chat.error` | `{ "code": string, "message": string, "clientMessageId": UUID \| null }` | A frame is rejected — `MESSAGE_TOO_LONG`, `RATE_LIMITED` |
+| `chat.presence` | `{ "userId": UUID, "state": "online" \| "offline" }` | Another member connects or disconnects |
+| `chat.error` | `{ "code": string, "message": string, "clientMessageId": UUID \| null }` | A frame is rejected; the socket stays open |
 | `chat.pong` | `{ "serverTime": Timestamp }` | Reply to `chat.ping` |
 
+`chat.error` codes are `VALIDATION_FAILED` (not JSON, not an object, binary, unknown `type` or an
+invalid field), `MESSAGE_TOO_LONG`, `RATE_LIMITED`, `CONCURRENCY_LIMIT_EXCEEDED`, `TASK_TIMEOUT`,
+`DEPENDENCY_UNAVAILABLE` and `INTERNAL_ERROR`. `clientMessageId` is unique per author and guild: a
+resent `chat.send` returns the stored `chat.message` to the sender only and is not broadcast again.
+
 Rate limit: 5 messages per 10 seconds per member. Exceeding it yields `chat.error` with
-`RATE_LIMITED` rather than a disconnect.
+`RATE_LIMITED` rather than a disconnect. Guild closes a socket with `4408` when no frame, including
+`chat.ping`, arrives for 90 seconds, and with `4403` when a member who is no longer in the guild
+sends a message.
 
 #### 8. Monster Raid Service — `http://monster-raid:8088`
 
@@ -1589,16 +1649,19 @@ corresponding reviewed `main` commits:
 | Service | Published image | CPR submodule commit |
 | ------- | --------------- | -------------------- |
 | Map | [`nickseen/tamagotchi-map:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `9f7083f` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `a8cf2c9` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `64652f6` |
 | User Management | [`amzavladislav/tamagotchi-user-management:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `e2421fa` |
 | Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
+| Guild | [`gabimiric/tamagotchi-guild:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `dec0223` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry:2.1.0`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `15fbabe` |
 
-User Management and Battle publish through CI: a merge to their `main` pushes `<VERSION>` and
-`latest` and tags the commit `v<VERSION>`, and refuses a version that is already published.
+User Management, Battle, Guild and Package Registry publish through CI: a merge to their `main`
+pushes `<VERSION>` and `latest` and tags the commit `v<VERSION>`, and refuses a version that is
+already published.
 
-The first table lists the images actually selected by `docker-compose.yml`. The four services above
+The first table lists the images actually selected by `docker-compose.yml`. The six services above
 remain on their Lab 1 tags because their Lab 2 images require the Gateway's trusted headers, and
-Map and Raid also its WebSocket signing keys. Gateway currently has no runnable release image, so
+Map, Raid and Guild also its WebSocket signing keys. Gateway currently has no runnable release image, so
 changing only these Compose image tags would break client requests.
 
 The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:
@@ -1710,7 +1773,7 @@ is supplied; its lifecycle uses the configured mock guild, raid definition, and 
 Tamagotchi IDs. Switching a service to live mode makes it call its neighbours for real. In Lab 1,
 Map → User Management and Battle → Tamagotchi use live calls. The Compose-pinned Raid 2.0.0 image
 reads guild level from `GET /api/v1/guilds/{guildId}`; this returned `200` in a live stack check,
-as did Raid's internal Guild membership call. Published Raid 2.1.0 uses the contracted internal
+as did Raid's internal Guild membership call. Published Raid 2.1.1 uses the contracted internal
 Guild route through Gateway, but the shared Compose stack has not switched to it. Creating a
 complete raid in live mode also needs an active Registry raid definition, which cannot currently be
 created through the stack because User Management does not issue admin JWTs. Live Raid → Tamagotchi
@@ -1778,6 +1841,32 @@ npx newman run postman/monster-raid.postman_collection.json \
 Use the same command form for another service by changing the collection filename. Run dependency
 services first when exercising a collection's integration folders; independently runnable mock
 scenarios use the mock configuration documented in the corresponding service repository.
+
+### Lab 2 collections for Guild and Package Registry
+
+Guild and Package Registry keep their Lab 2 collections here rather than in their submodules. They
+sit next to the Lab 1 collections above, which stay unchanged, and send every domain request through
+Gateway with a Bearer token:
+
+| Collection | Covers |
+| ---------- | ------ |
+| `guild-lab2.postman_collection.json` | User Management setup, guilds, invitations (Guild → Gateway → User Management), membership, internal routes with `X-Service-Token`, `guild.chat` ticket negotiation and chat history, Gateway errors such as `403 INTERNAL_ROUTE_FORBIDDEN` |
+| `package-registry-lab2.postman_collection.json` | User Management setup, packages and versions, registrations, internal definition routes with `X-Service-Token`, admin requests (skipped without `registryAdminToken`), Gateway errors |
+
+Use them with `tamagotchi-go-lab2.postman_environment.json`, which defines `gatewayUrl`
+(`http://localhost:8080`), the direct `guildUrl` and `packageRegistryUrl` used only for `/health`,
+and `serviceToken`. They need a running Gateway with User Management 2.0.0, Guild 2.1.0 and Package
+Registry 2.1.0 behind it, so they run once the Compose stack switches to the Lab 2 images:
+
+```sh
+npx newman run postman/guild-lab2.postman_collection.json \
+  -e postman/tamagotchi-go-lab2.postman_environment.json \
+  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+```
+
+WebSocket frames cannot run in the Collection Runner. The Guild collection's negotiation folder
+stores the returned socket URL as `guildChatUrl`; `scripts/ws_chat_client.py "<url>"` in the Guild
+repository walks through the chat contract with it.
 
 ---
 
