@@ -284,8 +284,8 @@ Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. Raid
 adds the internal participant lookup required for Gateway WebSocket tickets. These are published
 service capabilities, **not features of the Lab 1 Compose stack above**: that stack still pins
 `2.0.0` for both services until a runnable Gateway is available. The Lab 2 REST/WebSocket
-verification assets are in each service submodule's `postman/` directory; the shared `postman/`
-collections below continue to target this Lab 1 Compose stack.
+verification collections for Map and Raid are in this repository's `postman/` directory, alongside
+their separate Lab 1 collections. The latter continue to target this Lab 1 Compose stack.
 
 User Management and Battle `2.0.0` have since been released the same way, with their CPR submodules
 at the reviewed `main` commits. Both trust only the Gateway's context (`X-Gateway-Token` and the
@@ -1842,31 +1842,49 @@ Use the same command form for another service by changing the collection filenam
 services first when exercising a collection's integration folders; independently runnable mock
 scenarios use the mock configuration documented in the corresponding service repository.
 
-### Lab 2 collections for Guild and Package Registry
+### Lab 2 collections through Gateway
 
-Guild and Package Registry keep their Lab 2 collections here rather than in their submodules. They
-sit next to the Lab 1 collections above, which stay unchanged, and send every domain request through
-Gateway with a Bearer token:
+These collections sit next to the unchanged Lab 1 collections above. Their user-facing requests
+pass through Gateway with a Bearer token. The service-context internal checks use
+`X-Service-Token` as in the Guild and Registry Lab 2 collections:
 
 | Collection | Covers |
 | ---------- | ------ |
 | `guild-lab2.postman_collection.json` | User Management setup, guilds, invitations (Guild → Gateway → User Management), membership, internal routes with `X-Service-Token`, `guild.chat` ticket negotiation and chat history, Gateway errors such as `403 INTERNAL_ROUTE_FORBIDDEN` |
 | `package-registry-lab2.postman_collection.json` | User Management setup, packages and versions, registrations, internal definition routes with `X-Service-Token`, admin requests (skipped without `registryAdminToken`), Gateway errors |
+| `map-lab2.postman_collection.json` | User Management setup, location update/nearby/visible/delete, internal position checks, `map.stream` ticket negotiation and Gateway errors |
+| `monster-raid-lab2.postman_collection.json` | User Management setup, mock-backed raid lifecycle, participant eligibility, `raid.feed` ticket negotiation, optional admin checks and Gateway errors |
 
 Use them with `tamagotchi-go-lab2.postman_environment.json`, which defines `gatewayUrl`
 (`http://localhost:8080`), the direct `guildUrl` and `packageRegistryUrl` used only for `/health`,
-and `serviceToken`. They need a running Gateway with User Management 2.0.0, Guild 2.1.0 and Package
-Registry 2.1.0 behind it, so they run once the Compose stack switches to the Lab 2 images:
+`serviceToken` as a non-working placeholder, and `packageId` for Map/Raid test-user
+registration. Set the local `serviceToken` value to the running stack's `SERVICE_TOKEN` for
+internal-route checks; never commit or export real credentials. These collections need a running
+Gateway, User Management 2.0.0 and the corresponding Lab 2 service images:
 
 ```sh
 npx newman run postman/guild-lab2.postman_collection.json \
   -e postman/tamagotchi-go-lab2.postman_environment.json \
   --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+
+npx newman run postman/map-lab2.postman_collection.json \
+  -e postman/tamagotchi-go-lab2.postman_environment.json \
+  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+
+npx newman run postman/monster-raid-lab2.postman_collection.json \
+  -e postman/tamagotchi-go-lab2.postman_environment.json \
+  --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
 ```
 
-WebSocket frames cannot run in the Collection Runner. The Guild collection's negotiation folder
-stores the returned socket URL as `guildChatUrl`; `scripts/ws_chat_client.py "<url>"` in the Guild
-repository walks through the chat contract with it.
+WebSocket frames cannot run in the Collection Runner. The negotiation requests store fresh direct
+socket URLs as `guildChatUrl`, `mapStreamUrl` and `raidFeedUrl`. Open the Map or Raid URL in a
+separate Postman WebSocket request promptly (tickets expire within 60 seconds), without an
+`Authorization` header: Map expects a `location.update` frame and returns `map.snapshot`;
+Raid sends `raid.snapshot` and accepts `raid.ping` heartbeats. The Guild repository's
+`scripts/ws_chat_client.py "<url>"` walks through its chat contract. Map and Raid's lifecycle
+folders use the fixture IDs in their collection variables; Raid's admin checks skip unless a real
+admin JWT is supplied. In live dependency mode, provide actual Guild, Registry and Tamagotchi
+fixtures before running Raid's lifecycle.
 
 ---
 
