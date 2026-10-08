@@ -464,7 +464,11 @@ Content-Type: application/json
 
 `channel` is one of `map.stream`, `guild.chat` or `raid.feed`. `resourceId` is `null` for
 `map.stream`, a `guildId` for `guild.chat`, and a `raidId` for `raid.feed`. Gateway checks the user's
-role or membership required by the target channel and returns `201 Created`:
+role or membership required by the target channel. For `raid.feed`, Gateway calls Raid's
+`GET /api/v1/internal/raids/{raidId}/participants/{userId}` with the validated JWT subject as
+`userId` and its configured `X-Gateway-Token` and `X-Service-Token`. It issues a ticket only when
+Raid returns `{ "isParticipant": true }`; `false` becomes `403 FORBIDDEN`. Gateway never trusts a client-supplied
+`userId` for this check. It then returns `201 Created`:
 
 ```json
 {
@@ -485,6 +489,8 @@ Errors are `400 VALIDATION_FAILED` for an invalid channel/resource pair, `401 UN
 missing or invalid access token, `403 FORBIDDEN` when the user cannot join the resource, and
 `503 DEPENDENCY_UNAVAILABLE` when authorization data or the configured public WebSocket URL is
 unavailable.
+For `raid.feed`, Gateway also maps Raid's `404 RAID_NOT_FOUND` to `403 FORBIDDEN` so ticket requests
+do not reveal whether a raid ID exists.
 
 #### Deadlines and concurrent-task limits
 
@@ -1326,12 +1332,19 @@ Rate limit: 5 messages per 10 seconds per member. Exceeding it yields `chat.erro
 | `GET /api/v1/guilds/{guildId}/raids` | member | query `status`, `limit`, `cursor` | `200` → `[Raid]` |
 | `POST /api/v1/raids/{raidId}/participants` | member | `primaryTamagotchiId` `UUID` | `201` → `RaidParticipant` |
 | `GET /api/v1/raids/{raidId}/participants` | member | query `limit`, `cursor` | `200` → `[RaidParticipant]` |
+| `GET /api/v1/internal/raids/{raidId}/participants/{userId}` | service | path `raidId`, `userId` `UUID` | `200` → `{ "isParticipant": boolean }`; `404 RAID_NOT_FOUND` |
 | `DELETE /api/v1/raids/{raidId}/participants/me` | member | — | `204`; damage already dealt is retained |
 | `GET /api/v1/raids/{raidId}/leaderboard` | member | query `limit` integer (default `20`) | `200` → `{ "items": [{ "rank": integer, "userId": UUID, "damageDealt": integer, "share": number }] }` |
 | `POST /api/v1/raids/{raidId}/cancel` | role `admin` | `reason` string | `200` → `Raid` with `status: "cancelled"` |
 
 Joining is refused with `403 NOT_A_GUILD_MEMBER` (checked against Guild), `409 RAID_FULL` when
 `participantCount` has reached `maxParticipants`, and `409 RAID_NOT_ACTIVE` once the raid has ended.
+The internal participant check requires both Gateway's trusted `X-Gateway-Token` and the matching
+`X-Service-Token`; no user `Authorization` header is accepted. It returns `false` for a user who
+never joined or has left the raid, and `400 VALIDATION_FAILED` for malformed UUIDs. The check uses
+the current joined state, while damage history remains available after leaving. Gateway uses this
+response for `raid.feed` ticket eligibility, and Raid checks participation again at WebSocket
+upgrade time.
 
 ##### Attacks
 
