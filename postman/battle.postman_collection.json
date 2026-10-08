@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Battle Service",
-    "description": "Every route of the Battle Service, in run order: a challenge is issued, accepted, fought turn by turn and resolved. The Setup folder registers its own users through User Management and befriends them, because a challenge is refused between users who are unrelated \u2014 so the collection needs no stored credential and can be run repeatedly.\n\nSet userManagementUrl, battleUrl and serviceToken in the environment. The creature identifiers are collection variables: with DEPENDENCY_MODE=mock the mocked Tamagotchi Service derives a creature deterministically from its id, and these four resolve to level 20, which keeps the scripted match from ending before the last turn. Against a live Tamagotchi Service, replace them with creatures the two users own.",
+    "description": "Every route of the Battle Service, called through the API Gateway at {{gatewayUrl}}/battle/api/v1/..., in run order: a challenge is issued, accepted, fought turn by turn and resolved. The Gateway validates the access token, removes Authorization and forwards the trusted identity; Battle sees only that.\n\nThe Setup folder prepares real data through the Gateway, so the same run passes whether Battle's dependencies are live or mocked: a package with published stat definitions, players registered with it, their primary creatures in Tamagotchi and a secondary lent to the challenger through Tamagotchi's service route. No credential is stored in the collection.\n\nSet gatewayUrl and serviceToken in the environment, and battleDependencyMode to Battle's DEPENDENCY_MODE (live by default in the team stack; with mock, the unrelated-users refusal cannot be produced and is checked accordingly).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -17,8 +17,10 @@
           "    pm.collectionVariables.set('opponentName', 'pad_op_' + runId);",
           "    pm.collectionVariables.set('bystanderName', 'pad_by_' + runId);",
           "    pm.collectionVariables.set('password', 'postman-run-' + runId);",
+          "    pm.collectionVariables.set('ownerName', 'pad_pk_' + runId);",
           "    pm.collectionVariables.set('runPackageId', pm.variables.replaceIn('{{$guid}}'));",
           "}",
+          "pm.collectionVariables.set('dependenciesMocked', String((pm.environment.get('battleDependencyMode') || 'live') === 'mock'));",
           "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
         ]
       }
@@ -27,19 +29,19 @@
   "variable": [
     {
       "key": "primaryA",
-      "value": "4930fdf1-6c67-47f7-a63b-f3a58076fa3e"
+      "value": ""
     },
     {
       "key": "secondaryA",
-      "value": "f11d9baa-f6ae-4c2b-afaf-5f6e4619151d"
+      "value": ""
     },
     {
       "key": "primaryB",
-      "value": "e6433e2a-68cc-4407-b0e2-d886131f9603"
+      "value": ""
     },
     {
       "key": "secondaryB",
-      "value": "6d609c78-88b4-480f-ad9a-72caf413dac2"
+      "value": ""
     },
     {
       "key": "boostId",
@@ -120,18 +122,169 @@
     {
       "key": "opponentMaxHp",
       "value": ""
+    },
+    {
+      "key": "ownerName",
+      "value": ""
+    },
+    {
+      "key": "ownerToken",
+      "value": ""
     }
   ],
   "item": [
     {
-      "name": "Setup (User Management)",
+      "name": "Setup (User Management, Package Registry and Tamagotchi)",
       "item": [
+        {
+          "name": "Register the package owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{ownerName}}\",\n  \"email\": \"{{ownerName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as the package owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{ownerName}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('ownerToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create the package the battles are scored with",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"pad-battle-{{runId}}\",\n  \"name\": \"Battle run {{runId}}\",\n  \"description\": \"Created by the Battle collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "// The players register with this package, so their tokens carry it and Battle scores with its rules.",
+                  "pm.collectionVariables.set('runPackageId', pm.response.json().packageId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publish its stat definitions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{runPackageId}}/versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"1.0.0\",\n  \"growthRules\": {},\n  \"statDefinitions\": [\n    {\n      \"key\": \"happiness\",\n      \"label\": \"Happiness\",\n      \"minValue\": 0,\n      \"maxValue\": 100,\n      \"higherIsBetter\": true,\n      \"combatBonus\": {\n        \"threshold\": 80,\n        \"comparison\": \"gte\",\n        \"multiplier\": 1.1\n      }\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "Register the challenger",
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{challengerName}}\",\n  \"email\": \"{{challengerName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -160,7 +313,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{opponentName}}\",\n  \"email\": \"{{opponentName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -189,7 +342,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{bystanderName}}\",\n  \"email\": \"{{bystanderName}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -218,7 +371,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{challengerName}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -247,7 +400,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{opponentName}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -276,7 +429,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{bystanderName}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -301,6 +454,232 @@
           ]
         },
         {
+          "name": "Create the challenger's creature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{runPackageId}}\",\n  \"name\": \"Ember\",\n  \"combatType\": \"flame\",\n  \"spriteRef\": \"ember.png\",\n  \"stats\": {\n    \"happiness\": 90\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('primaryA', pm.response.json().tamagotchiId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Make it the challenger's primary",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{challengerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/users/me/primary-tamagotchi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tamagotchiId\": \"{{primaryA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create the opponent's creature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{runPackageId}}\",\n  \"name\": \"Fern\",\n  \"combatType\": \"nature\",\n  \"spriteRef\": \"fern.png\",\n  \"stats\": {\n    \"happiness\": 40\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('primaryB', pm.response.json().tamagotchiId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Make it the opponent's primary",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opponentToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/users/me/primary-tamagotchi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tamagotchiId\": \"{{primaryB}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create the bystander's creature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bystanderToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": \"{{runPackageId}}\",\n  \"name\": \"Tide\",\n  \"combatType\": \"water\",\n  \"spriteRef\": \"tide.png\",\n  \"stats\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('secondaryA', pm.response.json().tamagotchiId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lend it to the challenger as a secondary (service)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{challengerId}}/secondary-tamagotchis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commandId\": \"{{$guid}}\",\n  \"tamagotchiId\": \"{{secondaryA}}\",\n  \"acquiredFrom\": \"trade\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A secondary is a reference the player holds; Battle checks it with Tamagotchi before a challenge.",
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Send a friend request",
           "request": {
             "method": "POST",
@@ -310,7 +689,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"targetUserId\": \"{{opponentId}}\"\n}",
@@ -344,7 +723,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests/{{requestId}}/accept",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests/{{requestId}}/accept",
             "description": "Battle refuses a challenge between users who are neither friends nor enemies, so the relationship has to exist first."
           },
           "event": [
@@ -354,28 +733,6 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Dependency mode",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{battleUrl}}/health"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "// One assertion below depends on this: the mocked User Management reports every pair as",
-                  "// friends, so the unrelated-users rule can only be exercised against the live service.",
-                  "pm.collectionVariables.set('dependenciesMocked', String(pm.response.json().dependenciesMocked));"
                 ]
               }
             }
@@ -396,7 +753,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"secondaryTamagotchiId\": \"{{secondaryA}}\",\n  \"boosts\": []\n}",
@@ -429,7 +786,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
@@ -463,7 +820,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{challengerId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
@@ -497,7 +854,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": [\n    \"{{boostId}}\"\n  ]\n}",
@@ -532,7 +889,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"secondaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
@@ -566,7 +923,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{bystanderId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
@@ -608,7 +965,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
@@ -642,7 +999,7 @@
                 "value": "Bearer {{bystanderToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}"
           },
           "event": [
             {
@@ -667,7 +1024,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/00000000-0000-4000-8000-000000000000"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/00000000-0000-4000-8000-000000000000"
           },
           "event": [
             {
@@ -692,7 +1049,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/accept",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/accept",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryB}}\",\n  \"boosts\": []\n}",
@@ -726,7 +1083,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/accept",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/accept",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryB}}\",\n  \"boosts\": []\n}",
@@ -772,7 +1129,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/accept",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/accept",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"primaryTamagotchiId\": \"{{primaryB}}\",\n  \"boosts\": []\n}",
@@ -811,7 +1168,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
@@ -854,7 +1211,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"meditate\"\n}",
@@ -897,7 +1254,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"use_boost\",\n  \"boostId\": \"11111111-2222-4333-8444-555555555555\"\n}",
@@ -941,7 +1298,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
@@ -996,7 +1353,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
@@ -1031,7 +1388,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"special\"\n}",
@@ -1076,7 +1433,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"special\"\n}",
@@ -1122,7 +1479,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
@@ -1165,7 +1522,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\",\n  \"boostId\": \"{{boostId}}\"\n}",
@@ -1209,7 +1566,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns"
           },
           "event": [
             {
@@ -1242,7 +1599,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns?limit=2"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns?limit=2"
           },
           "event": [
             {
@@ -1272,7 +1629,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns?limit=500"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns?limit=500"
           },
           "event": [
             {
@@ -1302,7 +1659,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/forfeit"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/forfeit"
           },
           "event": [
             {
@@ -1338,7 +1695,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/turns",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/turns",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"action\": \"attack\"\n}",
@@ -1381,7 +1738,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{battleId}}/forfeit"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{battleId}}/forfeit"
           },
           "event": [
             {
@@ -1406,7 +1763,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles"
           },
           "event": [
             {
@@ -1431,7 +1788,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles?status=forfeited"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles?status=forfeited"
           },
           "event": [
             {
@@ -1456,7 +1813,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles?userId={{opponentId}}"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles?userId={{opponentId}}"
           },
           "event": [
             {
@@ -1482,7 +1839,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles?status=glorious"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles?status=glorious"
           },
           "event": [
             {
@@ -1507,7 +1864,7 @@
                 "value": "Bearer {{challengerToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles",
+            "url": "{{gatewayUrl}}/battle/api/v1/battles",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"opponentId\": \"{{opponentId}}\",\n  \"primaryTamagotchiId\": \"{{primaryA}}\",\n  \"boosts\": []\n}",
@@ -1541,7 +1898,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{secondBattleId}}/decline"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{secondBattleId}}/decline"
           },
           "event": [
             {
@@ -1566,7 +1923,7 @@
                 "value": "Bearer {{opponentToken}}"
               }
             ],
-            "url": "{{battleUrl}}/api/v1/battles/{{secondBattleId}}/decline"
+            "url": "{{gatewayUrl}}/battle/api/v1/battles/{{secondBattleId}}/decline"
           },
           "event": [
             {
@@ -1576,51 +1933,6 @@
                 "exec": [
                   "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));",
                   "pm.test(\"BATTLE_NOT_PENDING\", () => pm.expect(pm.response.json().error.code).to.eql(\"BATTLE_NOT_PENDING\"));"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Operations",
-      "item": [
-        {
-          "name": "Liveness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{battleUrl}}/health"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"reports whether the dependencies are mocked\", () => pm.expect(pm.response.json().dependenciesMocked).to.be.a(\"boolean\"));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Readiness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{battleUrl}}/ready"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"the database is reachable\", () => pm.expect(pm.response.json().status).to.eql(\"ready\"));"
                 ]
               }
             }

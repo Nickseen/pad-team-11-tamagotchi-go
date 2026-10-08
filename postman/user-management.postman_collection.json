@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "User Management Service",
-    "description": "Every route of the User Management Service, in run order: registration and login, profiles, the social graph and both currencies. Run the folder from top to bottom \u2014 each request feeds the next through collection variables, and no credential is stored in the collection: the users are registered by the run itself.\n\nSet userManagementUrl and serviceToken in the environment; serviceToken must equal the service's SERVICE_TOKEN.",
+    "description": "Every route of the User Management Service, called the way Lab 2 clients and services call it: through the API Gateway at {{gatewayUrl}}/user-management/api/v1/.... The Gateway validates the access token, removes Authorization and forwards the trusted identity; service routes carry X-Service-Token. Run the folders from top to bottom: each request feeds the next through collection variables, and no credential is stored in the collection, because the run registers its own users.\n\nSet gatewayUrl and serviceToken in the environment; serviceToken must equal the stack's SERVICE_TOKEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -94,7 +94,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -124,7 +124,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"email\": \"{{usernameB}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -153,7 +153,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameC}}\",\n  \"email\": \"{{usernameC}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -182,7 +182,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"email\": \"{{usernameA}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -216,7 +216,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}_short\",\n  \"email\": \"short_{{usernameA}}@example.com\",\n  \"password\": \"short\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -245,7 +245,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}_mail\",\n  \"email\": \"not-an-address\",\n  \"password\": \"{{password}}\",\n  \"packageId\": \"{{runPackageId}}\"\n}",
@@ -274,7 +274,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -310,7 +310,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -339,7 +339,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"wrong-password-entirely\"\n}",
@@ -368,7 +368,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"nobody_{{runId}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -398,7 +398,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/refresh",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/refresh",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshTokenA}}\"\n}",
@@ -431,7 +431,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/refresh",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/refresh",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{rotatedRefreshToken}}\"\n}",
@@ -461,7 +461,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/.well-known/jwks.json"
+            "url": "{{gatewayUrl}}/user-management/api/v1/.well-known/jwks.json"
           },
           "event": [
             {
@@ -496,7 +496,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me"
           },
           "event": [
             {
@@ -516,7 +516,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/users/me"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me"
           },
           "event": [
             {
@@ -532,6 +532,44 @@
           ]
         },
         {
+          "name": "Own profile with forged identity headers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Authenticated-User-Id",
+                "value": "{{userBId}}"
+              },
+              {
+                "key": "X-Gateway-Token",
+                "value": "forged-by-the-client"
+              }
+            ],
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The Gateway strips every trusted header a client sends and sets its own from the token.",
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the token's user is answered, not the forged one\", () => pm.expect(pm.response.json().userId).to.eql(pm.collectionVariables.get(\"userAId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Update the display name",
           "request": {
             "method": "PATCH",
@@ -541,7 +579,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"displayName\": \"Alice of the Flame\"\n}",
@@ -575,7 +613,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/{{userBId}}"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/{{userBId}}"
           },
           "event": [
             {
@@ -600,7 +638,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/00000000-0000-4000-8000-000000000000"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/00000000-0000-4000-8000-000000000000"
           },
           "event": [
             {
@@ -625,7 +663,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users?ids={{userAId}},{{userBId}}",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users?ids={{userAId}},{{userBId}}",
             "description": "The batched read Guild, Battle and Notification use instead of one call per user."
           },
           "event": [
@@ -646,7 +684,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/users?ids={{userAId}}"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users?ids={{userAId}}"
           },
           "event": [
             {
@@ -663,6 +701,36 @@
           ]
         },
         {
+          "name": "Bulk resolve with a user token instead",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/user-management/api/v1/users?ids={{userAId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A service route needs X-Service-Token; a user's access token does not stand in for it.",
+                  "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"UNAUTHORIZED\", () => pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Bulk resolve with a wrong service token",
           "request": {
             "method": "GET",
@@ -672,7 +740,7 @@
                 "value": "not-the-configured-token"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users?ids={{userAId}}"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users?ids={{userAId}}"
           },
           "event": [
             {
@@ -703,7 +771,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"targetUserId\": \"{{userBId}}\"\n}",
@@ -738,7 +806,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"targetUserId\": \"{{userBId}}\"\n}",
@@ -772,7 +840,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"targetUserId\": \"{{userAId}}\"\n}",
@@ -806,7 +874,7 @@
                 "value": "Bearer {{tokenB}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests?direction=incoming"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests?direction=incoming"
           },
           "event": [
             {
@@ -831,7 +899,7 @@
                 "value": "Bearer {{tokenB}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests/{{requestId}}/accept"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests/{{requestId}}/accept"
           },
           "event": [
             {
@@ -856,7 +924,7 @@
                 "value": "Bearer {{tokenB}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friend-requests/{{requestId}}/accept"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friend-requests/{{requestId}}/accept"
           },
           "event": [
             {
@@ -881,7 +949,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friends"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friends"
           },
           "event": [
             {
@@ -906,7 +974,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/relationships?userId={{userAId}}&otherUserIds={{userBId}}",
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/relationships?userId={{userAId}}&otherUserIds={{userBId}}",
             "description": "This is the call the Battle Service makes before it accepts a challenge."
           },
           "event": [
@@ -923,6 +991,66 @@
           ]
         },
         {
+          "name": "Relationship read by a client",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/relationships?userId={{userAId}}&otherUserIds={{userBId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Internal routes are for services only; the Gateway refuses clients before calling the service.",
+                  "pm.test(\"403 Forbidden\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"INTERNAL_ROUTE_FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"INTERNAL_ROUTE_FORBIDDEN\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Relationship read by a client through an escaped path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/user-management/api/v1/%69nternal/relationships?userId={{userAId}}&otherUserIds={{userBId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Internal routes are for services only; the Gateway refuses clients before calling the service.",
+                  "pm.test(\"403 Forbidden\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"INTERNAL_ROUTE_FORBIDDEN\", () => pm.expect(pm.response.json().error.code).to.eql(\"INTERNAL_ROUTE_FORBIDDEN\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Mark user C as an enemy",
           "request": {
             "method": "POST",
@@ -932,7 +1060,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/enemies",
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/enemies",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"targetUserId\": \"{{userCId}}\"\n}",
@@ -966,7 +1094,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/enemies"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/enemies"
           },
           "event": [
             {
@@ -991,7 +1119,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/enemies/{{userCId}}"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/enemies/{{userCId}}"
           },
           "event": [
             {
@@ -1015,7 +1143,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/friends/{{userBId}}"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/friends/{{userBId}}"
           },
           "event": [
             {
@@ -1044,7 +1172,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/users/me/balances"
+            "url": "{{gatewayUrl}}/user-management/api/v1/users/me/balances"
           },
           "event": [
             {
@@ -1069,7 +1197,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances"
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances"
           },
           "event": [
             {
@@ -1093,7 +1221,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": 250,\n  \"reason\": \"battle_reward\"\n}",
@@ -1137,7 +1265,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": 250,\n  \"reason\": \"battle_reward\"\n}",
@@ -1171,7 +1299,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100"
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100"
           },
           "event": [
             {
@@ -1196,7 +1324,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100000"
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100000"
           },
           "event": [
             {
@@ -1221,7 +1349,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": -100000,\n  \"reason\": \"battle_loss\"\n}",
@@ -1264,7 +1392,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"local\",\n  \"packageId\": null,\n  \"delta\": 10,\n  \"reason\": \"package_reward\"\n}",
@@ -1307,7 +1435,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"doubloons\",\n  \"packageId\": null,\n  \"delta\": 10,\n  \"reason\": \"typo\"\n}",
@@ -1355,7 +1483,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/auth/logout",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/logout",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshTokenA}}\"\n}",
@@ -1383,7 +1511,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/refresh",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/refresh",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshTokenA}}\"\n}",
@@ -1402,46 +1530,6 @@
                 "exec": [
                   "pm.test(\"401 Unauthorized\", () => pm.response.to.have.status(401));",
                   "pm.test(\"INVALID_CREDENTIALS\", () => pm.expect(pm.response.json().error.code).to.eql(\"INVALID_CREDENTIALS\"));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Liveness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{userManagementUrl}}/health"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "// Outside /api/v1 and outside the contract: the container health check uses it."
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Readiness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{userManagementUrl}}/ready"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"the database is reachable\", () => pm.expect(pm.response.json().status).to.eql(\"ready\"));"
                 ]
               }
             }
