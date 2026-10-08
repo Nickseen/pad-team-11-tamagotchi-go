@@ -426,8 +426,10 @@ unavailable, callers return an error rather than bypassing its authentication an
 Gateway strips every inbound header in the table below before applying its own value. Downstream
 services trust identity fields only when `X-Gateway-Token` exactly matches their configured
 `GATEWAY_TOKEN`; comparison is constant-time. Application routes reject a missing or invalid
-Gateway token with `401 UNAUTHORIZED`. Health endpoints are exempt. The service network exposes
-only Gateway to clients, but network isolation is not a substitute for this check.
+Gateway token with `401 UNAUTHORIZED`. Health endpoints are exempt, and so is User Management's
+`GET /api/v1/.well-known/jwks.json`: Gateway fetches that public key set directly to bootstrap token
+validation, so the request carries no Gateway token. The service network exposes only Gateway to
+clients, but network isolation is not a substitute for this check.
 
 | Header | Set by Gateway | Downstream rule |
 | ------ | -------------- | --------------- |
@@ -1022,22 +1024,28 @@ further damage. Errors: `403 NOT_YOUR_TURN`, `409 BATTLE_NOT_ACTIVE`, `422 BOOST
 ##### Synchronous dependencies
 
 Before the first turn, Battle resolves everything it needs and pins it for the duration of the
-match, so a mid-battle stat edit cannot change the arithmetic retroactively:
+match, so a mid-battle stat edit cannot change the arithmetic retroactively. Each lineup is checked
+when the challenge is created and again, with the opponent's, when it is accepted:
 
 | Call | Target | Purpose |
 | ---- | ------ | ------- |
 | `GET /api/v1/internal/tamagotchis?ids=…` | Tamagotchi | Levels, combat types and current stat documents for all four creatures |
-| `GET /api/v1/packages/{packageId}` | Package Registry | Its `latestVersion` is the version pinned at acceptance |
+| `GET /api/v1/internal/users/{userId}/primary-tamagotchi` | Tamagotchi | Confirms that each lineup's primary is its player's current primary |
+| `GET /api/v1/internal/users/{userId}/secondary-tamagotchis/{tamagotchiId}` | Tamagotchi | Confirms that each player holds the creature fielded as secondary |
+| `GET /api/v1/internal/packages/{packageId}/versions/current` | Package Registry | The package's current version, pinned at acceptance |
 | `GET /api/v1/internal/packages/{packageId}/versions/{version}/stat-definitions` | Package Registry | How to read those stats — maxima and combat-bonus thresholds |
 | `GET /api/v1/combat-types/advantage` | Tamagotchi | The type multiplier for each attacking pair |
 | `GET /api/v1/internal/relationships` | User Management | Rejects a challenge between users who are neither friends nor within proximity range |
 
-Every call carries `X-Service-Token` and no user token. Battle 1.1.0 reads `latestVersion` from the
-public Package resource and checks ownership of the primary, but does not yet verify the selected
-primary or secondary holding. Package Registry 2.0.1 already exposes
-`GET /api/v1/internal/packages/{packageId}/versions/current`, and Tamagotchi 2.1.0 exposes the two
-internal holding lookups above. A later Battle release must switch to those service routes; until
-then its live behaviour is narrower than the target contract.
+Every call is sent through Gateway as `GATEWAY_URL/<serviceSlug><path>`, for example
+`GET http://gateway:8080/tamagotchi/api/v1/internal/tamagotchis?ids=…`; Battle has no direct
+dependency URL. Each call carries `X-Service-Token` and `X-Correlation-Id` and no user token, and is
+cancelled when Battle's task deadline passes. Any non-success answer, including Gateway's `429`,
+`503` or `504`, is reported as `503 DEPENDENCY_UNAVAILABLE` and changes no battle state; a missing
+creature is `404 TAMAGOTCHI_NOT_FOUND`. A primary that is not the player's current primary, or a
+player without one, is refused with `422 TAMAGOTCHI_NOT_PRIMARY`; a secondary the player does not
+hold (`isHeld: false`) is refused with `403 TAMAGOTCHI_NOT_HELD`. The compose-pinned Battle 1.1.0
+still reads the public Package resource and does not perform the two holding checks.
 
 In Lab 1 Battle stores everything in PostgreSQL. The Redis match cache and RabbitMQ publishing are
 planned: events are written to the service log at their real publication points.
