@@ -275,9 +275,10 @@ Raid implementations. It does not certify uninspected private source code.
 | Guild | `gabimiric/tamagotchi-guild:2.0.1` | REST, PostgreSQL, RS256/JWKS, internal guild/member reads, live User Management bulk lookup | WebSocket chat, Redis Pub/Sub, RabbitMQ events and versioned migrations |
 | Monster Raid | `nickseen/tamagotchi-monster-raid:2.0.0` | REST, PostgreSQL, RS256/JWKS, service-authenticated membership check, dependency mocks | Internal Guild level lookup in a later image; Redis counters, WebSocket and RabbitMQ publishing |
 
-Map and Monster Raid `2.1.0` have since been released, and their CPR submodules point to the
-reviewed `main` commits for those releases. Map `2.1.0` adds the direct live-location WebSocket,
-Gateway-authenticated REST context, Gateway-routed relationship reads, Redis proximity cooldown,
+Map and Monster Raid have since released newer Lab 2 images, and their CPR submodules point to
+reviewed `main` commits for the published versions listed below. Map `2.1.0` adds the direct
+live-location WebSocket, Gateway-authenticated REST context, Gateway-routed relationship reads,
+Redis proximity cooldown,
 and RabbitMQ proximity publication. Monster Raid `2.1.0` adds the direct raid feed,
 Gateway-routed dependency reads, and PostgreSQL/Redis concurrency handling. These are published
 service capabilities, **not features of the Lab 1 Compose stack above**: that stack still pins
@@ -1587,7 +1588,7 @@ corresponding reviewed `main` commits:
 
 | Service | Published image | CPR submodule commit |
 | ------- | --------------- | -------------------- |
-| Map | [`nickseen/tamagotchi-map:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `5f3f26b` |
+| Map | [`nickseen/tamagotchi-map:2.1.1`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `9f7083f` |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid:2.1.0`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `a8cf2c9` |
 | User Management | [`amzavladislav/tamagotchi-user-management:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `e2421fa` |
 | Battle | [`amzavladislav/tamagotchi-battle:2.0.0`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `809d0e5` |
