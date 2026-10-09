@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Guild Service",
-    "description": "CRUD and lifecycle requests for the Guild service. Run top-to-bottom with the Collection Runner. Setup (User Management) registers and logs in two real users so every user-authenticated request carries a real RS256 token; internal routes send only X-Service-Token, no user token, per the CPR contract. The invitation flow exercises Guild's real call to User Management's bulk GET /api/v1/users?ids= route.",
+    "description": "CRUD, membership and Guild Chat negotiation requests for the Guild service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/guild. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity headers, so Guild never sees Authorization. Internal routes send X-Service-Token and no user token. The invitation flow exercises Guild's call to User Management, which also goes through Gateway. WebSocket frames cannot run in the Collection Runner: the negotiation folder checks the ticket URL, and tamagotchi-guild's scripts/ws_chat_client.py walks through the socket contract with it.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -56,6 +56,10 @@
     {
       "key": "shortTag",
       "value": ""
+    },
+    {
+      "key": "guildChatUrl",
+      "value": ""
     }
   ],
   "event": [
@@ -108,7 +112,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/register"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register"
           },
           "response": []
         },
@@ -138,7 +142,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/register"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register"
           },
           "response": []
         },
@@ -168,7 +172,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/login"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login"
           },
           "response": []
         },
@@ -198,7 +202,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/login"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login"
           },
           "response": []
         }
@@ -267,7 +271,7 @@
                 }
               }
             },
-            "url": "{{guildUrl}}/api/v1/guilds"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds"
           },
           "response": []
         },
@@ -287,24 +291,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{guildUrl}}/api/v1/guilds?query={{runId}}",
-              "host": [
-                "{{guildUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "guilds"
-              ],
-              "query": [
-                {
-                  "key": "query",
-                  "value": "{{runId}}"
-                }
-              ]
-            }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds?query={{runId}}"
           },
           "response": []
         },
@@ -324,8 +317,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}"
           },
           "response": []
         },
@@ -360,7 +358,7 @@
                 }
               }
             },
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}"
           },
           "response": []
         },
@@ -388,7 +386,210 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Guild Chat (Gateway negotiation)",
+      "item": [
+        {
+          "name": "Negotiate a guild.chat ticket (member)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "const path = '/api/v1/guilds/' + pm.collectionVariables.get('guildId') + '/chat?ticket=';",
+                  "pm.test('direct WebSocket URL to Guild', () => {",
+                  "    pm.expect(json.url).to.match(/^wss?:\\/\\//);",
+                  "    pm.expect(json.url).to.include(path);",
+                  "    pm.expect(json.url).to.not.include('/guild/api/'); // not proxied through Gateway",
+                  "});",
+                  "pm.test('ticket expires within 60 s', () => {",
+                  "    const ttl = new Date(json.expiresAt).getTime() - Date.now();",
+                  "    pm.expect(ttl).to.be.within(-5000, 65000);",
+                  "});",
+                  "pm.collectionVariables.set('guildChatUrl', json.url);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"guild.chat\",\n  \"resourceId\": \"{{guildId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "403 - negotiate for a guild the caller is not in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{inviteeToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"guild.chat\",\n  \"resourceId\": \"{{guildId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "400 - guild.chat without a guild",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"guild.chat\",\n  \"resourceId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "401 - negotiate without a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"guild.chat\",\n  \"resourceId\": \"{{guildId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Chat history (member)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('collection envelope', () => pm.expect(pm.response.json()).to.have.all.keys('items', 'nextCursor', 'hasMore'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/messages"
+          },
+          "response": []
+        },
+        {
+          "name": "403 - chat history as a non-member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{inviteeToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/messages"
           },
           "response": []
         }
@@ -430,7 +631,7 @@
                 }
               }
             },
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/invitations"
           },
           "response": []
         },
@@ -456,7 +657,7 @@
                 "value": "Bearer {{ownerToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/invitations"
           },
           "response": []
         },
@@ -482,7 +683,7 @@
                 "value": "Bearer {{inviteeToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/users/me/invitations"
+            "url": "{{gatewayUrl}}/guild/api/v1/users/me/invitations"
           },
           "response": []
         },
@@ -508,7 +709,7 @@
                 "value": "Bearer {{inviteeToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/invitations/{{invitationId}}/accept"
+            "url": "{{gatewayUrl}}/guild/api/v1/invitations/{{invitationId}}/accept"
           },
           "response": []
         }
@@ -533,8 +734,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/members"
           },
           "response": []
         },
@@ -569,7 +775,7 @@
                 }
               }
             },
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/members/{{inviteeId}}"
           },
           "response": []
         },
@@ -597,7 +803,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members/{{inviteeId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}/members/{{inviteeId}}"
           },
           "response": []
         },
@@ -623,7 +829,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}/members"
           },
           "response": []
         },
@@ -650,7 +856,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members?limit=1"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}/members?limit=1"
           },
           "response": []
         },
@@ -675,7 +881,7 @@
                 "value": "Bearer {{ownerToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/members/{{inviteeId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/members/{{inviteeId}}"
           },
           "response": []
         }
@@ -710,7 +916,7 @@
                 }
               }
             },
-            "url": "{{guildUrl}}/api/v1/guilds"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds"
           },
           "response": []
         },
@@ -730,8 +936,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{guildUrl}}/api/v1/guilds/00000000-0000-4000-8000-000000000000"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/00000000-0000-4000-8000-000000000000"
           },
           "response": []
         },
@@ -766,7 +977,7 @@
                 }
               }
             },
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}/invitations"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}/invitations"
           },
           "response": []
         },
@@ -792,20 +1003,20 @@
                 "value": "Bearer {{inviteeToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}"
           },
           "response": []
         },
         {
-          "name": "401 - internal route without X-Service-Token",
+          "name": "403 - client request to an internal route (Gateway)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
-                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN'));"
                 ]
               }
             }
@@ -813,20 +1024,20 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}/members"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}/members"
           },
           "response": []
         },
         {
-          "name": "401 - internal route with a user token but no X-Service-Token",
+          "name": "403 - internal route with only a user token (Gateway)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
-                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN'));"
                 ]
               }
             }
@@ -839,7 +1050,7 @@
                 "value": "Bearer {{ownerToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}"
           },
           "response": []
         },
@@ -864,7 +1075,7 @@
                 "value": "definitely-wrong"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/{{guildId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}"
           },
           "response": []
         },
@@ -890,7 +1101,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/internal/guilds/00000000-0000-4000-8000-000000000000"
+            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/00000000-0000-4000-8000-000000000000"
           },
           "response": []
         }
@@ -920,7 +1131,7 @@
                 "value": "Bearer {{ownerToken}}"
               }
             ],
-            "url": "{{guildUrl}}/api/v1/guilds/{{guildId}}"
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds/{{guildId}}"
           },
           "response": []
         }

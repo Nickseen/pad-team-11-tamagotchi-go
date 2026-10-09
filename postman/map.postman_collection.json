@@ -1,8 +1,7 @@
 {
   "info": {
-    "_postman_id": "bfd7c342-023a-46b6-b8c3-c81d223db4d1",
-    "name": "Tamagotchi Go - Map Service",
-    "description": "Executable Map API examples. Setup registers a User Management user and obtains an RS256 token; run folders in order. Set serviceToken in the shared environment.",
+    "name": "Map Service (Lab 2, through Gateway)",
+    "description": "Run in saved order against the Lab 2 stack. User Management registration and all REST requests go through Gateway. The map.stream ticket returns a direct WebSocket URL; open it separately in Postman and send a location.update frame. Do not commit a real service token or ticket.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -20,7 +19,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"{{username}}@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
@@ -53,7 +52,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -83,23 +82,15 @@
       ]
     },
     {
-      "name": "Health",
+      "name": "Gateway health",
       "item": [
         {
-          "name": "Health check",
+          "name": "Gateway health",
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{mapUrl}}/healthz",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "healthz"
-              ]
-            },
-            "description": "Expected: 200 and {\"status\":\"ok\"}."
+            "url": "{{gatewayUrl}}/health",
+            "description": "Gateway liveness. Service health is monitored by Compose."
           },
           "event": [
             {
@@ -107,8 +98,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Service is healthy', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                  "pm.test('Gateway returns 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
@@ -145,17 +135,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/locations",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "locations"
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/locations",
             "description": "Expected: 202, accepted=true. Generates a current UTC recordedAt value."
           },
           "event": [
@@ -193,24 +173,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "map",
-                "nearby"
-              ],
-              "query": [
-                {
-                  "key": "radiusMeters",
-                  "value": "{{radiusMeters}}"
-                }
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
             "description": "Expected: 200 with an items array. With one local token the array is normally empty."
           },
           "event": [
@@ -237,18 +200,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/map/visible",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "map",
-                "visible"
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/map/visible",
             "description": "Expected: 200 with an items array. The current empty relationship provider returns no users."
           },
           "event": [
@@ -275,20 +227,8 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/internal/positions/{{userId}}",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "internal",
-                "positions",
-                "{{userId}}"
-              ]
-            },
-            "description": "Expected: 200. Requires bearer and service tokens."
+            "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}",
+            "description": "Expected: 200. This service-context request uses X-Service-Token through Gateway, without a user bearer token."
           },
           "event": [
             {
@@ -314,18 +254,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/locations/me",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "locations",
-                "me"
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/locations/me",
             "description": "Expected: 204 with no response body."
           },
           "event": [
@@ -365,17 +294,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/locations",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "locations"
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/locations",
             "description": "Expected: 401 UNAUTHORIZED."
           },
           "event": [
@@ -417,17 +336,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/locations",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "locations"
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/locations",
             "description": "Expected: 400 INVALID_COORDINATE."
           },
           "event": [
@@ -478,17 +387,7 @@
                 }
               }
             },
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/locations",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "locations"
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/locations",
             "description": "Expected: 400 POSITION_ALREADY_EXPIRED."
           },
           "event": [
@@ -525,24 +424,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters=5001",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "map",
-                "nearby"
-              ],
-              "query": [
-                {
-                  "key": "radiusMeters",
-                  "value": "5001"
-                }
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/map/nearby?radiusMeters=5001",
             "description": "Expected: 400 INVALID_RADIUS. Requires an active caller position; run Location flow through the update first."
           },
           "event": [
@@ -570,20 +452,8 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/internal/positions/{{userId}}",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "internal",
-                "positions",
-                "{{userId}}"
-              ]
-            },
-            "description": "Expected: 401 UNAUTHORIZED."
+            "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}",
+            "description": "Expected: 401 UNAUTHORIZED for an invalid X-Service-Token through Gateway."
           },
           "event": [
             {
@@ -610,24 +480,7 @@
                 "type": "text"
               }
             ],
-            "url": {
-              "raw": "{{mapUrl}}/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
-              "host": [
-                "{{mapUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "map",
-                "nearby"
-              ],
-              "query": [
-                {
-                  "key": "radiusMeters",
-                  "value": "{{radiusMeters}}"
-                }
-              ]
-            },
+            "url": "{{gatewayUrl}}/map/api/v1/map/nearby?radiusMeters={{radiusMeters}}",
             "description": "Expected: 404 POSITION_EXPIRED when run after Delete my location."
           },
           "event": [
@@ -643,8 +496,148 @@
               }
             }
           ]
+        },
+        {
+          "name": "403 - client cannot read internal position",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 INTERNAL_ROUTE_FORBIDDEN', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN'));"
+                ]
+              }
+            }
+          ]
         }
       ]
+    },
+    {
+      "name": "Map stream (Gateway ticket)",
+      "item": [
+        {
+          "name": "Negotiate map.stream ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"channel\":\"map.stream\",\"resourceId\":null}"
+            },
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "description": "Gateway issues a short-lived ticket and direct service URL. Open websocketUrl as a WebSocket request in Postman; obtain a fresh ticket for reconnect."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('direct WebSocket URL', () => { pm.expect(json.url).to.match(/^wss?:\\/\\//); pm.expect(json.url).to.include('/api/v1/map/stream?ticket='); pm.expect(json.url).to.not.include('/monster-raid/api/'); pm.expect(json.url).to.not.include('/map/api/'); });",
+                  "pm.test('ticket expires within 60 s', () => { const ttl = new Date(json.expiresAt).getTime() - Date.now(); pm.expect(ttl).to.be.within(-5000, 65000); });",
+                  "pm.collectionVariables.set('mapStreamUrl', json.url);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 - map.stream cannot name a resource",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"map.stream\",\n  \"resourceId\": \"{{userId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 VALIDATION_FAILED', () => pm.response.to.have.status(400));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - ticket without access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"map.stream\",\n  \"resourceId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 UNAUTHORIZED', () => pm.response.to.have.status(401));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "The runner checks ticket negotiation. Open mapStreamUrl separately as a Postman WebSocket request and send a location.update frame with a current recordedAt. Request a fresh ticket for every reconnect; never log the ticket."
     }
   ],
   "event": [
@@ -698,6 +691,10 @@
     },
     {
       "key": "expiredRecordedAt",
+      "value": ""
+    },
+    {
+      "key": "mapStreamUrl",
       "value": ""
     }
   ]

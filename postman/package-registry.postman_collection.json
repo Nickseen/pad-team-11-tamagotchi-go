@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Package Registry Service",
-    "description": "CRUD and lifecycle requests for the Package Registry service. Run top-to-bottom with the Collection Runner. Setup (User Management) registers and logs in two real users so every user-authenticated request carries a real RS256 token; internal routes send only X-Service-Token, no user token, per the CPR contract. Admin-only requests are skipped when no registryAdminToken is set, since User Management only issues the user role in Lab 1.",
+    "description": "CRUD and lifecycle requests for the Package Registry service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/package-registry. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity and role headers, so the Registry never sees Authorization. Moderator checks use the package's moderatorIds; admin checks use the Gateway-provided roles. Internal routes send X-Service-Token and no user token. Admin-only requests are skipped when no registryAdminToken is set, since User Management only issues the user role.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -116,7 +116,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/register"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register"
           },
           "response": []
         },
@@ -146,7 +146,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/register"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register"
           },
           "response": []
         },
@@ -176,7 +176,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/login"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login"
           },
           "response": []
         },
@@ -206,7 +206,7 @@
                 }
               }
             },
-            "url": "{{userManagementUrl}}/api/v1/auth/login"
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login"
           },
           "response": []
         }
@@ -214,29 +214,7 @@
     },
     {
       "name": "Health",
-      "item": [
-        {
-          "name": "Health check",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('database ok', () => pm.expect(pm.response.json().database).to.eql('ok'));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/health"
-          },
-          "response": []
-        }
-      ]
+      "item": []
     },
     {
       "name": "Packages & Versions",
@@ -274,7 +252,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages"
           },
           "response": []
         },
@@ -294,8 +272,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/packages?limit=100"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages?limit=100"
           },
           "response": []
         },
@@ -315,8 +298,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}"
           },
           "response": []
         },
@@ -351,7 +339,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}"
           },
           "response": []
         },
@@ -386,7 +374,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/versions"
           },
           "response": []
         },
@@ -406,8 +394,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/versions"
           },
           "response": []
         },
@@ -427,8 +420,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions/{{version}}"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/versions/{{version}}"
           },
           "response": []
         },
@@ -454,7 +452,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions"
           },
           "response": []
         },
@@ -480,7 +478,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
           },
           "response": []
         }
@@ -504,7 +502,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{otherToken}}"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"userId\": \"{{otherId}}\"\n}",
@@ -514,7 +517,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/registrations"
           },
           "response": []
         },
@@ -534,8 +537,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/users/{{otherId}}/packages"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{otherToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/users/{{otherId}}/packages"
           },
           "response": []
         },
@@ -554,15 +562,20 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/registrations/{{otherId}}"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{otherToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/registrations/{{otherId}}"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Admin (skipped in the stack \u2014 User Management only issues the user role)",
+      "name": "Admin (skipped in the stack — User Management only issues the user role)",
       "item": [
         {
           "name": "Grant moderator (admin)",
@@ -603,7 +616,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/moderators"
           },
           "response": []
         },
@@ -637,7 +650,7 @@
                 "value": "Bearer {{registryAdminToken}}"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/moderators/{{otherId}}"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/moderators/{{otherId}}"
           },
           "response": []
         },
@@ -681,7 +694,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/monsters"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/monsters"
           },
           "response": []
         },
@@ -725,7 +738,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/monsters/{{monsterId}}"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/monsters/{{monsterId}}"
           },
           "response": []
         },
@@ -769,7 +782,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/raid-definitions"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/raid-definitions"
           },
           "response": []
         },
@@ -804,7 +817,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/internal/raid-definitions/{{raidDefinitionId}}"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/raid-definitions/{{raidDefinitionId}}"
           },
           "response": []
         },
@@ -839,7 +852,7 @@
                 "value": "Bearer {{registryAdminToken}}"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/activate"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/raid-definitions/{{raidDefinitionId}}/activate"
           },
           "response": []
         },
@@ -883,7 +896,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/raid-definitions/{{raidDefinitionId}}/cancel"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/raid-definitions/{{raidDefinitionId}}/cancel"
           },
           "response": []
         }
@@ -918,7 +931,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages"
           },
           "response": []
         },
@@ -938,8 +951,13 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/packages/00000000-0000-4000-8000-000000000000"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{moderatorToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/00000000-0000-4000-8000-000000000000"
           },
           "response": []
         },
@@ -974,7 +992,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages/{{registryPackageId}}/versions"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{registryPackageId}}/versions"
           },
           "response": []
         },
@@ -1010,7 +1028,7 @@
                 }
               }
             },
-            "url": "{{packageRegistryUrl}}/api/v1/packages"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages"
           },
           "response": []
         },
@@ -1036,20 +1054,20 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{emptyPackageId}}/versions/current"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{emptyPackageId}}/versions/current"
           },
           "response": []
         },
         {
-          "name": "401 - internal route without X-Service-Token",
+          "name": "403 - client request to an internal route (Gateway)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
-                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN'));"
                 ]
               }
             }
@@ -1057,20 +1075,20 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
           },
           "response": []
         },
         {
-          "name": "401 - internal route with a user token but no X-Service-Token",
+          "name": "403 - internal route with only a user token (Gateway)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
-                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'));"
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('error code', () => pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN'));"
                 ]
               }
             }
@@ -1083,7 +1101,7 @@
                 "value": "Bearer {{moderatorToken}}"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
           },
           "response": []
         },
@@ -1108,7 +1126,7 @@
                 "value": "definitely-wrong"
               }
             ],
-            "url": "{{packageRegistryUrl}}/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
           },
           "response": []
         }

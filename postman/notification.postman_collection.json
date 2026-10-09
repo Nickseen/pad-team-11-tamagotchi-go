@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Notification Service",
-    "description": "Every route of the Notification service (Lab 1), in the order the Runner should run them. Tokens are signed from the environment's mockJwtSecret, which must equal the service's MOCK_JWT_SECRET.",
+    "description": "Every route of the Notification service, called through the API Gateway (Lab 2), in the order the Runner should run them. Setup registers and logs in through the Gateway. User requests carry the access token, which the Gateway validates and replaces with its trusted headers; service requests carry only X-Service-Token. Uses the shared environment's gatewayUrl and serviceToken.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -80,6 +80,14 @@
     {
       "key": "requestId",
       "value": ""
+    },
+    {
+      "key": "guildId",
+      "value": ""
+    },
+    {
+      "key": "guildTag",
+      "value": ""
     }
   ],
   "item": [
@@ -92,7 +100,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"postman-a@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
@@ -120,7 +128,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameA}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -151,7 +159,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/register",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\",\n  \"email\": \"postman-b@example.com\",\n  \"packageId\": \"{{packageId}}\"\n}",
@@ -179,7 +187,7 @@
           "request": {
             "method": "POST",
             "header": [],
-            "url": "{{userManagementUrl}}/api/v1/auth/login",
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{usernameB}}\",\n  \"password\": \"{{password}}\"\n}",
@@ -221,7 +229,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices",
+            "url": "{{gatewayUrl}}/notification/api/v1/devices",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fcmToken\": \"{{fcmTokenA}}\",\n  \"platform\": \"android\",\n  \"locale\": \"ro-MD\"\n}",
@@ -264,7 +272,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices",
+            "url": "{{gatewayUrl}}/notification/api/v1/devices",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fcmToken\": \"{{fcmTokenA}}\",\n  \"platform\": \"android\",\n  \"locale\": \"en-US\"\n}",
@@ -298,7 +306,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices",
+            "url": "{{gatewayUrl}}/notification/api/v1/devices",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fcmToken\": \"{{deadToken}}\",\n  \"platform\": \"ios\",\n  \"locale\": \"ro-MD\"\n}",
@@ -341,7 +349,7 @@
                 "value": "Bearer {{tokenB}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices",
+            "url": "{{gatewayUrl}}/notification/api/v1/devices",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fcmToken\": \"{{fcmTokenB}}\",\n  \"platform\": \"web\",\n  \"locale\": \"en-US\"\n}",
@@ -383,7 +391,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices"
+            "url": "{{gatewayUrl}}/notification/api/v1/devices"
           },
           "event": [
             {
@@ -407,7 +415,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices",
+            "url": "{{gatewayUrl}}/notification/api/v1/devices",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fcmToken\": \"x\",\n  \"platform\": \"windows\",\n  \"locale\": \"ro-MD\"\n}",
@@ -443,7 +451,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices",
+            "url": "{{gatewayUrl}}/notification/api/v1/devices",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fcmToken\": \"x\",\n  \"platform\": \"web\",\n  \"locale\": \"!!\"\n}",
@@ -468,6 +476,28 @@
               }
             }
           ]
+        },
+        {
+          "name": "Error: no token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/notification/api/v1/devices"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -485,7 +515,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications/preferences"
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications/preferences"
           },
           "event": [
             {
@@ -510,7 +540,7 @@
                 "value": "Bearer {{tokenB}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications/preferences",
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications/preferences",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"items\": [\n    {\n      \"category\": \"battle_result\",\n      \"push\": false\n    }\n  ]\n}",
@@ -543,7 +573,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications/preferences",
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications/preferences",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"items\": [\n    {\n      \"category\": \"raid_started\",\n      \"push\": true,\n      \"quietHours\": {\n        \"from\": \"25:00\",\n        \"to\": \"08:00\"\n      }\n    }\n  ]\n}",
@@ -581,15 +611,11 @@
             "method": "POST",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{tokenA}}"
-              },
-              {
                 "key": "X-Service-Token",
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
@@ -635,7 +661,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications?category=battle_result"
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications?category=battle_result"
           },
           "event": [
             {
@@ -661,7 +687,7 @@
                 "value": "Bearer {{tokenB}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications?category=battle_result"
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications?category=battle_result"
           },
           "event": [
             {
@@ -686,7 +712,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices"
+            "url": "{{gatewayUrl}}/notification/api/v1/devices"
           },
           "event": [
             {
@@ -707,15 +733,11 @@
             "method": "POST",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{tokenA}}"
-              },
-              {
                 "key": "X-Service-Token",
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
@@ -745,15 +767,11 @@
             "method": "POST",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{tokenA}}"
-              },
-              {
                 "key": "X-Service-Token",
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.registered\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"userId\": \"{{userAId}}\"\n  }\n}",
@@ -789,7 +807,7 @@
           ]
         },
         {
-          "name": "raid.started: every guild member is notified",
+          "name": "A real guild for the raid (Guild, through the Gateway)",
           "request": {
             "method": "POST",
             "header": [
@@ -798,14 +816,58 @@
                 "value": "Bearer {{tokenA}}"
               },
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/guild/api/v1/guilds",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Notification check {{guildTag}}\",\n  \"tag\": \"{{guildTag}}\",\n  \"description\": \"Created by the Notification collection; user A is its owner and only member.\",\n  \"emblemRef\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A tag of 2 to 5 characters, different on every run.",
+                  "pm.collectionVariables.set('guildTag', 'N' + Math.random().toString(36).slice(2, 6).toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('guildId', pm.response.json().guildId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "raid.started: every guild member is notified",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
                 "key": "X-Service-Token",
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"raid.started\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidId}}\",\n    \"guildId\": \"{{raidId}}\",\n    \"monsterId\": \"{{raidId}}\",\n    \"expiresAt\": \"2026-09-22T13:00:00.000Z\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"raid.started\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidId}}\",\n    \"guildId\": \"{{guildId}}\",\n    \"monsterId\": \"{{raidId}}\",\n    \"expiresAt\": \"2026-09-22T13:00:00.000Z\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -839,6 +901,34 @@
           ]
         },
         {
+          "name": "User A, the guild's only member, got the raid notification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications?category=raid_started"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "// Only this run's raid counts, so the collection can be run again on the same stack.",
+                  "const mine = pm.response.json().items.filter((n) => n.data.raidId === pm.collectionVariables.get('raidId')",
+                  "    && n.data.guildId === pm.collectionVariables.get('guildId'));",
+                  "pm.test(\"exactly one notification for this raid\", () => pm.expect(mine.length).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "battle.created with the service token only",
           "request": {
             "method": "POST",
@@ -848,7 +938,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"challengerId\": \"{{userAId}}\",\n    \"opponentId\": \"{{userBId}}\"\n  }\n}",
@@ -890,15 +980,11 @@
             "method": "POST",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{tokenA}}"
-              },
-              {
                 "key": "X-Service-Token",
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 2,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
@@ -936,7 +1022,7 @@
           ]
         },
         {
-          "name": "Error: event without X-Service-Token",
+          "name": "Error: a client cannot call an internal route",
           "request": {
             "method": "POST",
             "header": [
@@ -945,7 +1031,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
@@ -962,9 +1048,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"401 UNAUTHORIZED\", () => {",
-                  "    pm.response.to.have.status(401);",
-                  "    pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED');",
+                  "pm.test(\"403 INTERNAL_ROUTE_FORBIDDEN from the Gateway\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN');",
                   "});"
                 ]
               }
@@ -987,7 +1073,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications?category=battle_result&limit=5"
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications?category=battle_result&limit=5"
           },
           "event": [
             {
@@ -1012,7 +1098,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications/{{notificationId}}/read"
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications/{{notificationId}}/read"
           },
           "event": [
             {
@@ -1037,7 +1123,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/internal/events",
+            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.friend_request_created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"requestId\": \"{{requestId}}\",\n    \"fromUserId\": \"{{userBId}}\",\n    \"toUserId\": \"{{userAId}}\"\n  }\n}",
@@ -1083,7 +1169,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications/read-all"
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications/read-all"
           },
           "event": [
             {
@@ -1108,7 +1194,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/notifications/00000000-0000-4000-8000-000000000000/read"
+            "url": "{{gatewayUrl}}/notification/api/v1/notifications/00000000-0000-4000-8000-000000000000/read"
           },
           "event": [
             {
@@ -1128,7 +1214,7 @@
       ]
     },
     {
-      "name": "Cleanup and operations",
+      "name": "Cleanup",
       "description": "",
       "item": [
         {
@@ -1141,7 +1227,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices/{{deviceId}}"
+            "url": "{{gatewayUrl}}/notification/api/v1/devices/{{deviceId}}"
           },
           "event": [
             {
@@ -1165,7 +1251,7 @@
                 "value": "Bearer {{tokenA}}"
               }
             ],
-            "url": "{{notificationUrl}}/api/v1/devices/{{deviceId}}"
+            "url": "{{gatewayUrl}}/notification/api/v1/devices/{{deviceId}}"
           },
           "event": [
             {
@@ -1177,25 +1263,6 @@
                   "    pm.response.to.have.status(404);",
                   "    pm.expect(pm.response.json().error.code).to.eql('DEVICE_NOT_FOUND');",
                   "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{notificationUrl}}/health"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
                 ]
               }
             }
