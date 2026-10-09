@@ -151,17 +151,36 @@ service set.
 
 ## Architecture Diagram
 
-Each box lists the state its service exclusively owns. Solid arrows are synchronous requests, dashed
-arrows are asynchronous events. Arrows point from the caller toward the owner of the data.
+Each domain box lists the state its service exclusively owns. The API Gateway sits between the
+clients and the eight services and owns no domain data. Three kinds of arrow are drawn, and every
+arrow points from the caller toward the receiver:
+
+- **Solid grey: synchronous REST.** Clients send every request to Gateway with
+  `Authorization: Bearer <accessToken>`; Gateway validates the token, removes `Authorization`, and
+  forwards the request to the owning service with `X-Gateway-Token` and the trusted
+  `X-Authenticated-*` context. Service-to-service calls take the same path: the caller sends them to
+  Gateway with `X-Service-Token`, and Gateway forwards them. No service calls another one directly.
+  The routed calls are Battle → Tamagotchi, Package Registry and User Management; Map → User
+  Management; Guild → User Management; Monster Raid → Guild, Tamagotchi and Package Registry; and
+  Notification → Guild.
+- **Solid blue: direct WebSocket.** A client first asks Gateway for a ticket
+  (`POST /api/v1/gateway/websocket-tickets`, part of the client → Gateway arrow). Gateway checks the
+  user's eligibility, asking Guild for `guild.chat` and Monster Raid for `raid.feed`, and returns a
+  short-lived signed ticket with the service's direct URL. The client then connects to Map, Guild or
+  Monster Raid itself; Gateway never carries socket traffic. The three services verify tickets
+  against Gateway's public key set, one of the service → Gateway calls.
+- **Dashed: asynchronous RabbitMQ events** on the `tamagotchi.events` exchange. They never pass
+  through Gateway.
 
 ![Architecture](docs/architecture.svg)
 
 Two properties are worth pointing out, because they are the reason the boundaries are drawn this
 way:
 
-**The dependency graph is acyclic.** Nothing in the core layer calls back up into a gameplay
-service. Battle reads from Tamagotchi, Registry and User Management, but none of them knows Battle
-exists — they learn about a finished fight from an event, not a call.
+**The dependency graph is acyclic.** Every REST call passes through Gateway, but the dependencies it
+routes still only point from gameplay services toward the core. Nothing in the core layer calls back
+up into a gameplay service. Battle reads from Tamagotchi, Registry and User Management, but none of
+them knows Battle exists — they learn about a finished fight from an event, not a call.
 
 **Nobody writes to state they do not own.** Battle decides who won, but Tamagotchi performs the
 owner transfer and User Management applies the currency change, both keyed on `battleId` so a
@@ -228,7 +247,8 @@ context it forwards.
 
 ### Persistent connections
 
-Everything else is request/response. Only these three client channels stay open:
+Everything else is request/response through Gateway. Only these three client channels stay open,
+each negotiated with a Gateway ticket and then connected directly to its service:
 
 | Channel    | Service      | Carries                                    |
 | ---------- | ------------ | ------------------------------------------ |
@@ -249,6 +269,7 @@ to the same fact. `BattleFinished` is consumed by Tamagotchi (owner transfer and
 Management (currency) and Notification (push) independently.
 
 **WebSockets** for sustained client connections: live map updates, guild chat and live raid damage.
+The client negotiates each one with Gateway and then connects to the service directly.
 
 Every event consumer is idempotent on the event id (`battleId`, `raidId`), so a redelivered or
 duplicated event cannot transfer the same creature twice or pay out a raid twice.
