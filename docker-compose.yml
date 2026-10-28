@@ -1,5 +1,6 @@
 # The whole Tamagotchi Go ecosystem behind the API Gateway: the Gateway, the eight services and the
-# stores each one owns, run from the Lab 2 images published on Docker Hub. Nothing is built locally.
+# stores each one owns, run from versioned images. Map/Raid 3.0.0 are staged for the Lab 3 rollout; see README.
+# Do not merge this staging change until publication and #133 integration are verified.
 #
 #   cp .env.example .env    # replace every CHANGE_ME
 #   docker compose up -d
@@ -198,7 +199,7 @@ services:
       - map-redis-data:/data
 
   map:
-    image: nickseen/tamagotchi-map:2.1.1 # its image declares the /healthz check
+    image: nickseen/tamagotchi-map:3.0.0 # its image declares the /healthz check
     restart: on-failure # a single Redis ping at start-up, no retry
     depends_on:
       map-redis:
@@ -210,6 +211,9 @@ services:
       PORT: 8085
       GATEWAY_URL: http://gateway:8080
       GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
+      DISCOVERY_URL: ${DISCOVERY_URL:-http://service-discovery:8090}
+      INSTANCE_BASE_URL: http://map:8085
+      INSTANCE_WS_PUBLIC_URL: ${MAP_WS_PUBLIC_URL:-ws://localhost:8085}
       MAP_STORAGE: redis
       MAP_REDIS_ADDR: map-redis:6379
       MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
@@ -314,7 +318,7 @@ services:
       - raid-redis-data:/data
 
   monster-raid:
-    image: nickseen/tamagotchi-monster-raid:2.1.1 # its image declares the /healthz check
+    image: nickseen/tamagotchi-monster-raid:3.0.0 # its image declares the /healthz check
     restart: on-failure
     depends_on:
       monster-raid-db:
@@ -326,6 +330,9 @@ services:
       MAX_CONCURRENT_TASKS: 50
       MAX_WEBSOCKET_CONNECTIONS: 100
       RAID_ADDR: ":8088"
+      DISCOVERY_URL: ${DISCOVERY_URL:-http://service-discovery:8090}
+      INSTANCE_BASE_URL: http://monster-raid:8088
+      INSTANCE_WS_PUBLIC_URL: ${MONSTER_RAID_WS_PUBLIC_URL:-ws://localhost:8088}
       RAID_STORAGE: postgres-redis
       DATABASE_URL: postgres://raid:${RAID_DB_PASSWORD}@monster-raid-db:5432/raid?sslmode=disable
       RAID_REDIS_ADDR: monster-raid-redis:6379
