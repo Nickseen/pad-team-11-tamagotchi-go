@@ -1,8 +1,9 @@
 # Lab 3: discovery, scaling and failure contract
 
-Status: **proposal for team review**, tracked by CPR #119. Telegram is the owner's selected
-notification channel. All other new defaults below require confirmation by all four owners
-before dependent implementation PRs merge. The released Lab 2 stack remains documented in README.
+Status: **accepted**, tracked by CPR #119 and confirmed by all four owners in
+[contract PR #135](https://github.com/Nickseen/pad-team-11-tamagotchi-go/pull/135). Telegram is
+the agreed notification channel. This is the shared Lab 3 target contract; release and integration
+status are recorded separately in README.
 
 ## Scope and topology
 
@@ -78,7 +79,7 @@ all UTC timestamps. A lease response contains no credentials. Invalid fields ret
 `404 INSTANCE_NOT_FOUND`; removed instance renewal `409 INSTANCE_REMOVED`. All failures use
 README's common error envelope, timestamp and correlation ID.
 
-Proposed timings: renew every 10 s, lease TTL 30 s, probe every 5 s with 1 s timeout; run the first
+Agreed timings: renew every 10 s, lease TTL 30 s, probe every 5 s with 1 s timeout; run the first
 probe immediately after registration. SD marks ready only after a successful readiness probe.
 A failed/not-ready probe excludes the instance immediately; the next successful probe restores
 it if its lease is valid and it has not been removed by a breaker. Expired leases disappear from
@@ -241,10 +242,11 @@ duplicates after ambiguous provider timeouts remain possible and carry the same 
 
 ## Review gates and rollout evidence
 
-These proposed defaults, endpoints, failure semantics and topology need written confirmation in
-the #119 PR by Nickseen, Vlad, Gabi and Cristi. The contributor-policy minimum of one dev approval
-does not replace that issue-specific gate. Code can be drafted against mocks; dependent changes
-must not merge until the contract is accepted. This document does not claim deployed support.
+These defaults, endpoints, failure semantics and topology were confirmed in the #119 PR by
+Nickseen, Vlad, Gabi and Cristi. That completed issue-specific agreement was separate from the
+normal dev approval policy. Further contract changes follow the CPR contribution workflow and
+must be reviewed before dependent implementation merges. This document alone does not claim
+deployed support; verify the published versions and shared-stack evidence.
 
 1. Agree this contract and bootstrap SD (#120); each contributor owns a separate SD part
    (#121 health, #122 Telegram, #123 removal).
