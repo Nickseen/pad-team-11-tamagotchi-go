@@ -39,3 +39,12 @@ CREATE TABLE IF NOT EXISTS raid.processed_commands (
     result JSONB NOT NULL,
     PRIMARY KEY (raid_id, command_id)
 );
+
+CREATE TABLE IF NOT EXISTS raid.feed_events (
+    sequence BIGSERIAL PRIMARY KEY,
+    raid_id UUID NOT NULL REFERENCES raid.raids(raid_id) ON DELETE CASCADE,
+    event_key TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    UNIQUE (raid_id, event_key)
+);
+CREATE INDEX IF NOT EXISTS feed_events_raid_sequence_idx ON raid.feed_events (raid_id, sequence);
