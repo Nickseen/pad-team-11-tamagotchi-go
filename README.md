@@ -13,6 +13,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Technologies and Communication Patterns](#technologies-and-communication-patterns)
 - [Communication Overview](#communication-overview)
 - [Communication Contract](#communication-contract)
+- [Lab 3 Discovery Contract (proposal)](docs/lab3-discovery-contract.md)
 - [Running the Stack](#running-the-stack)
 - [Postman Collections](#postman-collections)
 - [Open Boundary Decisions](#open-boundary-decisions)
@@ -173,6 +174,10 @@ arrow points from the caller toward the receiver:
   through Gateway.
 
 ![Architecture](docs/architecture.svg)
+
+The [Lab 3 discovery and scaling proposal](docs/lab3-discovery-contract.md) adds a separate
+topology for Service Discovery and domain replicas. It is pending the team review required by
+issue #119; the diagram above describes the released Lab 2 architecture.
 
 Two properties are worth pointing out, because they are the reason the boundaries are drawn this
 way:
