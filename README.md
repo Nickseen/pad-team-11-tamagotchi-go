@@ -1663,16 +1663,16 @@ Delivery rules, uniform across every consumer:
 ## Running the Stack
 
 The repository root holds [`docker-compose.yml`](docker-compose.yml), which uses published
-images without building services locally. Its Lab 3 migration is in progress: Map, Raid, Guild and
-Package Registry already select `3.0.0`, while the SD/dynamic-Gateway/multi-replica topology still
-belongs to #133.
+images without building services locally. Its Lab 3 migration is in progress: Map, Raid, Guild,
+Package Registry, Tamagotchi and Notification already select `3.0.0`, while the
+SD/dynamic-Gateway/multi-replica topology still belongs to #133.
 Do not treat this intermediate configuration as a verified runnable Lab 3 stack. The target
 client REST entry point remains `http://localhost:8080`; service REST calls pass through Gateway.
 
 ### Published Lab 3 baselines and integration status
 
 The first Lab 3 baselines are published and their CPR submodules pin the actual released
-`main` commits. All five `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
+`main` commits. All seven `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
 Git `v3.0.0` tags match the commits below:
 
 | Service | Released main/tag commit | Successful publication |
@@ -1682,6 +1682,8 @@ Git `v3.0.0` tags match the commits below:
 | Service Discovery | `f33c0db` | [main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/40763156371) |
 | Guild | `1efe963` | [main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain) |
 | Package Registry | `6632c94` | [main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain) |
+| Tamagotchi | `6dbc821` | [main CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/workflows/ci.yml?query=branch%3Amain) |
+| Notification | `806a3d7` | [main CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/workflows/ci.yml?query=branch%3Amain) |
 
 SD `3.0.0` contains registration, leases, lookup, status, structured logs and the delivery
 pipeline. Registrations remain pending until a monitor supplies readiness. Monitoring (#121),
@@ -1714,23 +1716,40 @@ go into SD's `DISCOVERY_ALLOWED_ORIGINS`. All Guild replicas share `guild-db` an
 all Registry replicas share `package-registry-db`; the services keep no correctness-critical state
 in memory, so no sticky routing is needed.
 
+Tamagotchi and Notification `3.0.0` ([#130](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/130),
+[#131](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/131)) read `DISCOVERY_URL` and
+`INSTANCE_BASE_URL` and advertise no `wsPublicUrl` (no live channel). They keep serving while unregistered,
+retrying registration with 1-10 s backoff and logging `discovery.unreachable` (SD cannot be reached) or
+`discovery.registration_failed` (SD refused it); their `GET /api/v1/status` is
+ready once the database answers, and SD routes to them only after the registration and a healthy probe. On
+SIGTERM they report not ready and deregister first, then drain for at most 5 s, within Docker's default 10 s
+stop timeout. Replicas apply an event once: each claims the event ID in the shared database before applying
+it, so a second replica receiving it at the same moment waits, then answers `duplicate` once the first has
+committed, or applies the event itself if the first failed. Notification's call to Guild
+(through Gateway) has a circuit breaker and reports failures attributed by Gateway's `X-Upstream-*` headers
+to SD's failure endpoint (#123); Tamagotchi calls no other service, so it has no breaker. For #133, each
+replica block needs its own `INSTANCE_BASE_URL` (e.g. `http://tamagotchi-1:8082`, `http://tamagotchi-2:8082`,
+`http://notification-1:8086`, `http://notification-2:8086`) in SD's `DISCOVERY_ALLOWED_ORIGINS`; Tamagotchi
+replicas share `tamagotchi-db` and Notification replicas share `notification-db`.
+
 ### Docker Hub images
 
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
 and Apple Silicon machines. The table below lists the versions selected by this branch.
-Map, Raid, SD, Guild and Package Registry `3.0.0` use actual released main submodule pins. The
-other services retain their Lab 2 versions; deployment integration remains separate as described above.
+Map, Raid, SD, Guild, Package Registry, Tamagotchi and Notification `3.0.0` use actual released main
+submodule pins. The other services retain their Lab 2 versions; deployment integration remains separate
+as described above.
 
 | Service | Image | Tag | Host port | Store | CPR submodule commit |
 | ------- | ----- | --- | --------- | ----- | -------------------- |
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `2.0.0` | 8080 | — | `ef71c2c` |
 | Service Discovery (baseline; not enabled in Compose) | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.0.0` | — (internal 8090) | In-memory registry | `f33c0db` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `2.0.0` | — | PostgreSQL | `e2421fa` |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `2.2.0` | — | PostgreSQL | `88686bd` |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | — | PostgreSQL | `6dbc821` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | — | PostgreSQL | `6632c94` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `2.0.1` | — | PostgreSQL | `a955e55` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.0.0` | 8085 (WebSocket) | Redis | `7162888` |
-| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `2.2.0` | — | PostgreSQL | `24dacd1` |
+| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | — | PostgreSQL | `806a3d7` |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `3.0.0` | 8087 (WebSocket) | PostgreSQL and Redis | `1efe963` |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.0.0` | 8088 (WebSocket) | PostgreSQL and Redis | `cf4de5c` |
 
