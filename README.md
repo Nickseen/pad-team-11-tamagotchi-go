@@ -1707,19 +1707,18 @@ confirms or corrects it, and this table and the submodule pin change with it bef
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `3.0.0` | planned (#132: discovery, round robin) | 8080 | — | pending |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.0` | planned (monitor #121 and Telegram #122 merged to dev; removal #123 open) | — (internal 8090) | In-memory registry | pending (`3.0.0` is `f33c0db`) |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/40881080297)) | — | PostgreSQL | `8ee4f2e` |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | planned (#130) | — | PostgreSQL | pending |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `6dbc821` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `6632c94` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/40885743058)) | — | PostgreSQL | `63ddb73` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.0.0` | published | 18085, 28085, 38085 (WebSocket) | Redis | `7162888` |
-| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | planned (#131) | — | PostgreSQL | pending |
+| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `806a3d7` |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL and Redis | `1efe963` |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.0.0` | published | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `cf4de5c` |
 
 Every Lab 3 service image must accept the contract's `DISCOVERY_URL`, `INSTANCE_BASE_URL` and, for
-Map, Guild and Raid, `INSTANCE_WS_PUBLIC_URL`, as Map, Raid, Guild, Package Registry, User
-Management and Battle do. A service that names them differently needs its replica blocks adjusted
-here before merge. Package Registry must not advertise a WebSocket origin: Discovery rejects one
-for a service without a live channel.
+Map, Guild and Raid, `INSTANCE_WS_PUBLIC_URL`; all eight released images do. Package Registry,
+Tamagotchi and Notification must not advertise a WebSocket origin: Discovery rejects one for a
+service without a live channel.
 
 Guild and Package Registry `3.0.0` ([#128](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/128),
 [#129](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/129)) keep serving while
@@ -1728,6 +1727,15 @@ unregistered: until Discovery accepts the registration their `GET /api/v1/status
 report not ready, deregister and drain for at most 8 s, so their replicas set
 `stop_grace_period: 15s`. Their replicas share `guild-db`/`guild-redis` and `package-registry-db`;
 neither keeps correctness-critical state in memory, so no sticky routing is needed.
+
+Tamagotchi and Notification `3.0.0` ([#130](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/130),
+[#131](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/131)) also keep serving while
+unregistered, retrying with 1–10 s backoff (`discovery.unreachable` or
+`discovery.registration_failed`). On SIGTERM they report not ready, deregister and drain for at most
+5 s, inside Docker's default 10 s stop timeout, so their replicas set no grace period. Replicas apply
+an event once: each claims the event ID in the shared database first. Notification's call to Guild
+has a circuit breaker that reports failures attributed by the Gateway's `X-Upstream-*` headers;
+Tamagotchi calls no other service. Their replicas share `tamagotchi-db` and `notification-db`.
 
 Every image is published by its repository's CI on a merge to `main`, which pushes the version and
 `latest` and refuses a version that is already published. User Management, Battle, Guild and Package
