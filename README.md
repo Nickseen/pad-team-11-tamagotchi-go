@@ -1663,15 +1663,16 @@ Delivery rules, uniform across every consumer:
 ## Running the Stack
 
 The repository root holds [`docker-compose.yml`](docker-compose.yml), which uses published
-images without building services locally. Its Lab 3 migration is in progress: Map/Raid already
-select `3.0.0`, while the SD/dynamic-Gateway/multi-replica topology still belongs to #133.
+images without building services locally. Its Lab 3 migration is in progress: Map, Raid, Guild and
+Package Registry already select `3.0.0`, while the SD/dynamic-Gateway/multi-replica topology still
+belongs to #133.
 Do not treat this intermediate configuration as a verified runnable Lab 3 stack. The target
 client REST entry point remains `http://localhost:8080`; service REST calls pass through Gateway.
 
 ### Published Lab 3 baselines and integration status
 
 The first Lab 3 baselines are published and their CPR submodules pin the actual released
-`main` commits. All three `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
+`main` commits. All five `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
 Git `v3.0.0` tags match the commits below:
 
 | Service | Released main/tag commit | Successful publication |
@@ -1679,6 +1680,8 @@ Git `v3.0.0` tags match the commits below:
 | Map | `7162888` | [main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/40758224891) |
 | Monster Raid | `cf4de5c` | [main CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/40758144433) |
 | Service Discovery | `f33c0db` | [main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/40763156371) |
+| Guild | `1efe963` | [main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain) |
+| Package Registry | `6632c94` | [main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain) |
 
 SD `3.0.0` contains registration, leases, lookup, status, structured logs and the delivery
 pipeline. Registrations remain pending until a monitor supplies readiness. Monitoring (#121),
@@ -1697,12 +1700,26 @@ the existing Map/Raid names, but the complete SD/multi-replica topology is still
 publication and submodule pins alone do not make this a runnable, fully integrated Lab 3 stack.
 SD is recorded below as a published baseline; it is not yet enabled in this Compose file.
 
+Guild and Package Registry `3.0.0` ([#128](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/128),
+[#129](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/129)) read `DISCOVERY_URL` and
+`INSTANCE_BASE_URL`; Guild also needs `INSTANCE_WS_PUBLIC_URL`, while Registry must not advertise one
+(SD rejects it for a service without a live channel). Unlike Map/Raid they keep serving while
+unregistered: until SD accepts the registration their `GET /api/v1/status` reports `ready: false`
+and they retry registration with 1-10 s backoff, logging `discovery.unavailable`. On SIGTERM they
+report not ready, deregister and drain for at most 8 s (`stop_grace_period: 15s`). For #133, each
+replica block needs its own `INSTANCE_BASE_URL` (e.g. `http://guild-1:8087`, `http://guild-2:8087`,
+`http://package-registry-1:8083`), Guild replicas need distinct host ports and
+`INSTANCE_WS_PUBLIC_URL` (e.g. `ws://localhost:18087`, `ws://localhost:28087`), and the same origins
+go into SD's `DISCOVERY_ALLOWED_ORIGINS`. All Guild replicas share `guild-db` and `guild-redis`, and
+all Registry replicas share `package-registry-db`; the services keep no correctness-critical state
+in memory, so no sticky routing is needed.
+
 ### Docker Hub images
 
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
 and Apple Silicon machines. The table below lists the versions selected by this branch.
-Map, Raid and SD `3.0.0` use actual released main submodule pins. The other services retain
-their Lab 2 versions; deployment integration remains separate as described above.
+Map, Raid, SD, Guild and Package Registry `3.0.0` use actual released main submodule pins. The
+other services retain their Lab 2 versions; deployment integration remains separate as described above.
 
 | Service | Image | Tag | Host port | Store | CPR submodule commit |
 | ------- | ----- | --- | --------- | ----- | -------------------- |
@@ -1710,11 +1727,11 @@ their Lab 2 versions; deployment integration remains separate as described above
 | Service Discovery (baseline; not enabled in Compose) | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.0.0` | — (internal 8090) | In-memory registry | `f33c0db` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `2.0.0` | — | PostgreSQL | `e2421fa` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `2.2.0` | — | PostgreSQL | `88686bd` |
-| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `2.1.0` | — | PostgreSQL | `15fbabe` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | — | PostgreSQL | `6632c94` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `2.0.1` | — | PostgreSQL | `a955e55` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.0.0` | 8085 (WebSocket) | Redis | `7162888` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `2.2.0` | — | PostgreSQL | `24dacd1` |
-| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `2.1.0` | 8087 (WebSocket) | PostgreSQL and Redis | `dec0223` |
+| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `3.0.0` | 8087 (WebSocket) | PostgreSQL and Redis | `1efe963` |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.0.0` | 8088 (WebSocket) | PostgreSQL and Redis | `cf4de5c` |
 
 Every image is published by its repository's CI on a merge to `main`, which pushes the version and
