@@ -1724,7 +1724,8 @@ retrying registration with 1-10 s backoff and logging `discovery.unreachable` (S
 ready once the database answers, and SD routes to them only after the registration and a healthy probe. On
 SIGTERM they report not ready and deregister first, then drain for at most 5 s, within Docker's default 10 s
 stop timeout. Replicas apply an event once: each claims the event ID in the shared database before applying
-it, so a second replica receiving it at the same moment answers `duplicate`. Notification's call to Guild
+it, so a second replica receiving it at the same moment waits, then answers `duplicate` once the first has
+committed, or applies the event itself if the first failed. Notification's call to Guild
 (through Gateway) has a circuit breaker and reports failures attributed by Gateway's `X-Upstream-*` headers
 to SD's failure endpoint (#123); Tamagotchi calls no other service, so it has no breaker. For #133, each
 replica block needs its own `INSTANCE_BASE_URL` (e.g. `http://tamagotchi-1:8082`, `http://tamagotchi-2:8082`,
