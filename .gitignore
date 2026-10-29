@@ -1,2 +1,5 @@
 # Local configuration and secrets
 .env
+
+# The shared User Management signing key the Compose stack mounts
+secrets/
