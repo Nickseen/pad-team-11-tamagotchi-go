@@ -109,6 +109,7 @@ x-package-registry-env: &package-registry-env
 x-package-registry: &package-registry
   image: gabimiric/tamagotchi-package-registry:3.0.0
   restart: on-failure
+  stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
     package-registry-db:
       condition: service_healthy
@@ -182,6 +183,7 @@ x-guild-env: &guild-env
 x-guild: &guild
   image: gabimiric/tamagotchi-guild:3.0.0
   restart: on-failure
+  stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
     guild-db:
       condition: service_healthy
