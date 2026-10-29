@@ -1706,7 +1706,7 @@ confirms or corrects it, and this table and the submodule pin change with it bef
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `3.0.0` | planned (#132: discovery, round robin) | 8080 | — | pending |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.0` | planned (monitor #121 and Telegram #122 merged to dev; removal #123 open) | — (internal 8090) | In-memory registry | pending (`3.0.0` is `f33c0db`) |
-| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `3.0.0` | planned (#126 merged to dev) | — | PostgreSQL | pending |
+| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/40881080297)) | — | PostgreSQL | `8ee4f2e` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | planned (#130) | — | PostgreSQL | pending |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `6632c94` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `3.0.0` | planned (#127 in review) | — | PostgreSQL | pending |
