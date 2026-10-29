@@ -1719,7 +1719,8 @@ in memory, so no sticky routing is needed.
 Tamagotchi and Notification `3.0.0` ([#130](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/130),
 [#131](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/131)) read `DISCOVERY_URL` and
 `INSTANCE_BASE_URL` and advertise no `wsPublicUrl` (no live channel). They keep serving while unregistered,
-retrying registration with 1-10 s backoff and logging `discovery.unreachable`; their `GET /api/v1/status` is
+retrying registration with 1-10 s backoff and logging `discovery.unreachable` (SD cannot be reached) or
+`discovery.registration_failed` (SD refused it); their `GET /api/v1/status` is
 ready once the database answers, and SD routes to them only after the registration and a healthy probe. On
 SIGTERM they report not ready and deregister first, then drain for at most 5 s, within Docker's default 10 s
 stop timeout. Replicas apply an event once: each claims the event ID in the shared database before applying
