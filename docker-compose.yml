@@ -149,8 +149,9 @@ services:
       test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
 
   package-registry:
-    image: gabimiric/tamagotchi-package-registry:2.1.0
+    image: gabimiric/tamagotchi-package-registry:3.0.0
     restart: on-failure
+    stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
     depends_on:
       package-registry-db:
         condition: service_healthy
@@ -158,6 +159,8 @@ services:
       <<: *gateway-context
       MAX_CONCURRENT_TASKS: 64
       DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@package-registry-db:5432/registry
+      DISCOVERY_URL: ${DISCOVERY_URL:-http://service-discovery:8090}
+      INSTANCE_BASE_URL: http://package-registry:8083 # no wsPublicUrl: no live channel
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"]
@@ -273,8 +276,9 @@ services:
       REDISCLI_AUTH: ${GUILD_REDIS_PASSWORD}
 
   guild:
-    image: gabimiric/tamagotchi-guild:2.1.0
+    image: gabimiric/tamagotchi-guild:3.0.0
     restart: on-failure
+    stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
     depends_on:
       guild-db:
         condition: service_healthy
@@ -290,6 +294,9 @@ services:
       GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
       CHAT_BROKER: redis
       REDIS_URL: redis://:${GUILD_REDIS_PASSWORD}@guild-redis:6379/0
+      DISCOVERY_URL: ${DISCOVERY_URL:-http://service-discovery:8090}
+      INSTANCE_BASE_URL: http://guild:8087
+      INSTANCE_WS_PUBLIC_URL: ${GUILD_WS_PUBLIC_URL:-ws://localhost:8087}
     healthcheck:
       <<: *python-healthcheck
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8087/health')"]
