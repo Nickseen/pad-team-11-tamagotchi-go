@@ -1672,7 +1672,7 @@ client REST entry point remains `http://localhost:8080`; service REST calls pass
 ### Published Lab 3 baselines and integration status
 
 The first Lab 3 baselines are published and their CPR submodules pin the actual released
-`main` commits. All seven `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
+`main` commits. All eight `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
 Git `v3.0.0` tags match the commits below:
 
 | Service | Released main/tag commit | Successful publication |
@@ -1684,6 +1684,7 @@ Git `v3.0.0` tags match the commits below:
 | Package Registry | `6632c94` | [main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain) |
 | Tamagotchi | `6dbc821` | [main CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/workflows/ci.yml?query=branch%3Amain) |
 | Notification | `806a3d7` | [main CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/workflows/ci.yml?query=branch%3Amain) |
+| API Gateway | `1e64f48` | [main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277) |
 
 SD `3.0.0` contains registration, leases, lookup, status, structured logs and the delivery
 pipeline. Registrations remain pending until a monitor supplies readiness. Monitoring (#121),
@@ -1732,6 +1733,9 @@ replica block needs its own `INSTANCE_BASE_URL` (e.g. `http://tamagotchi-1:8082`
 `http://notification-1:8086`, `http://notification-2:8086`) in SD's `DISCOVERY_ALLOWED_ORIGINS`; Tamagotchi
 replicas share `tamagotchi-db` and Notification replicas share `notification-db`.
 
+API Gateway `3.0.0` ([#132](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/132)) routes through Service
+Discovery and needs it in the stack, so this Compose file still runs Gateway `2.0.0` until #133 switches it.
+
 ### Docker Hub images
 
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
@@ -1742,7 +1746,7 @@ as described above.
 
 | Service | Image | Tag | Host port | Store | CPR submodule commit |
 | ------- | ----- | --- | --------- | ----- | -------------------- |
-| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `2.0.0` | 8080 | — | `ef71c2c` |
+| API Gateway (`3.0.0` released, enabled with #133) | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `2.0.0` | 8080 | — | `1e64f48` (`v3.0.0`) |
 | Service Discovery (baseline; not enabled in Compose) | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.0.0` | — (internal 8090) | In-memory registry | `f33c0db` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `2.0.0` | — | PostgreSQL | `e2421fa` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | — | PostgreSQL | `6dbc821` |
