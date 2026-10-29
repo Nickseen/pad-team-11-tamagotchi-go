@@ -8,12 +8,13 @@
 #   openssl genrsa -out secrets/jwt-signing-key.pem 2048   # one key for every User Management replica
 #   chmod 644 secrets/jwt-signing-key.pem                  # the distroless image runs as non-root
 #   docker compose up -d                                   # two replicas of every service
+#   docker compose --profile scale-battle up -d            # plus battle-3; scale-all adds every -3
 #
 # Clients reach the system only through the Gateway on localhost:8080, as /<service>/api/v1/...;
 # services call each other through it too, at http://gateway:8080. The Gateway routes each request
 # round-robin over the replicas Service Discovery reports ready, so no service has a fixed address.
 # Map, Guild and Monster Raid replicas also publish one host port each (map-1 18085, map-2 28085,
-# likewise 1808x/2808x for Guild and Raid), because clients open their
+# map-3 38085, likewise 1808x/2808x/3808x for Guild and Raid), because clients open their
 # WebSockets directly to the replica named in their Gateway ticket. Nothing else, Service Discovery
 # included, is reachable from the host.
 #
@@ -231,9 +232,9 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       # The only origins a replica may register: its internal base URL and, for the three live
-      # services, its own published WebSocket origin.
+      # services, its own published WebSocket origin. -3 entries serve the optional third replicas.
       DISCOVERY_ALLOWED_ORIGINS: >-
-        {"user-management":{"baseUrls":["http://user-management-1:8081","http://user-management-2:8081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082"]},"package-registry":{"baseUrls":["http://package-registry-1:8083","http://package-registry-2:8083"]},"battle":{"baseUrls":["http://battle-1:8084","http://battle-2:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088"]}}
+        {"user-management":{"baseUrls":["http://user-management-1:8081","http://user-management-2:8081","http://user-management-3:8081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082","http://tamagotchi-3:8082"]},"package-registry":{"baseUrls":["http://package-registry-1:8083","http://package-registry-2:8083","http://package-registry-3:8083"]},"battle":{"baseUrls":["http://battle-1:8084","http://battle-2:8084","http://battle-3:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085","http://map-3:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085","ws://localhost:38085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086","http://notification-3:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087","http://guild-3:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087","ws://localhost:38087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088","http://monster-raid-3:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088","ws://localhost:38088"]}}
     # Internal only: no host port. Replicas, the Gateway and probes reach it on the Compose network.
 
   # --- API Gateway ----------------------------------------------------------------------------------
@@ -282,6 +283,13 @@ services:
       <<: *user-management-env
       INSTANCE_BASE_URL: http://user-management-2:8081
 
+  user-management-3:
+    <<: *user-management
+    profiles: [scale-user-management, scale-all] # the optional third replica
+    environment:
+      <<: *user-management-env
+      INSTANCE_BASE_URL: http://user-management-3:8081
+
   # --- Tamagotchi -----------------------------------------------------------------------------------
   tamagotchi-db:
     <<: *postgres
@@ -306,6 +314,13 @@ services:
     environment:
       <<: *tamagotchi-env
       INSTANCE_BASE_URL: http://tamagotchi-2:8082
+
+  tamagotchi-3:
+    <<: *tamagotchi
+    profiles: [scale-tamagotchi, scale-all] # the optional third replica
+    environment:
+      <<: *tamagotchi-env
+      INSTANCE_BASE_URL: http://tamagotchi-3:8082
 
   # --- Package Registry -----------------------------------------------------------------------------
   package-registry-db:
@@ -332,6 +347,13 @@ services:
       <<: *package-registry-env
       INSTANCE_BASE_URL: http://package-registry-2:8083
 
+  package-registry-3:
+    <<: *package-registry
+    profiles: [scale-package-registry, scale-all] # the optional third replica
+    environment:
+      <<: *package-registry-env
+      INSTANCE_BASE_URL: http://package-registry-3:8083
+
   # --- Battle ---------------------------------------------------------------------------------------
   battle-db:
     <<: *postgres
@@ -356,6 +378,13 @@ services:
     environment:
       <<: *battle-env
       INSTANCE_BASE_URL: http://battle-2:8084
+
+  battle-3:
+    <<: *battle
+    profiles: [scale-battle, scale-all] # the optional third replica
+    environment:
+      <<: *battle-env
+      INSTANCE_BASE_URL: http://battle-3:8084
 
   # --- Map ------------------------------------------------------------------------------------------
   map-redis:
@@ -384,6 +413,16 @@ services:
     ports:
       - "28085:8085" # this replica's direct WebSocket origin
 
+  map-3:
+    <<: *map
+    profiles: [scale-map, scale-all] # the optional third replica
+    environment:
+      <<: *map-env
+      INSTANCE_BASE_URL: http://map-3:8085
+      INSTANCE_WS_PUBLIC_URL: ws://localhost:38085
+    ports:
+      - "38085:8085" # this replica's direct WebSocket origin
+
   # --- Notification ---------------------------------------------------------------------------------
   notification-db:
     <<: *postgres
@@ -408,6 +447,13 @@ services:
     environment:
       <<: *notification-env
       INSTANCE_BASE_URL: http://notification-2:8086
+
+  notification-3:
+    <<: *notification
+    profiles: [scale-notification, scale-all] # the optional third replica
+    environment:
+      <<: *notification-env
+      INSTANCE_BASE_URL: http://notification-3:8086
 
   # --- Guild ----------------------------------------------------------------------------------------
   guild-db:
@@ -445,6 +491,16 @@ services:
       INSTANCE_WS_PUBLIC_URL: ws://localhost:28087
     ports:
       - "28087:8087" # this replica's direct WebSocket origin
+
+  guild-3:
+    <<: *guild
+    profiles: [scale-guild, scale-all] # the optional third replica
+    environment:
+      <<: *guild-env
+      INSTANCE_BASE_URL: http://guild-3:8087
+      INSTANCE_WS_PUBLIC_URL: ws://localhost:38087
+    ports:
+      - "38087:8087" # this replica's direct WebSocket origin
 
   # --- Monster Raid ---------------------------------------------------------------------------------
   monster-raid-db:
@@ -484,6 +540,16 @@ services:
       INSTANCE_WS_PUBLIC_URL: ws://localhost:28088
     ports:
       - "28088:8088" # this replica's direct WebSocket origin
+
+  monster-raid-3:
+    <<: *monster-raid
+    profiles: [scale-monster-raid, scale-all] # the optional third replica
+    environment:
+      <<: *monster-raid-env
+      INSTANCE_BASE_URL: http://monster-raid-3:8088
+      INSTANCE_WS_PUBLIC_URL: ws://localhost:38088
+    ports:
+      - "38088:8088" # this replica's direct WebSocket origin
 
 secrets:
   jwt-signing-key:
