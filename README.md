@@ -1672,9 +1672,11 @@ Service Discovery, **two replicas of each of the eight services** (an optional t
 demonstration) and the stores each service owns. The client entry point stays
 `http://localhost:8080`, and services still call each other through the Gateway.
 
-> **[#133](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/133).** Every image this file
-> selects is published (see the table below). The shared-stack evidence from
-> [Lab 3 checks](#lab-3-checks) is recorded in #133; final Grade 10 evidence belongs to #134.
+> **Draft for [#133](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/133).** The file
+> selects the released image versions listed below. `docker compose config` validates the topology;
+> publication alone does not verify service integration. Do not treat
+> it as a verified Lab 3 stack before the shared-stack checks in
+> [Lab 3 checks](#lab-3-checks) pass; final Grade 10 evidence belongs to #134.
 
 ### Lab 3 topology
 
@@ -1696,13 +1698,14 @@ replica validates against the key set of every other.
 ### Docker Hub images
 
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
-and Apple Silicon machines. The table below lists the versions this Compose file selects, each
-with its publication run and the released commit its CPR submodule pins.
+and Apple Silicon machines. The table below lists the versions this Compose file selects and
+their publication evidence. Image tags and submodule pins must refer to the same released main
+commit; updating these references does not complete the shared-stack checks below.
 
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `3.0.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277)) | 8080 | — | `1e64f48` |
-| Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.1` | published ([main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/41046178076); monitor, Telegram, removal) | — (internal 8090) | In-memory registry | `d543b3e` |
+| Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.1` | published ([main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/41046178076)) | — (internal 8090) | In-memory registry | `d543b3e` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/40881080297)) | — | PostgreSQL | `8ee4f2e` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `6dbc821` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `6632c94` |
