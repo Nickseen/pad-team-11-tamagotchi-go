@@ -70,7 +70,9 @@ x-gateway-context: &gateway-context
 # own origins, so no two processes ever advertise the same address.
 x-user-management-env: &user-management-env
   <<: *gateway-context
-  MAX_CONCURRENT_TASKS: 50
+  # bcrypt costs ~200 ms of CPU per login: admit no more than the 10-connection database pool, so excess
+  # logins get 429 instead of queueing past TASK_TIMEOUT_MS (contract: overload, timeouts and the last replica).
+  MAX_CONCURRENT_TASKS: 10
   DATABASE_URL: postgres://usermgmt:${USERMGMT_DB_PASSWORD}@user-management-db:5432/usermgmt?sslmode=disable
   JWT_ISSUER: user-management
   JWT_AUDIENCE: tamagotchi-go

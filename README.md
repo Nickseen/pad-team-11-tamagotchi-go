@@ -1806,9 +1806,16 @@ service's `503 TASK_TIMEOUT` reaches the client before the Gateway would answer 
 | Service | `MAX_CONCURRENT_TASKS` | `MAX_WEBSOCKET_CONNECTIONS` |
 | ------- | ---------------------- | --------------------------- |
 | API Gateway | `MAX_IN_FLIGHT_REQUESTS=100` | — |
-| User Management, Battle, Map, Monster Raid | `50` | Map and Raid: `100` |
+| Battle, Map, Monster Raid | `50` | Map and Raid: `100` |
+| User Management | `10` | — |
 | Tamagotchi, Notification | `10` | — |
 | Package Registry, Guild | `64` | Guild: `100` |
+
+The limits are per replica. User Management's is 10, its database pool size, because every login
+spends about 200 ms of CPU on bcrypt: at 50 per replica a login flood queued requests past the
+3000 ms budget, the Gateway counted the resulting `503 TASK_TIMEOUT`s as failures and Discovery
+removed both replicas. At 10 the same flood is answered with `429` and logins stay under 1 s, as
+the contract's "Overload, timeouts and the last replica" requires.
 
 ### Start
 
