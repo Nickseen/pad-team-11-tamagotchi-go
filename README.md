@@ -1663,45 +1663,47 @@ Delivery rules, uniform across every consumer:
 ## Running the Stack
 
 The repository root holds [`docker-compose.yml`](docker-compose.yml), which uses published
-images without building services locally. Its Lab 3 migration is in progress: Map, Raid, Guild,
-Package Registry, Tamagotchi and Notification already select `3.0.0`, while the
+images without building services locally. Its Lab 3 migration is in progress: Map and Raid already select `3.1.0`; Guild, Package Registry, Tamagotchi and Notification
+select `3.0.0`, while the
 SD/dynamic-Gateway/multi-replica topology still belongs to #133.
 Do not treat this intermediate configuration as a verified runnable Lab 3 stack. The target
 client REST entry point remains `http://localhost:8080`; service REST calls pass through Gateway.
 
 ### Published Lab 3 baselines and integration status
 
-The first Lab 3 baselines are published and their CPR submodules pin the actual released
-`main` commits. All eight `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
-Git `v3.0.0` tags match the commits below:
+The published Lab 3 releases below pin their actual released `main` commits. Their images
+provide linux/amd64 and linux/arm64 manifests; Git `v<version>` tags match the listed commits.
 
-| Service | Released main/tag commit | Successful publication |
-| --- | --- | --- |
-| Map | `7162888` | [main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/40758224891) |
-| Monster Raid | `cf4de5c` | [main CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/40758144433) |
-| Service Discovery | `f33c0db` | [main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/40763156371) |
-| Guild | `1efe963` | [main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain) |
-| Package Registry | `6632c94` | [main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain) |
-| Tamagotchi | `6dbc821` | [main CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/workflows/ci.yml?query=branch%3Amain) |
-| Notification | `806a3d7` | [main CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/workflows/ci.yml?query=branch%3Amain) |
-| API Gateway | `1e64f48` | [main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277) |
+| Service | Version | Released main/tag commit | Successful publication |
+| --- | --- | --- | --- |
+| Map | `3.1.0` | `4e48e9a` | [main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/41043807490) |
+| Monster Raid | `3.1.0` | `3464216` | [main CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/41043899252) |
+| Service Discovery | `3.1.1` | `d543b3e` | [main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/41046178076) |
+| Guild | `3.0.0` | `1efe963` | [main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain) |
+| Package Registry | `3.0.0` | `6632c94` | [main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain) |
+| Tamagotchi | `3.0.0` | `6dbc821` | [main CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/workflows/ci.yml?query=branch%3Amain) |
+| Notification | `3.0.0` | `806a3d7` | [main CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/workflows/ci.yml?query=branch%3Amain) |
+| API Gateway | `3.0.0` | `1e64f48` | [main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277) |
 
-SD `3.0.0` contains registration, leases, lookup, status, structured logs and the delivery
-pipeline. Registrations remain pending until a monitor supplies readiness. Monitoring (#121),
-Telegram (#122) and threshold removal (#123) are separate dev PRs, followed by a combined
-compatible release such as `3.1.0`; there is no release after every contributor or dev commit.
-The final stack must select an SD version containing the required monitoring/removal/alert behavior.
+SD `3.1.1` combines the registry, leases, lookup and status with periodic monitoring (#121),
+Telegram (#122), threshold removal (#123) and the reviewed release-audit fixes. Its image and
+Git tag are verified against `d543b3e`; this patch also includes the basic Postman examples. Telegram requires deployment credentials, or explicitly
+`ALERTS_ENABLED=false` for local test mode; this publication is not a claim of full-stack evidence.
+
+Map/Raid `3.1.0` releases are tracked in [Map #18](https://github.com/Nickseen/tamagotchi-map/pull/18)
+and [Raid #21](https://github.com/Nickseen/tamagotchi-monster-raid/pull/21). Both main publications
+succeeded; CPR selects their `3.1.0` images and the actual released main/tag commits above.
 
 [Compose integration #133](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/133)
 still needs compatible SD/Gateway versions and two explicit replica blocks per domain service,
 with deployment-allowlisted HTTP/WebSocket origins. Verify registration/readiness, cross-replica
 sockets and failure isolation before cutover; final Grade 10 evidence belongs to #134.
 
-Map/Raid `3.0.0` require `DISCOVERY_URL`, `INSTANCE_BASE_URL` and `INSTANCE_WS_PUBLIC_URL`, and
+Map/Raid `3.1.0` require `DISCOVERY_URL`, `INSTANCE_BASE_URL` and `INSTANCE_WS_PUBLIC_URL`, and
 reject new admissions until registered. The current Compose entries contain those variables for
 the existing Map/Raid names, but the complete SD/multi-replica topology is still #133. Image
 publication and submodule pins alone do not make this a runnable, fully integrated Lab 3 stack.
-SD is recorded below as a published baseline; it is not yet enabled in this Compose file.
+SD is recorded below as a published release; the shared topology is still the separate #133 cutover.
 
 Guild and Package Registry `3.0.0` ([#128](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/128),
 [#129](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/129)) read `DISCOVERY_URL` and
@@ -1740,22 +1742,22 @@ Discovery and needs it in the stack, so this Compose file still runs Gateway `2.
 
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
 and Apple Silicon machines. The table below lists the versions selected by this branch.
-Map, Raid, SD, Guild, Package Registry, Tamagotchi and Notification `3.0.0` use actual released main
-submodule pins. The other services retain their Lab 2 versions; deployment integration remains separate
+Map/Raid `3.1.0`, SD `3.1.1`, and Guild, Package Registry, Tamagotchi and Notification `3.0.0`
+use actual released main submodule pins. The other services retain their Lab 2 versions; deployment integration remains separate
 as described above.
 
 | Service | Image | Tag | Host port | Store | CPR submodule commit |
 | ------- | ----- | --- | --------- | ----- | -------------------- |
 | API Gateway (`3.0.0` released, enabled with #133) | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `2.0.0` | 8080 | — | `1e64f48` (`v3.0.0`) |
-| Service Discovery (baseline; not enabled in Compose) | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.0.0` | — (internal 8090) | In-memory registry | `f33c0db` |
+| Service Discovery (not enabled in Compose) | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.1` | — (internal 8090) | In-memory registry | `d543b3e` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `2.0.0` | — | PostgreSQL | `e2421fa` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | — | PostgreSQL | `6dbc821` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | — | PostgreSQL | `6632c94` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `2.0.1` | — | PostgreSQL | `a955e55` |
-| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.0.0` | 8085 (WebSocket) | Redis | `7162888` |
+| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.1.0` | 8085 (WebSocket) | Redis | `4e48e9a` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | — | PostgreSQL | `806a3d7` |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `3.0.0` | 8087 (WebSocket) | PostgreSQL and Redis | `1efe963` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.0.0` | 8088 (WebSocket) | PostgreSQL and Redis | `cf4de5c` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.1.0` | 8088 (WebSocket) | PostgreSQL and Redis | `3464216` |
 
 Every image is published by its repository's CI on a merge to `main`, which pushes the version and
 `latest` and refuses a version that is already published. User Management, Battle, Guild and Package
@@ -1898,7 +1900,7 @@ which keeps it runnable on its own.
 ## Postman Collections
 
 The [`postman/`](postman/) directory contains one collection for every service and one shared
-environment. Every collection calls its service through the Gateway at
+environment. Domain collections call their service through the Gateway at
 `{{gatewayUrl}}/<serviceSlug>/api/v1/...`: user requests carry a Bearer token, which the Gateway
 validates and replaces with its trusted headers, and service requests carry only
 `X-Service-Token`. Each setup folder registers and logs in its own users, so no credential is
@@ -1921,6 +1923,11 @@ The environment `tamagotchi-go.postman_environment.json` defines `gatewayUrl`
 (`http://localhost:8080`), `guildUrl` for Guild's health probe, `packageId` for test-user
 registration, `serviceToken` as a placeholder and `battleDependencyMode`, which must match Battle's
 `DEPENDENCY_MODE` (`live` by default).
+
+Map/Raid collections include `/api/v1/status` through Gateway. The basic
+`service-discovery.postman_collection.json` runs from the internal network using `discoveryUrl`
+and `serviceToken`, with no public SD port. Use `discoveryService` for lookup; manual control
+requests require a dedicated test instance UUID in `discoveryInstanceId` and matching body.
 
 ### Import and configure
 
