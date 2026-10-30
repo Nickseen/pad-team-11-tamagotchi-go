@@ -1671,26 +1671,28 @@ client REST entry point remains `http://localhost:8080`; service REST calls pass
 
 ### Published Lab 3 baselines and integration status
 
-The first Lab 3 baselines are published and their CPR submodules pin the actual released
-`main` commits. All eight `3.0.0` images provide linux/amd64 and linux/arm64 manifests, and
-Git `v3.0.0` tags match the commits below:
+The published Lab 3 releases below pin their actual released `main` commits. Their images
+provide linux/amd64 and linux/arm64 manifests; Git `v<version>` tags match the listed commits.
 
-| Service | Released main/tag commit | Successful publication |
-| --- | --- | --- |
-| Map | `7162888` | [main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/40758224891) |
-| Monster Raid | `cf4de5c` | [main CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/40758144433) |
-| Service Discovery | `f33c0db` | [main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/40763156371) |
-| Guild | `1efe963` | [main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain) |
-| Package Registry | `6632c94` | [main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain) |
-| Tamagotchi | `6dbc821` | [main CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/workflows/ci.yml?query=branch%3Amain) |
-| Notification | `806a3d7` | [main CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/workflows/ci.yml?query=branch%3Amain) |
-| API Gateway | `1e64f48` | [main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277) |
+| Service | Version | Released main/tag commit | Successful publication |
+| --- | --- | --- | --- |
+| Map | `3.0.0` | `7162888` | [main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/40758224891) |
+| Monster Raid | `3.0.0` | `cf4de5c` | [main CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/40758144433) |
+| Service Discovery | `3.1.0` | `ad4700c` | [main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/41035537285) |
+| Guild | `3.0.0` | `1efe963` | [main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain) |
+| Package Registry | `3.0.0` | `6632c94` | [main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain) |
+| Tamagotchi | `3.0.0` | `6dbc821` | [main CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/workflows/ci.yml?query=branch%3Amain) |
+| Notification | `3.0.0` | `806a3d7` | [main CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/workflows/ci.yml?query=branch%3Amain) |
+| API Gateway | `3.0.0` | `1e64f48` | [main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277) |
 
-SD `3.0.0` contains registration, leases, lookup, status, structured logs and the delivery
-pipeline. Registrations remain pending until a monitor supplies readiness. Monitoring (#121),
-Telegram (#122) and threshold removal (#123) are separate dev PRs, followed by a combined
-compatible release such as `3.1.0`; there is no release after every contributor or dev commit.
-The final stack must select an SD version containing the required monitoring/removal/alert behavior.
+SD `3.1.0` combines the registry, leases, lookup and status with periodic monitoring (#121),
+Telegram (#122), threshold removal (#123) and the reviewed release-audit fixes. Its image and
+Git tag are verified against `ad4700c`. Telegram requires deployment credentials, or explicitly
+`ALERTS_ENABLED=false` for local test mode; this publication is not a claim of full-stack evidence.
+
+Map/Raid `3.1.0` preparation is tracked in [Map #17](https://github.com/Nickseen/tamagotchi-map/pull/17)
+and [Raid #20](https://github.com/Nickseen/tamagotchi-monster-raid/pull/20). Until their reviewed
+main publications succeed, CPR keeps their published `3.0.0` images and actual released pins.
 
 [Compose integration #133](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/133)
 still needs compatible SD/Gateway versions and two explicit replica blocks per domain service,
@@ -1701,7 +1703,7 @@ Map/Raid `3.0.0` require `DISCOVERY_URL`, `INSTANCE_BASE_URL` and `INSTANCE_WS_P
 reject new admissions until registered. The current Compose entries contain those variables for
 the existing Map/Raid names, but the complete SD/multi-replica topology is still #133. Image
 publication and submodule pins alone do not make this a runnable, fully integrated Lab 3 stack.
-SD is recorded below as a published baseline; it is not yet enabled in this Compose file.
+SD is recorded below as a published release; the shared topology is still the separate #133 cutover.
 
 Guild and Package Registry `3.0.0` ([#128](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/128),
 [#129](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/129)) read `DISCOVERY_URL` and
@@ -1747,7 +1749,7 @@ as described above.
 | Service | Image | Tag | Host port | Store | CPR submodule commit |
 | ------- | ----- | --- | --------- | ----- | -------------------- |
 | API Gateway (`3.0.0` released, enabled with #133) | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `2.0.0` | 8080 | — | `1e64f48` (`v3.0.0`) |
-| Service Discovery (baseline; not enabled in Compose) | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.0.0` | — (internal 8090) | In-memory registry | `f33c0db` |
+| Service Discovery (not enabled in Compose) | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.0` | — (internal 8090) | In-memory registry | `ad4700c` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `2.0.0` | — | PostgreSQL | `e2421fa` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | — | PostgreSQL | `6dbc821` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | — | PostgreSQL | `6632c94` |
