@@ -147,7 +147,7 @@ x-map-env: &map-env
   MAP_EVENTS_MODE: disabled # the stack has no RabbitMQ yet
 
 x-map: &map
-  image: nickseen/tamagotchi-map:3.0.0 # its image declares the /healthz check
+  image: nickseen/tamagotchi-map:3.1.0 # its image declares the /healthz check
   restart: on-failure # a single Redis ping at start-up, no retry
   depends_on:
     map-redis:
@@ -209,7 +209,7 @@ x-monster-raid-env: &monster-raid-env
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
 
 x-monster-raid: &monster-raid
-  image: nickseen/tamagotchi-monster-raid:3.0.0 # its image declares the /healthz check
+  image: nickseen/tamagotchi-monster-raid:3.1.0 # its image declares the /healthz check
   restart: on-failure
   depends_on:
     monster-raid-db:
@@ -220,7 +220,7 @@ x-monster-raid: &monster-raid
 services:
   # --- Service Discovery ----------------------------------------------------------------------------
   service-discovery:
-    image: nickseen/tamagotchi-service-discovery:3.1.0 # monitor, Telegram and removal; its image declares the status check
+    image: nickseen/tamagotchi-service-discovery:3.1.1 # monitor, Telegram and removal; its image declares the status check
     restart: unless-stopped
     environment:
       PORT: 8090

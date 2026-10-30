@@ -1673,8 +1673,8 @@ demonstration) and the stores each service owns. The client entry point stays
 `http://localhost:8080`, and services still call each other through the Gateway.
 
 > **Draft for [#133](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/133).** The file
-> selects the planned Lab 3 releases, most of which are not published yet (see the table below).
-> `docker compose config` validates it today; the stack runs once every image exists. Do not treat
+> selects the released image versions listed below. `docker compose config` validates the topology;
+> publication alone does not verify service integration. Do not treat
 > it as a verified Lab 3 stack before the shared-stack checks in
 > [Lab 3 checks](#lab-3-checks) pass; final Grade 10 evidence belongs to #134.
 
@@ -1699,21 +1699,21 @@ replica validates against the key set of every other.
 
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
 and Apple Silicon machines. The table below lists the versions this Compose file selects and
-whether each is published yet. A tag marked *planned* is the owner's next Lab 3 release; the owner
-confirms or corrects it, and this table and the submodule pin change with it before merge.
+their publication evidence. Image tags and submodule pins must refer to the same released main
+commit; updating these references does not complete the shared-stack checks below.
 
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `3.0.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277)) | 8080 | — | `1e64f48` |
-| Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.0` | planned (monitor #121, Telegram #122 and removal #123 merged to dev; release pending) | — (internal 8090) | In-memory registry | pending (`3.0.0` is `f33c0db`) |
+| Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.1` | published ([main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/41046178076)) | — (internal 8090) | In-memory registry | `d543b3e` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/40881080297)) | — | PostgreSQL | `8ee4f2e` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `6dbc821` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `6632c94` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/40885743058)) | — | PostgreSQL | `63ddb73` |
-| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.0.0` | published | 18085, 28085, 38085 (WebSocket) | Redis | `7162888` |
+| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.1.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/41043807490)) | 18085, 28085, 38085 (WebSocket) | Redis | `4e48e9a` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `806a3d7` |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL and Redis | `1efe963` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.0.0` | published | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `cf4de5c` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.1.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/41043899252)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `3464216` |
 
 Every Lab 3 service image must accept the contract's `DISCOVERY_URL`, `INSTANCE_BASE_URL` and, for
 Map, Guild and Raid, `INSTANCE_WS_PUBLIC_URL`; all eight released images do. Package Registry,
