@@ -1,8 +1,9 @@
 {
   "info": {
-    "name": "Map Service (Lab 2, through Gateway)",
-    "description": "Run in saved order against the Lab 2 stack. User Management registration and all REST requests go through Gateway. The map.stream ticket returns a direct WebSocket URL; open it separately in Postman and send a location.update frame. Do not commit a real service token or ticket.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "name": "Map Service (through Gateway)",
+    "description": "Run in saved order against the reviewed shared stack. REST and user setup use gatewayUrl; internal service calls use only serviceToken through Gateway. Tokens and generated identifiers stay collection-scoped. Set runReplicaChecks=true and expectedReplicaCount=2 or 3 only after the configured replicas are healthy. Direct status checks use the per-replica URLs; WebSockets use the exact URL returned by ticket negotiation. Runner checks negotiation only; open the saved socket URL separately for fan-out. Never export real tokens or ticket URLs to Git.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "bfd7c342-023a-46b6-b8c3-c81d223db4d1"
   },
   "item": [
     {
@@ -99,6 +100,132 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Gateway returns 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Replica status (optional)",
+      "description": "Opt in with runReplicaChecks=true. Defaults use the distinct HTTP ports already exposed for live replicas; no SD or non-live-service port is exposed. Configure all URLs for your deployment. Status needs no bearer or Gateway secret.",
+      "item": [
+        {
+          "name": "Replica 1 status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mapReplica1Url}}/api/v1/status",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
+                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
+                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ready status is 200', () => pm.response.to.have.status(200));",
+                  "const payload = pm.response.json();",
+                  "pm.test('correct service and version', () => { pm.expect(payload.service).to.eql('map'); pm.expect(payload.version).to.match(/^3\\.\\d+\\.\\d+$/); });",
+                  "pm.test('process identity is UUID v4', () => pm.expect(payload.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                  "pm.test('replica is live and ready', () => { pm.expect(payload.live).to.eql(true); pm.expect(payload.ready).to.eql(true); });",
+                  "pm.test('valid load and timestamp', () => { pm.expect(payload.load.activeTasks).to.be.at.least(0); pm.expect(Number.isInteger(payload.load.activeTasks)).to.eql(true); pm.expect(payload.load.maxTasks).to.be.above(0); pm.expect(Number.isInteger(payload.load.maxTasks)).to.eql(true); pm.expect(payload.load.ratio).to.be.closeTo(payload.load.activeTasks / payload.load.maxTasks, 0.000001); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); });",
+                  "pm.collectionVariables.set('mapReplica1InstanceId', payload.instanceId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replica 2 status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mapReplica2Url}}/api/v1/status",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
+                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
+                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ready status is 200', () => pm.response.to.have.status(200));",
+                  "const payload = pm.response.json();",
+                  "pm.test('correct service and version', () => { pm.expect(payload.service).to.eql('map'); pm.expect(payload.version).to.match(/^3\\.\\d+\\.\\d+$/); });",
+                  "pm.test('process identity is UUID v4', () => pm.expect(payload.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                  "pm.test('replica is live and ready', () => { pm.expect(payload.live).to.eql(true); pm.expect(payload.ready).to.eql(true); });",
+                  "pm.test('valid load and timestamp', () => { pm.expect(payload.load.activeTasks).to.be.at.least(0); pm.expect(Number.isInteger(payload.load.activeTasks)).to.eql(true); pm.expect(payload.load.maxTasks).to.be.above(0); pm.expect(Number.isInteger(payload.load.maxTasks)).to.eql(true); pm.expect(payload.load.ratio).to.be.closeTo(payload.load.activeTasks / payload.load.maxTasks, 0.000001); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); });",
+                  "pm.collectionVariables.set('mapReplica2InstanceId', payload.instanceId);",
+                  "pm.test('replicas have different process IDs', () => { for (let n = 1; n < 2; n++) pm.expect(payload.instanceId).to.not.eql(pm.collectionVariables.get('mapReplica' + n + 'InstanceId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replica 3 status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mapReplica3Url}}/api/v1/status",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
+                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
+                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');",
+                  "if (count < 3) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ready status is 200', () => pm.response.to.have.status(200));",
+                  "const payload = pm.response.json();",
+                  "pm.test('correct service and version', () => { pm.expect(payload.service).to.eql('map'); pm.expect(payload.version).to.match(/^3\\.\\d+\\.\\d+$/); });",
+                  "pm.test('process identity is UUID v4', () => pm.expect(payload.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                  "pm.test('replica is live and ready', () => { pm.expect(payload.live).to.eql(true); pm.expect(payload.ready).to.eql(true); });",
+                  "pm.test('valid load and timestamp', () => { pm.expect(payload.load.activeTasks).to.be.at.least(0); pm.expect(Number.isInteger(payload.load.activeTasks)).to.eql(true); pm.expect(payload.load.maxTasks).to.be.above(0); pm.expect(Number.isInteger(payload.load.maxTasks)).to.eql(true); pm.expect(payload.load.ratio).to.be.closeTo(payload.load.activeTasks / payload.load.maxTasks, 0.000001); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); });",
+                  "pm.collectionVariables.set('mapReplica3InstanceId', payload.instanceId);",
+                  "pm.test('replicas have different process IDs', () => { for (let n = 1; n < 3; n++) pm.expect(payload.instanceId).to.not.eql(pm.collectionVariables.get('mapReplica' + n + 'InstanceId')); });"
                 ]
               }
             }
@@ -240,6 +367,137 @@
                   "pm.test('Correct user is returned', () => pm.expect(pm.response.json().userId).to.eql(pm.collectionVariables.get('userId')));"
                 ]
               }
+            }
+          ]
+        },
+        {
+          "name": "Shared state and round robin (optional)",
+          "description": "Run against an otherwise idle test user/raid. Three sequential authenticated service reads cover 2 or 3 stable replicas, using Gateway-generated response metadata; no command is retried or failure fabricated. Status folder must run first. Real WebSocket fan-out remains a manual two-socket check.",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
+                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
+                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');"
+                ]
+              }
+            }
+          ],
+          "item": [
+            {
+              "name": "Shared state read 1",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Service-Token",
+                    "value": "{{serviceToken}}"
+                  }
+                ],
+                "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('shared state is readable', () => pm.response.to.have.status(200));",
+                      "const payload = pm.response.json();",
+                      "const selected = pm.response.headers.get('X-Upstream-Instance-Id');",
+                      "pm.test('Gateway identifies the selected replica', () => pm.expect(selected).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                      "pm.test('Gateway supplies physical attempt metadata', () => { pm.expect(pm.response.headers.get('X-Upstream-Attempt-Id')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Number(pm.response.headers.get('X-Upstream-Task-Timeout-Ms'))).to.be.above(0); });",
+                      "const configured = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => pm.collectionVariables.get('mapReplica' + (i + 1) + 'InstanceId'));",
+                      "pm.test('selection belongs to the configured ready replicas', () => pm.expect(configured).to.include(selected));",
+                      "pm.test('position survives routing to another process', () => { pm.expect(payload.userId).to.eql(pm.collectionVariables.get('userId')); pm.expect(payload.latitude).to.eql(Number(pm.variables.get('latitude'))); pm.expect(payload.longitude).to.eql(Number(pm.variables.get('longitude'))); pm.expect(Date.parse(payload.recordedAt)).to.eql(Date.parse(pm.collectionVariables.get('recordedAt'))); });",
+                      "const seen = [];",
+                      "seen.push(selected);",
+                      "pm.collectionVariables.set('mapSelectedReplicas', JSON.stringify(seen));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Shared state read 2",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Service-Token",
+                    "value": "{{serviceToken}}"
+                  }
+                ],
+                "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('shared state is readable', () => pm.response.to.have.status(200));",
+                      "const payload = pm.response.json();",
+                      "const selected = pm.response.headers.get('X-Upstream-Instance-Id');",
+                      "pm.test('Gateway identifies the selected replica', () => pm.expect(selected).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                      "pm.test('Gateway supplies physical attempt metadata', () => { pm.expect(pm.response.headers.get('X-Upstream-Attempt-Id')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Number(pm.response.headers.get('X-Upstream-Task-Timeout-Ms'))).to.be.above(0); });",
+                      "const configured = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => pm.collectionVariables.get('mapReplica' + (i + 1) + 'InstanceId'));",
+                      "pm.test('selection belongs to the configured ready replicas', () => pm.expect(configured).to.include(selected));",
+                      "pm.test('position survives routing to another process', () => { pm.expect(payload.userId).to.eql(pm.collectionVariables.get('userId')); pm.expect(payload.latitude).to.eql(Number(pm.variables.get('latitude'))); pm.expect(payload.longitude).to.eql(Number(pm.variables.get('longitude'))); pm.expect(Date.parse(payload.recordedAt)).to.eql(Date.parse(pm.collectionVariables.get('recordedAt'))); });",
+                      "const seen = JSON.parse(pm.collectionVariables.get('mapSelectedReplicas') || '[]');",
+                      "seen.push(selected);",
+                      "pm.collectionVariables.set('mapSelectedReplicas', JSON.stringify(seen));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Shared state read 3",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Service-Token",
+                    "value": "{{serviceToken}}"
+                  }
+                ],
+                "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('shared state is readable', () => pm.response.to.have.status(200));",
+                      "const payload = pm.response.json();",
+                      "const selected = pm.response.headers.get('X-Upstream-Instance-Id');",
+                      "pm.test('Gateway identifies the selected replica', () => pm.expect(selected).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                      "pm.test('Gateway supplies physical attempt metadata', () => { pm.expect(pm.response.headers.get('X-Upstream-Attempt-Id')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Number(pm.response.headers.get('X-Upstream-Task-Timeout-Ms'))).to.be.above(0); });",
+                      "const configured = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => pm.collectionVariables.get('mapReplica' + (i + 1) + 'InstanceId'));",
+                      "pm.test('selection belongs to the configured ready replicas', () => pm.expect(configured).to.include(selected));",
+                      "pm.test('position survives routing to another process', () => { pm.expect(payload.userId).to.eql(pm.collectionVariables.get('userId')); pm.expect(payload.latitude).to.eql(Number(pm.variables.get('latitude'))); pm.expect(payload.longitude).to.eql(Number(pm.variables.get('longitude'))); pm.expect(Date.parse(payload.recordedAt)).to.eql(Date.parse(pm.collectionVariables.get('recordedAt'))); });",
+                      "const seen = JSON.parse(pm.collectionVariables.get('mapSelectedReplicas') || '[]');",
+                      "seen.push(selected);",
+                      "pm.collectionVariables.set('mapSelectedReplicas', JSON.stringify(seen));",
+                      "pm.test('round robin reaches every configured replica', () => pm.expect(new Set(seen).size).to.eql(Number(pm.variables.get('expectedReplicaCount'))));"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         },
@@ -544,7 +802,7 @@
               "raw": "{\"channel\":\"map.stream\",\"resourceId\":null}"
             },
             "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
-            "description": "Gateway issues a short-lived ticket and direct service URL. Open websocketUrl as a WebSocket request in Postman; obtain a fresh ticket for reconnect."
+            "description": "Open mapStreamUrl exactly as returned by Gateway, without Authorization. Never replace the origin with a fixed service port. Obtain a new ticket to reconnect; expired tickets do not terminate an already-open socket."
           },
           "event": [
             {
@@ -556,7 +814,11 @@
                   "const json = pm.response.json();",
                   "pm.test('direct WebSocket URL', () => { pm.expect(json.url).to.match(/^wss?:\\/\\//); pm.expect(json.url).to.include('/api/v1/map/stream?ticket='); pm.expect(json.url).to.not.include('/monster-raid/api/'); pm.expect(json.url).to.not.include('/map/api/'); });",
                   "pm.test('ticket expires within 60 s', () => { const ttl = new Date(json.expiresAt).getTime() - Date.now(); pm.expect(ttl).to.be.within(-5000, 65000); });",
-                  "pm.collectionVariables.set('mapStreamUrl', json.url);"
+                  "pm.collectionVariables.set('mapStreamUrl', json.url);",
+                  "if (String(pm.variables.get('runReplicaChecks')) === 'true') {",
+                  "  const origins = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => String(pm.variables.get('mapReplica' + (i + 1) + 'Url')).replace(/^http/, 'ws').replace(/\\/$/, ''));",
+                  "  pm.test('ticket URL belongs to a configured live replica', () => pm.expect(origins).to.include((json.url.match(/^wss?:\\/\\/[^/]+/) || [])[0]));",
+                  "}"
                 ]
               }
             }
