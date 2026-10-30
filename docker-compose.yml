@@ -1,5 +1,5 @@
 # The whole Tamagotchi Go ecosystem behind the API Gateway: the Gateway, the eight services and the
-# stores each one owns, run from versioned images. Map/Raid 3.0.0 are staged for the Lab 3 rollout; see README.
+# stores each one owns, run from versioned images. Map/Raid 3.1.0 are staged for the Lab 3 rollout; see README.
 # Do not merge this staging change until publication and #133 integration are verified.
 #
 #   cp .env.example .env    # replace every CHANGE_ME
@@ -204,7 +204,7 @@ services:
       - map-redis-data:/data
 
   map:
-    image: nickseen/tamagotchi-map:3.0.0 # its image declares the /healthz check
+    image: nickseen/tamagotchi-map:3.1.0 # its image declares the /healthz check
     restart: on-failure # a single Redis ping at start-up, no retry
     depends_on:
       map-redis:
@@ -329,7 +329,7 @@ services:
       - raid-redis-data:/data
 
   monster-raid:
-    image: nickseen/tamagotchi-monster-raid:3.0.0 # its image declares the /healthz check
+    image: nickseen/tamagotchi-monster-raid:3.1.0 # its image declares the /healthz check
     restart: on-failure
     depends_on:
       monster-raid-db:
