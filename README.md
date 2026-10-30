@@ -1690,8 +1690,8 @@ Telegram (#122), threshold removal (#123) and the reviewed release-audit fixes. 
 Git tag are verified against `ad4700c`. Telegram requires deployment credentials, or explicitly
 `ALERTS_ENABLED=false` for local test mode; this publication is not a claim of full-stack evidence.
 
-Map/Raid `3.1.0` preparation is tracked in [Map #17](https://github.com/Nickseen/tamagotchi-map/pull/17)
-and [Raid #20](https://github.com/Nickseen/tamagotchi-monster-raid/pull/20). Until their reviewed
+Map/Raid `3.1.0` releases are tracked in [Map #18](https://github.com/Nickseen/tamagotchi-map/pull/18)
+and [Raid #21](https://github.com/Nickseen/tamagotchi-monster-raid/pull/21). Until their reviewed
 main publications succeed, CPR keeps their published `3.0.0` images and actual released pins.
 
 [Compose integration #133](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/133)
