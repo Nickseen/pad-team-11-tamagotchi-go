@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Monster Raid Service (Lab 2, through Gateway)",
+    "name": "Monster Raid Service (through Gateway)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Run in saved order against the Lab 2 stack. User Management registration and all REST requests go through Gateway. The raid lifecycle uses the configured mock Guild/Registry/Tamagotchi IDs unless real fixtures are provided. The raid.feed ticket returns a direct WebSocket URL; open it separately in Postman. Admin-only requests skip without a real admin JWT. Do not commit a real service token or ticket."
+    "description": "Run in saved order against the shared stack. User Management registration and all REST requests go through Gateway. The raid lifecycle uses the configured mock Guild/Registry/Tamagotchi IDs unless real fixtures are provided. The raid.feed ticket returns a direct WebSocket URL; open it separately in Postman. Admin-only requests skip without a real admin JWT. Do not commit a real service token or ticket."
   },
   "item": [
     {
@@ -103,6 +103,19 @@
               }
             }
           ]
+        },
+        {
+          "name": "Raid status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/status"
+          }
         }
       ]
     },

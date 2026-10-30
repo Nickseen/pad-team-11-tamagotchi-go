@@ -13,6 +13,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Technologies and Communication Patterns](#technologies-and-communication-patterns)
 - [Communication Overview](#communication-overview)
 - [Communication Contract](#communication-contract)
+- [Lab 3 Discovery Contract](docs/lab3-discovery-contract.md)
 - [Running the Stack](#running-the-stack)
 - [Postman Collections](#postman-collections)
 - [Open Boundary Decisions](#open-boundary-decisions)
@@ -173,6 +174,10 @@ arrow points from the caller toward the receiver:
   through Gateway.
 
 ![Architecture](docs/architecture.svg)
+
+The [Lab 3 discovery and scaling proposal](docs/lab3-discovery-contract.md) adds a separate
+topology for Service Discovery and domain replicas. It is pending the team review required by
+issue #119; the diagram above describes the released Lab 2 architecture.
 
 Two properties are worth pointing out, because they are the reason the boundaries are drawn this
 way:
@@ -548,7 +553,10 @@ returns `201 Created`:
 }
 ```
 
-The URL comes from `MAP_WS_PUBLIC_URL`, `GUILD_WS_PUBLIC_URL` or `MONSTER_RAID_WS_PUBLIC_URL`.
+Since Lab 3 the URL's origin is the `wsPublicUrl` the chosen Map, Guild or Monster Raid replica
+registered with Service Discovery, so the ticket names one specific replica
+([Lab 3 contract](docs/lab3-discovery-contract.md#direct-websockets-and-state-across-replicas));
+Lab 2 read it from `MAP_WS_PUBLIC_URL`, `GUILD_WS_PUBLIC_URL` or `MONSTER_RAID_WS_PUBLIC_URL`.
 The ticket is an RS256 JWT issued by `tamagotchi-gateway`, valid for at most 60 seconds and carrying
 `sub`, `roles`, `aud` (`map`, `guild` or `monster-raid`), `resourceId`, `iat`, `exp` and `jti`.
 Map, Guild and Monster Raid validate it using Gateway's internal JWKS endpoint at
@@ -1657,32 +1665,81 @@ Delivery rules, uniform across every consumer:
 
 ## Running the Stack
 
-The whole ecosystem runs from the images published on Docker Hub. The repository root holds
-[`docker-compose.yml`](docker-compose.yml), which starts the API Gateway, the eight services and the
-stores each one owns — 19 containers — without building anything locally. Clients reach the system
-only through the Gateway on `http://localhost:8080`; the services call each other through it too.
+The repository root holds [`docker-compose.yml`](docker-compose.yml), which uses published
+images without building services locally. It describes the Lab 3 topology from the
+[discovery, scaling and failure contract](docs/lab3-discovery-contract.md): one API Gateway, one
+Service Discovery, **two replicas of each of the eight services** (an optional third for the scale
+demonstration) and the stores each service owns. The client entry point stays
+`http://localhost:8080`, and services still call each other through the Gateway.
+
+> **Draft for [#133](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/133).** The file
+> selects the released image versions listed below. `docker compose config` validates the topology;
+> publication alone does not verify service integration. Do not treat
+> it as a verified Lab 3 stack before the shared-stack checks in
+> [Lab 3 checks](#lab-3-checks) pass; final Grade 10 evidence belongs to #134.
+
+### Lab 3 topology
+
+| Component | Compose services | How it is reached |
+| --------- | ---------------- | ----------------- |
+| API Gateway | `gateway` | Host port `8080`; round-robins each request over the replicas Discovery reports ready |
+| Service Discovery | `service-discovery` | Internal only (`http://service-discovery:8090`); no host port |
+| Each domain service | `<service>-1`, `<service>-2`, optional `<service>-3` | Through the Gateway only; each replica registers its own `INSTANCE_BASE_URL`, e.g. `http://battle-2:8084` |
+| Map, Guild, Monster Raid WebSockets | the same replicas | One host port per replica: `18085`/`28085`/`38085` (Map), `18087`/`28087`/`38087` (Guild), `18088`/`28088`/`38088` (Raid); each replica registers that origin as `INSTANCE_WS_PUBLIC_URL`, so a Gateway ticket names one specific replica |
+| Stores | `<service>-db`, `map-redis`, `guild-redis`, `monster-raid-redis` | Internal only; shared by the replicas of the one service that owns them |
+
+Replica blocks share one base per service (YAML anchors `x-<service>` and `x-<service>-env`) and
+add only their own origins, so no two processes advertise the same address and no Gateway URL
+changes when a replica joins or leaves. Discovery accepts a registration only for the origins in
+its `DISCOVERY_ALLOWED_ORIGINS`, which lists `-1`, `-2` and `-3` of every service. User Management
+replicas mount one signing key as the Compose secret `jwt-signing-key`, so a token issued by any
+replica validates against the key set of every other.
 
 ### Docker Hub images
 
-Every repository is public and every tag is published for `linux/amd64` and `linux/arm64`, so the
-same Compose file runs on Intel, AMD and Apple Silicon machines. These are the Lab 2 images the
-Compose file runs; the CPR submodules point at the reviewed `main` commits of the same releases.
+Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
+and Apple Silicon machines. The table below lists the versions this Compose file selects and
+their publication evidence. Image tags and submodule pins must refer to the same released main
+commit; updating these references does not complete the shared-stack checks below.
 
-| Service | Image | Tag | Host port | Store | CPR submodule commit |
-| ------- | ----- | --- | --------- | ----- | -------------------- |
-| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `2.0.0` | 8080 | — | `ef71c2c` |
-| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `2.0.0` | — | PostgreSQL | `e2421fa` |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `2.2.0` | — | PostgreSQL | `88686bd` |
-| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `2.1.0` | — | PostgreSQL | `15fbabe` |
-| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `2.0.1` | — | PostgreSQL | `a955e55` |
-| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `2.1.1` | 8085 (WebSocket) | Redis | `9f7083f` |
-| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `2.2.0` | — | PostgreSQL | `24dacd1` |
-| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `2.1.0` | 8087 (WebSocket) | PostgreSQL and Redis | `dec0223` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `2.1.1` | 8088 (WebSocket) | PostgreSQL and Redis | `64652f6` |
+| Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
+| ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
+| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `3.0.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277)) | 8080 | — | `1e64f48` |
+| Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `3.1.1` | published ([main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/41046178076)) | — (internal 8090) | In-memory registry | `d543b3e` |
+| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/40881080297)) | — | PostgreSQL | `8ee4f2e` |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `6dbc821` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `6632c94` |
+| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `3.0.0` | published ([main CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/40885743058)) | — | PostgreSQL | `63ddb73` |
+| Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `3.1.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/41043807490)) | 18085, 28085, 38085 (WebSocket) | Redis | `4e48e9a` |
+| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `806a3d7` |
+| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `3.0.0` | published ([main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL and Redis | `1efe963` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `3.1.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/41043899252)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `3464216` |
+
+Every Lab 3 service image must accept the contract's `DISCOVERY_URL`, `INSTANCE_BASE_URL` and, for
+Map, Guild and Raid, `INSTANCE_WS_PUBLIC_URL`; all eight released images do. Package Registry,
+Tamagotchi and Notification must not advertise a WebSocket origin: Discovery rejects one for a
+service without a live channel.
+
+Guild and Package Registry `3.0.0` ([#128](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/128),
+[#129](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/129)) keep serving while
+unregistered: until Discovery accepts the registration their `GET /api/v1/status` reports
+`ready: false` and they retry with 1–10 s backoff, logging `discovery.unavailable`. On SIGTERM they
+report not ready, deregister and drain for at most 8 s, so their replicas set
+`stop_grace_period: 15s`. Their replicas share `guild-db`/`guild-redis` and `package-registry-db`;
+neither keeps correctness-critical state in memory, so no sticky routing is needed.
+
+Tamagotchi and Notification `3.0.0` ([#130](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/130),
+[#131](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/131)) also keep serving while
+unregistered, retrying with 1–10 s backoff (`discovery.unreachable` or
+`discovery.registration_failed`). On SIGTERM they report not ready, deregister and drain for at most
+5 s, inside Docker's default 10 s stop timeout, so their replicas set no grace period. Replicas apply
+an event once: each claims the event ID in the shared database first. Notification's call to Guild
+has a circuit breaker that reports failures attributed by the Gateway's `X-Upstream-*` headers;
+Tamagotchi calls no other service. Their replicas share `tamagotchi-db` and `notification-db`.
 
 Every image is published by its repository's CI on a merge to `main`, which pushes the version and
 `latest` and refuses a version that is already published. User Management, Battle, Guild and Package
-Registry read the version from `VERSION` and Gateway from `package.json`, and their CI tags the
+Registry read the version from `VERSION`; Gateway and SD use `package.json`. Their CI tags the
 commit `v<version>`. Tamagotchi and Notification read the `service_version` in `app/config.py`, and
 their release commit is tagged `v<version>` by hand. The Lab 1 images stay on Docker Hub under their
 `1.x` and `2.0.x` tags; the [Lab 1 implementation audit](#lab-1-implementation-audit) records them.
@@ -1693,9 +1750,12 @@ version 18 moved the data directory, so the volumes below would silently stop pe
 ### Prerequisites
 
 - Docker with Compose v2 — Docker Desktop, or Docker Engine with the `docker compose` plugin.
-- Host ports `8080`, `8085`, `8087` and `8088` free. Only the Gateway and the three WebSocket
-  services publish a port: clients open the live map, guild chat and raid feed directly, with a
-  ticket the Gateway issues. Every other service and every store stays on the Compose network.
+- Host ports free: `8080`, and `18085`, `28085`, `18087`, `28087`, `18088`, `28088` for the two
+  WebSocket replicas of Map, Guild and Raid (`38085`, `38087`, `38088` too with a third replica).
+  Only the Gateway and those replicas publish a port: clients open the live map, guild chat and raid
+  feed directly, with a ticket the Gateway issues for one specific replica. Every other service,
+  Service Discovery and every store stays on the Compose network.
+- `openssl`, to create the shared User Management signing key once.
 - No local toolchain: nothing is compiled.
 
 ### Configure
@@ -1707,7 +1767,13 @@ is missing.
 ```sh
 cp .env.example .env
 openssl rand -hex 32    # one way to produce each secret
+mkdir -p secrets && openssl genrsa -out secrets/jwt-signing-key.pem 2048
+chmod 644 secrets/jwt-signing-key.pem   # readable by the non-root User Management image
 ```
+
+`secrets/` is git-ignored. Every User Management replica mounts the key as
+`/run/secrets/jwt-signing-key.pem`; without a shared key each replica would sign tokens that the
+others' key sets reject. Replace the file and restart the replicas to rotate it.
 
 | Variable | Used by | Value |
 | -------- | ------- | ----- |
@@ -1715,10 +1781,11 @@ openssl rand -hex 32    # one way to produce each secret
 | `SERVICE_TOKEN` | Gateway and all eight services | Sent as `X-Service-Token` on service-to-service calls; the Gateway and the callee both compare it. At least 16 characters |
 | `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
 | `MAP_REDIS_PASSWORD`, `GUILD_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Guild, Monster Raid | Redis passwords |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Service Discovery | Telegram bot and developers' chat for critical-load and health alerts; required unless `ALERTS_ENABLED=false` |
 
 The other variables are not secrets. They are commented out in `.env.example`; four switch one
-service between mocked neighbours and real calls through the Gateway, and three set the WebSocket
-addresses the Gateway returns to clients:
+service between mocked neighbours and real calls through the Gateway, and `ALERTS_ENABLED=false`
+makes Discovery log alerts instead of sending them, for a run without a Telegram bot:
 
 | Variable | Mocked | Real | Default |
 | -------- | ------ | ---- | ------- |
@@ -1726,27 +1793,43 @@ addresses the Gateway returns to clients:
 | `GUILD_USER_MANAGEMENT_MODE` | `mock` | `real` | `real` |
 | `MAP_RELATIONSHIP_MODE` | `mock` | `http` | `http` |
 | `RAID_DEPENDENCY_MODE` | `mock` | `http` | `mock` |
-| `MAP_WS_PUBLIC_URL`, `GUILD_WS_PUBLIC_URL`, `MONSTER_RAID_WS_PUBLIC_URL` | | | `ws://localhost:8085`, `:8087`, `:8088` |
+| `ALERTS_ENABLED` | `false` (log only) | `true` (Telegram) | `true` |
 
-Every other setting, such as service URLs, database names and limits, is fixed in the Compose file.
-The services reach each other through `GATEWAY_URL=http://gateway:8080`, and the Gateway reaches
-them by their Compose names, which are the hostnames the communication contract uses. Each service
+Every other setting, such as replica origins, the Discovery allowlist, database names and limits,
+is fixed in the Compose file. The services reach each other through `GATEWAY_URL=http://gateway:8080`,
+and the Gateway reaches whichever replicas Discovery reports ready; no service address is
+configured in the Gateway any more. The WebSocket origin in a ticket is the one the chosen replica
+registered, so the former `*_WS_PUBLIC_URL` variables are gone. Each service
 stops a request after `TASK_TIMEOUT_MS=3000`, below the Gateway's `REQUEST_TIMEOUT_MS=5000`, so a
 service's `503 TASK_TIMEOUT` reaches the client before the Gateway would answer `504`:
 
 | Service | `MAX_CONCURRENT_TASKS` | `MAX_WEBSOCKET_CONNECTIONS` |
 | ------- | ---------------------- | --------------------------- |
 | API Gateway | `MAX_IN_FLIGHT_REQUESTS=100` | — |
-| User Management, Battle, Map, Monster Raid | `50` | Map and Raid: `100` |
+| Battle, Map, Monster Raid | `50` | Map and Raid: `100` |
+| User Management | `10` | — |
 | Tamagotchi, Notification | `10` | — |
 | Package Registry, Guild | `64` | Guild: `100` |
+
+The limits are per replica. User Management's is 10, its database pool size, because every login
+spends about 200 ms of CPU on bcrypt: at 50 per replica a login flood queued requests past the
+3000 ms budget, the Gateway counted the resulting `503 TASK_TIMEOUT`s as failures and Discovery
+removed both replicas. At 10 the same flood is answered with `429` and logins stay under 1 s, as
+the contract's "Overload, timeouts and the last replica" requires.
 
 ### Start
 
 ```sh
-docker compose up -d
+docker compose up -d                              # two replicas of every service
+docker compose --profile scale-battle up -d       # add battle-3; scale-<service> for any one service
+docker compose --profile scale-all up -d          # a third replica of every service
 docker compose ps
 ```
+
+A third replica is an ordinary profile-gated block (`battle-3` and so on) with its own allowlisted
+origin, so it registers, becomes routable after its first healthy probe and joins the Gateway's
+round robin without touching any other service. `docker compose stop battle-3` (or
+`docker compose --profile scale-battle down battle-3`) deregisters it again.
 
 The first start pulls about 520 MB of compressed images. The databases and Redis become healthy
 first; the services that do not retry their database connection wait for that health check, and
@@ -1770,6 +1853,34 @@ curl -X POST localhost:8080/user-management/api/v1/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"username":"ember_keeper","email":"ember@example.com","password":"correct horse battery","packageId":"1d4e9a02-8c77-4a1e-b6f0-77c3b1d9e402"}'
 ```
+
+### Lab 3 checks
+
+These are the shared-stack checks #133 must pass before merge. Run them with `SERVICE_TOKEN`
+exported from `.env`. Discovery has no host port, so lookups run inside its container:
+
+```sh
+# Every replica registered and ready: two per service (three with a scale profile).
+docker compose exec service-discovery sh -c 'for s in user-management tamagotchi package-registry battle map notification guild monster-raid; do
+  wget -qO- --header "X-Service-Token: $SERVICE_TOKEN" http://localhost:8090/api/v1/internal/discovery/services/$s/instances; echo; done'
+
+# Every replica's own status: live, ready and its load.
+docker compose exec service-discovery wget -qO- http://battle-2:8084/api/v1/status
+```
+
+| Check | How | Expected |
+| ----- | --- | -------- |
+| Registration and readiness | lookup above | every `-1`/`-2` replica `ready`, each with a distinct `instanceId` |
+| All eight route groups | the Postman collections through `localhost:8080` | every request passes, as in Lab 2 |
+| Round robin | repeat one request, then `docker compose logs battle-1 battle-2 \| grep request.completed` | the requests alternate between the replicas |
+| Scale to three | `docker compose --profile scale-battle up -d`, then the lookup | `battle-3` appears and starts receiving requests |
+| Failed replica, healthy sibling | `docker compose kill battle-2` | lookup drops it within one probe (5 s); requests keep succeeding on `battle-1`; its lease expires after 30 s |
+| Restart | `docker compose start battle-2` | a new `instanceId` registers and rejoins after a healthy probe |
+| Cross-replica WebSockets | open Map/Guild/Raid sockets via tickets on `-1` and `-2` | a change made through one replica reaches sockets on the other |
+| Circuit breaker and removal | make one replica fail (for example stop its database) and send 3 requests within 10.5 s | the caller logs `circuit.open`; Discovery removes only that replica, which stays out of lookup |
+| Critical load and alerts | load one replica above 80 % of `MAX_CONCURRENT_TASKS` for two probes | Discovery logs `load.critical` once and the developers' Telegram chat receives one alert; `load.recovered` follows below 60 % |
+
+Each result, with the commands' output, is recorded in #133 before this stack is promoted.
 
 ### Data and volumes
 
