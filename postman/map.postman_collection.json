@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Map Service (Lab 2, through Gateway)",
-    "description": "Run in saved order against the Lab 2 stack. User Management registration and all REST requests go through Gateway. The map.stream ticket returns a direct WebSocket URL; open it separately in Postman and send a location.update frame. Do not commit a real service token or ticket.",
+    "name": "Map Service (through Gateway)",
+    "description": "Run in saved order against the shared stack. User Management registration and all REST requests go through Gateway. The map.stream ticket returns a direct WebSocket URL; open it separately in Postman and send a location.update frame. Do not commit a real service token or ticket.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -103,6 +103,19 @@
               }
             }
           ]
+        },
+        {
+          "name": "Map status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/map/api/v1/status"
+          }
         }
       ]
     },

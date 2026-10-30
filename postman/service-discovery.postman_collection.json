@@ -1,0 +1,129 @@
+{
+  "info": {
+    "_postman_id": "57298982-fd71-48b8-904e-d761a3d04797",
+    "name": "Service Discovery",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Basic internal API examples. Run individual requests from the private service network; SD has no Gateway slug or public port. Services normally register themselves. For manual register/lease/failure/delete requests, use a dedicated test instance and configure its UUID and registration body. discoveryInstanceId is intentionally blank. Do not run the whole collection against live service instances."
+  },
+  "item": [
+    {
+      "name": "Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{discoveryUrl}}/api/v1/status"
+      }
+    },
+    {
+      "name": "Ready instances",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/{{discoveryService}}/instances"
+      }
+    },
+    {
+      "name": "Register test instance",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"service\": \"{{discoveryService}}\",\n  \"instanceId\": \"{{discoveryInstanceId}}\",\n  \"baseUrl\": \"http://map-1:8085\",\n  \"statusPath\": \"/api/v1/status\",\n  \"wsPublicUrl\": \"ws://localhost:18085\",\n  \"version\": \"3.0.0\",\n  \"taskTimeoutMs\": 3000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Renew test instance lease",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{discoveryInstanceId}}/lease"
+      }
+    },
+    {
+      "name": "Report a test instance failure",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"service\": \"{{discoveryService}}\",\n  \"instanceId\": \"{{discoveryInstanceId}}\",\n  \"attemptId\": \"{{$guid}}\",\n  \"endpoint\": \"POST /api/v1/locations\",\n  \"failure\": \"UPSTREAM_5XX\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Deregister test instance",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{discoveryInstanceId}}"
+      }
+    }
+  ]
+}

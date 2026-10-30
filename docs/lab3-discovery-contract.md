@@ -199,6 +199,34 @@ tripped target and invalidates its service cache. A failed report cannot keep ro
 failed instance. Removal only affects that ID, not the whole service. Recovery requires an
 operator restart/new ID and a successful probe; a heartbeat cannot silently undo quarantine.
 
+### Overload, timeouts and the last replica
+
+High load and failed work are separate observations. A high status `load.ratio` produces an
+alert, not a failure report. An admission rejection (`429 CONCURRENCY_LIMIT_EXCEEDED`, with
+`Retry-After`) is never a breaker sample. A request accepted by the target that actually exceeds
+the target's own task budget is still a failure, including `503 TASK_TIMEOUT`. Do not relabel
+completed attempts as admission rejections or ignore every timeout to keep the registry populated.
+The caller's earlier deadline/cancellation remains excluded unless an actual target failure is
+independently observed.
+
+Each service owner must choose an admission capacity that its constrained resources can sustain
+(including database pools and expensive password hashing). Admission must reject excess work
+before it accumulates an unbounded queue. Repeated task timeouts under load require investigation
+of that service's limits and resource waits; they do not by themselves justify weakening removal.
+
+Grade 10 has no last-replica exemption: if every instance independently reaches the three-error
+threshold, every failed instance is removed. The empty lookup is answered with the documented
+`503 SERVICE_UNAVAILABLE` and `Retry-After: 1`. Keeping a known-failed instance routable is not an
+availability guarantee. Recovery uses an operator restart/new ID and a successful probe; neither
+load recovery nor a lease renewal revives a removed ID.
+
+Record separate evidence in #133/#134: controlled admission saturation gives `429`, keeps healthy
+status observable and causes no failure reports/removal; high ready-status ratios emit load
+alerts without removal; actual injected endpoint failures remove only the attributed instance
+on the third in-window attempt, including when it is the last ready instance. Preserve the
+existing deduplication and timing-boundary checks. A flood that causes real `TASK_TIMEOUT` replies
+is evidence of accepted work failing, not a passing admission-only overload demonstration.
+
 ## Direct WebSockets and state across replicas
 
 Gateway chooses a ready Map/Guild/Raid replica during ticket negotiation and builds the direct URL
