@@ -2,8 +2,7 @@
   "info": {
     "name": "Monster Raid Service (through Gateway)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Run in saved order against the reviewed shared stack. REST and user setup use gatewayUrl; internal service calls use only serviceToken through Gateway. Tokens and generated identifiers stay collection-scoped. Set runReplicaChecks=true and expectedReplicaCount=2 or 3 only after the configured replicas are healthy. Direct status checks use the per-replica URLs; WebSockets use the exact URL returned by ticket negotiation. Runner checks negotiation only; open the saved socket URL separately for fan-out. Raid lifecycle requires real Guild/Registry/Tamagotchi fixtures in live mode, or matching IDs for the configured mocks. Admin-only requests skip without the collection adminToken. Never export real tokens or ticket URLs to Git.",
-    "_postman_id": "e0ae5ad6-4bcb-4c79-93c5-fcefe518ab89"
+    "description": "Run in saved order against the shared stack. User Management registration and all REST requests go through Gateway. The raid lifecycle uses the configured mock Guild/Registry/Tamagotchi IDs unless real fixtures are provided. The raid.feed ticket returns a direct WebSocket URL; open it separately in Postman. Admin-only requests skip without a real admin JWT. Do not commit a real service token or ticket."
   },
   "item": [
     {
@@ -104,132 +103,19 @@
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "Replica status (optional)",
-      "description": "Opt in with runReplicaChecks=true. Defaults use the distinct HTTP ports already exposed for live replicas; no SD or non-live-service port is exposed. Configure all URLs for your deployment. Status needs no bearer or Gateway secret.",
-      "item": [
-        {
-          "name": "Replica 1 status",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{raidReplica1Url}}/api/v1/status",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
-                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
-                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ready status is 200', () => pm.response.to.have.status(200));",
-                  "const payload = pm.response.json();",
-                  "pm.test('correct service and version', () => { pm.expect(payload.service).to.eql('monster-raid'); pm.expect(payload.version).to.match(/^3\\.\\d+\\.\\d+$/); });",
-                  "pm.test('process identity is UUID v4', () => pm.expect(payload.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
-                  "pm.test('replica is live and ready', () => { pm.expect(payload.live).to.eql(true); pm.expect(payload.ready).to.eql(true); });",
-                  "pm.test('valid load and timestamp', () => { pm.expect(payload.load.activeTasks).to.be.at.least(0); pm.expect(Number.isInteger(payload.load.activeTasks)).to.eql(true); pm.expect(payload.load.maxTasks).to.be.above(0); pm.expect(Number.isInteger(payload.load.maxTasks)).to.eql(true); pm.expect(payload.load.ratio).to.be.closeTo(payload.load.activeTasks / payload.load.maxTasks, 0.000001); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); });",
-                  "pm.collectionVariables.set('raidReplica1InstanceId', payload.instanceId);"
-                ]
-              }
-            }
-          ]
         },
         {
-          "name": "Replica 2 status",
+          "name": "Raid status",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{raidReplica2Url}}/api/v1/status",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
-                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
-                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');"
-                ]
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
               }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ready status is 200', () => pm.response.to.have.status(200));",
-                  "const payload = pm.response.json();",
-                  "pm.test('correct service and version', () => { pm.expect(payload.service).to.eql('monster-raid'); pm.expect(payload.version).to.match(/^3\\.\\d+\\.\\d+$/); });",
-                  "pm.test('process identity is UUID v4', () => pm.expect(payload.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
-                  "pm.test('replica is live and ready', () => { pm.expect(payload.live).to.eql(true); pm.expect(payload.ready).to.eql(true); });",
-                  "pm.test('valid load and timestamp', () => { pm.expect(payload.load.activeTasks).to.be.at.least(0); pm.expect(Number.isInteger(payload.load.activeTasks)).to.eql(true); pm.expect(payload.load.maxTasks).to.be.above(0); pm.expect(Number.isInteger(payload.load.maxTasks)).to.eql(true); pm.expect(payload.load.ratio).to.be.closeTo(payload.load.activeTasks / payload.load.maxTasks, 0.000001); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); });",
-                  "pm.collectionVariables.set('raidReplica2InstanceId', payload.instanceId);",
-                  "pm.test('replicas have different process IDs', () => { for (let n = 1; n < 2; n++) pm.expect(payload.instanceId).to.not.eql(pm.collectionVariables.get('raidReplica' + n + 'InstanceId')); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Replica 3 status",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{raidReplica3Url}}/api/v1/status",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
-                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
-                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');",
-                  "if (count < 3) pm.execution.skipRequest();"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ready status is 200', () => pm.response.to.have.status(200));",
-                  "const payload = pm.response.json();",
-                  "pm.test('correct service and version', () => { pm.expect(payload.service).to.eql('monster-raid'); pm.expect(payload.version).to.match(/^3\\.\\d+\\.\\d+$/); });",
-                  "pm.test('process identity is UUID v4', () => pm.expect(payload.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
-                  "pm.test('replica is live and ready', () => { pm.expect(payload.live).to.eql(true); pm.expect(payload.ready).to.eql(true); });",
-                  "pm.test('valid load and timestamp', () => { pm.expect(payload.load.activeTasks).to.be.at.least(0); pm.expect(Number.isInteger(payload.load.activeTasks)).to.eql(true); pm.expect(payload.load.maxTasks).to.be.above(0); pm.expect(Number.isInteger(payload.load.maxTasks)).to.eql(true); pm.expect(payload.load.ratio).to.be.closeTo(payload.load.activeTasks / payload.load.maxTasks, 0.000001); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); });",
-                  "pm.collectionVariables.set('raidReplica3InstanceId', payload.instanceId);",
-                  "pm.test('replicas have different process IDs', () => { for (let n = 1; n < 3; n++) pm.expect(payload.instanceId).to.not.eql(pm.collectionVariables.get('raidReplica' + n + 'InstanceId')); });"
-                ]
-              }
-            }
-          ]
+            ],
+            "url": "{{gatewayUrl}}/monster-raid/api/v1/status"
+          }
         }
       ]
     },
@@ -410,7 +296,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));",
-                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.variables.get('primaryTamagotchiId')));"
+                  "pm.test('Primary Tamagotchi is pinned', () => pm.expect(pm.response.json().tamagotchiId).to.eql(pm.collectionVariables.get('primaryTamagotchiId')));"
                 ]
               }
             }
@@ -463,7 +349,7 @@
               "raw": "{\"channel\":\"raid.feed\",\"resourceId\":\"{{raidId}}\"}"
             },
             "url": "{{gatewayUrl}}/api/v1/gateway/websocket-tickets",
-            "description": "Open raidFeedUrl exactly as returned by Gateway, without Authorization. Never replace the origin with a fixed service port. Obtain a new ticket to reconnect; expired tickets do not terminate an already-open socket."
+            "description": "Open raidFeedUrl separately as a Postman WebSocket request. Expect raid.snapshot on connect; request a fresh ticket to reconnect."
           },
           "event": [
             {
@@ -476,11 +362,7 @@
                   "pm.test('direct WebSocket URL', () => { pm.expect(json.url).to.match(/^wss?:\\/\\//); pm.expect(json.url).to.include('/api/v1/raids/'); pm.expect(json.url).to.not.include('/monster-raid/api/'); pm.expect(json.url).to.not.include('/map/api/'); });",
                   "pm.test('ticket expires within 60 s', () => { const ttl = new Date(json.expiresAt).getTime() - Date.now(); pm.expect(ttl).to.be.within(-5000, 65000); });",
                   "pm.collectionVariables.set('raidFeedUrl', json.url);",
-                  "pm.test('URL matches raid', () => pm.expect(pm.response.json().url).to.include('/raids/' + pm.collectionVariables.get('raidId') + '/feed?ticket='));",
-                  "if (String(pm.variables.get('runReplicaChecks')) === 'true') {",
-                  "  const origins = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => String(pm.variables.get('raidReplica' + (i + 1) + 'Url')).replace(/^http/, 'ws').replace(/\\/$/, ''));",
-                  "  pm.test('ticket URL belongs to a configured live replica', () => pm.expect(origins).to.include((json.url.match(/^wss?:\\/\\/[^/]+/) || [])[0]));",
-                  "}"
+                  "pm.test('URL matches raid', () => pm.expect(pm.response.json().url).to.include('/raids/' + pm.collectionVariables.get('raidId') + '/feed?ticket='));"
                 ]
               }
             }
@@ -605,224 +487,6 @@
                   "pm.test('Idempotent response is unchanged', () => { pm.expect(replay.commandId).to.eql(original.commandId); pm.expect(replay.monsterHpRemaining).to.eql(original.monsterHpRemaining); pm.expect(replay.yourTotalDamage).to.eql(original.yourTotalDamage); pm.expect(replay.attackedAt).to.eql(original.attackedAt); });"
                 ]
               }
-            }
-          ]
-        },
-        {
-          "name": "Shared state and round robin (optional)",
-          "description": "Run against an otherwise idle test user/raid. Three sequential authenticated service reads cover 2 or 3 stable replicas, using Gateway-generated response metadata; no command is retried or failure fabricated. Status folder must run first. Real WebSocket fan-out remains a manual two-socket check.",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (String(pm.variables.get('runReplicaChecks')) !== 'true') pm.execution.skipRequest();",
-                  "const count = Number(pm.variables.get('expectedReplicaCount'));",
-                  "if (![2, 3].includes(count)) throw new Error('expectedReplicaCount must be 2 or 3');"
-                ]
-              }
-            }
-          ],
-          "item": [
-            {
-              "name": "Shared state read 1",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Service-Token",
-                    "value": "{{serviceToken}}"
-                  }
-                ],
-                "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}",
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('shared state is readable', () => pm.response.to.have.status(200));",
-                      "const payload = pm.response.json();",
-                      "const selected = pm.response.headers.get('X-Upstream-Instance-Id');",
-                      "pm.test('Gateway identifies the selected replica', () => pm.expect(selected).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
-                      "pm.test('Gateway supplies physical attempt metadata', () => { pm.expect(pm.response.headers.get('X-Upstream-Attempt-Id')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Number(pm.response.headers.get('X-Upstream-Task-Timeout-Ms'))).to.be.above(0); });",
-                      "const configured = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => pm.collectionVariables.get('raidReplica' + (i + 1) + 'InstanceId'));",
-                      "pm.test('selection belongs to the configured ready replicas', () => pm.expect(configured).to.include(selected));",
-                      "pm.test('participant state is shared', () => pm.expect(payload.isParticipant).to.eql(true));",
-                      "const seen = [];",
-                      "seen.push(selected);",
-                      "pm.collectionVariables.set('raidSelectedReplicas', JSON.stringify(seen));"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "Shared state read 2",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Service-Token",
-                    "value": "{{serviceToken}}"
-                  }
-                ],
-                "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}",
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('shared state is readable', () => pm.response.to.have.status(200));",
-                      "const payload = pm.response.json();",
-                      "const selected = pm.response.headers.get('X-Upstream-Instance-Id');",
-                      "pm.test('Gateway identifies the selected replica', () => pm.expect(selected).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
-                      "pm.test('Gateway supplies physical attempt metadata', () => { pm.expect(pm.response.headers.get('X-Upstream-Attempt-Id')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Number(pm.response.headers.get('X-Upstream-Task-Timeout-Ms'))).to.be.above(0); });",
-                      "const configured = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => pm.collectionVariables.get('raidReplica' + (i + 1) + 'InstanceId'));",
-                      "pm.test('selection belongs to the configured ready replicas', () => pm.expect(configured).to.include(selected));",
-                      "pm.test('participant state is shared', () => pm.expect(payload.isParticipant).to.eql(true));",
-                      "const seen = JSON.parse(pm.collectionVariables.get('raidSelectedReplicas') || '[]');",
-                      "seen.push(selected);",
-                      "pm.collectionVariables.set('raidSelectedReplicas', JSON.stringify(seen));"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "Shared state read 3",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Service-Token",
-                    "value": "{{serviceToken}}"
-                  }
-                ],
-                "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}",
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('shared state is readable', () => pm.response.to.have.status(200));",
-                      "const payload = pm.response.json();",
-                      "const selected = pm.response.headers.get('X-Upstream-Instance-Id');",
-                      "pm.test('Gateway identifies the selected replica', () => pm.expect(selected).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
-                      "pm.test('Gateway supplies physical attempt metadata', () => { pm.expect(pm.response.headers.get('X-Upstream-Attempt-Id')).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Number(pm.response.headers.get('X-Upstream-Task-Timeout-Ms'))).to.be.above(0); });",
-                      "const configured = Array.from({length: Number(pm.variables.get('expectedReplicaCount'))}, (_, i) => pm.collectionVariables.get('raidReplica' + (i + 1) + 'InstanceId'));",
-                      "pm.test('selection belongs to the configured ready replicas', () => pm.expect(configured).to.include(selected));",
-                      "pm.test('participant state is shared', () => pm.expect(payload.isParticipant).to.eql(true));",
-                      "const seen = JSON.parse(pm.collectionVariables.get('raidSelectedReplicas') || '[]');",
-                      "seen.push(selected);",
-                      "pm.collectionVariables.set('raidSelectedReplicas', JSON.stringify(seen));",
-                      "pm.test('round robin reaches every configured replica', () => pm.expect(new Set(seen).size).to.eql(Number(pm.variables.get('expectedReplicaCount'))));"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "Shared raid HP read 1",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{userToken}}"
-                  }
-                ],
-                "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}",
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('raid remains readable', () => pm.response.to.have.status(200));",
-                      "const payload = pm.response.json(); const attack = JSON.parse(pm.collectionVariables.get('attackSnapshot'));",
-                      "pm.test('the same raid HP is shared after the replayed attack', () => { pm.expect(payload.raidId).to.eql(pm.collectionVariables.get('raidId')); pm.expect(payload.currentHp).to.eql(attack.monsterHpRemaining); });"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "Shared raid HP read 2",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{userToken}}"
-                  }
-                ],
-                "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}",
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('raid remains readable', () => pm.response.to.have.status(200));",
-                      "const payload = pm.response.json(); const attack = JSON.parse(pm.collectionVariables.get('attackSnapshot'));",
-                      "pm.test('the same raid HP is shared after the replayed attack', () => { pm.expect(payload.raidId).to.eql(pm.collectionVariables.get('raidId')); pm.expect(payload.currentHp).to.eql(attack.monsterHpRemaining); });"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "Shared raid HP read 3",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{userToken}}"
-                  }
-                ],
-                "url": "{{gatewayUrl}}/monster-raid/api/v1/raids/{{raidId}}",
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('raid remains readable', () => pm.response.to.have.status(200));",
-                      "const payload = pm.response.json(); const attack = JSON.parse(pm.collectionVariables.get('attackSnapshot'));",
-                      "pm.test('the same raid HP is shared after the replayed attack', () => { pm.expect(payload.raidId).to.eql(pm.collectionVariables.get('raidId')); pm.expect(payload.currentHp).to.eql(attack.monsterHpRemaining); });"
-                    ]
-                  }
-                }
-              ]
             }
           ]
         },

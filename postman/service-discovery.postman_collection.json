@@ -3,988 +3,127 @@
     "_postman_id": "57298982-fd71-48b8-904e-d761a3d04797",
     "name": "Service Discovery",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Internal control-plane collection for the accepted CPR contract. SD has no Gateway slug or client port. Run read-only/negative checks from the private service network. Mutation/failure-injection tests skip unless sdRunLifecycle=true and a fresh isolated battle fixture is configured; never use a real service instance ID. No actual Telegram message is sent or verified here. Fault reports are synthetic API tests, not proof of actual Gateway breaker integration."
+    "description": "Basic internal API examples. Run individual requests from the private service network; SD has no Gateway slug or public port. Services normally register themselves. For manual register/lease/failure/delete requests, use a dedicated test instance and configure its UUID and registration body. discoveryInstanceId is intentionally blank. Do not run the whole collection against live service instances."
   },
-  "variable": [
-    {
-      "key": "sdFixtureOwned",
-      "value": "false"
-    },
-    {
-      "key": "sdFixtureAttemptId",
-      "value": ""
-    },
-    {
-      "key": "sdHealthySiblingIds",
-      "value": "[]"
-    },
-    {
-      "key": "sdFixtureOwnedId",
-      "value": ""
-    },
-    {
-      "key": "sdFixtureOwnedBaseUrl",
-      "value": ""
-    }
-  ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "pm.variables.set('sdCorrelationId', pm.variables.replaceIn('{{$guid}}'));",
-          "pm.variables.set('sdUnknownInstanceId', pm.variables.replaceIn('{{$guid}}'));",
-          "pm.variables.set('sdUnknownAttemptId', pm.variables.replaceIn('{{$guid}}')); "
-        ]
-      }
-    }
-  ],
   "item": [
     {
-      "name": "Read-only checks",
-      "item": [
-        {
-          "name": "Discovery status",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/status",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Discovery is ready', () => pm.response.to.have.status(200));",
-                  "const payload = pm.response.json();",
-                  "pm.test('SD status identity and version', () => { pm.expect(payload.service).to.eql('service-discovery'); pm.expect(payload.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(payload.version).to.match(/^3\\.\\d+\\.\\d+$/); });",
-                  "pm.test('local readiness and load are observable', () => { pm.expect(payload.live).to.eql(true); pm.expect(payload.ready).to.eql(true); pm.expect(Number.isInteger(payload.load.activeTasks)).to.eql(true); pm.expect(payload.load.activeTasks).to.be.at.least(0); pm.expect(Number.isInteger(payload.load.maxTasks)).to.eql(true); pm.expect(payload.load.maxTasks).to.be.above(0); pm.expect(payload.load.ratio).to.be.closeTo(payload.load.activeTasks / payload.load.maxTasks, 0.000001); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Ready Map instances",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/map/instances",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('lookup succeeds', () => pm.response.to.have.status(200));",
-                  "const payload = pm.response.json();",
-                  "pm.test('lookup is a timestamped instance list', () => { pm.expect(payload.instances).to.be.an('array'); pm.expect(Number.isNaN(Date.parse(payload.generatedAt))).to.eql(false); });",
-                  "pm.test('only ready unexpired map instances are exposed', () => { for (const instance of payload.instances) { pm.expect(instance.service).to.eql('map'); pm.expect(instance.state).to.eql('ready'); pm.expect(instance.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Date.parse(instance.leaseExpiresAt)).to.be.above(Date.parse(payload.generatedAt)); pm.expect(instance).to.not.have.property('serviceToken'); } });",
-                  "pm.test('IDs are unique and sorted', () => { const ids = payload.instances.map(x => x.instanceId); pm.expect(ids).to.eql([...ids].sort()); pm.expect(new Set(ids).size).to.eql(ids.length); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Ready Raid instances",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/monster-raid/instances",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('lookup succeeds', () => pm.response.to.have.status(200));",
-                  "const payload = pm.response.json();",
-                  "pm.test('lookup is a timestamped instance list', () => { pm.expect(payload.instances).to.be.an('array'); pm.expect(Number.isNaN(Date.parse(payload.generatedAt))).to.eql(false); });",
-                  "pm.test('only ready unexpired monster-raid instances are exposed', () => { for (const instance of payload.instances) { pm.expect(instance.service).to.eql('monster-raid'); pm.expect(instance.state).to.eql('ready'); pm.expect(instance.instanceId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); pm.expect(Date.parse(instance.leaseExpiresAt)).to.be.above(Date.parse(payload.generatedAt)); pm.expect(instance).to.not.have.property('serviceToken'); } });",
-                  "pm.test('IDs are unique and sorted', () => { const ids = payload.instances.map(x => x.instanceId); pm.expect(ids).to.eql([...ids].sort()); pm.expect(new Set(ids).size).to.eql(ids.length); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
+      "name": "Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{discoveryUrl}}/api/v1/status"
+      }
     },
     {
-      "name": "Authorization and validation",
-      "description": "Only negative reports against freshly generated unknown IDs are sent; no existing registration is changed.",
-      "item": [
-        {
-          "name": "401 - lookup without service token",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/map/instances",
-            "auth": {
-              "type": "noauth"
-            }
+      "name": "Ready instances",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('401 UNAUTHORIZED', () => { pm.response.to.have.status(401); pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "401 - incorrect service token",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "X-Service-Token",
-                "value": "invalid-postman-token"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/map/instances",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('401 UNAUTHORIZED', () => { pm.response.to.have.status(401); pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "404 - unknown service",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/not-a-service/instances",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('404 SERVICE_NOT_FOUND', () => { pm.response.to.have.status(404); pm.expect(pm.response.json().error.code).to.eql('SERVICE_NOT_FOUND'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "400 - admission 429 is not a failure report",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdUnknownInstanceId}}\",\n  \"attemptId\": \"{{sdUnknownAttemptId}}\",\n  \"endpoint\": \"GET /api/v1/battles/{battleId}\",\n  \"failure\": \"CONCURRENCY_LIMIT_EXCEEDED\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('400 VALIDATION_FAILED', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "404 - failure report cannot target an unknown process",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdUnknownInstanceId}}\",\n  \"attemptId\": \"{{sdUnknownAttemptId}}\",\n  \"endpoint\": \"GET /api/v1/battles/{battleId}\",\n  \"failure\": \"UPSTREAM_5XX\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('404 INSTANCE_NOT_FOUND', () => { pm.response.to.have.status(404); pm.expect(pm.response.json().error.code).to.eql('INSTANCE_NOT_FOUND'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/{{discoveryService}}/instances"
+      }
     },
     {
-      "name": "Isolated fixture lifecycle (opt in)",
-      "description": "Start a dedicated healthy battle status fixture at the explicitly allowlisted sdFixtureBaseUrl, with the fresh sdFixtureInstanceId. sdRunLifecycle defaults false. This folder registers only a newly owned ID, tests lease/dedup/three-error removal and cleans up that ID. It requires an otherwise idle isolated SD test process; do not run against the shared stack.",
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "const enabled = String(pm.variables.get('sdRunLifecycle')) === 'true';",
-              "if (!enabled) pm.execution.skipRequest();",
-              "if (enabled) {",
-              "  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(String(pm.variables.get('sdFixtureInstanceId')))) throw new Error('Use a fresh UUID v4 for a dedicated fixture process');",
-              "  if (!/^http:\\/\\/(sd-postman-fixture|127\\.0\\.0\\.1):\\d+$/.test(String(pm.variables.get('sdFixtureBaseUrl')))) throw new Error('Lifecycle requests require the isolated fixture origin');",
-              "  if (pm.info.requestName !== 'Register isolated fixture' && (pm.collectionVariables.get('sdFixtureOwned') !== 'true' || pm.collectionVariables.get('sdFixtureOwnedId') !== pm.variables.get('sdFixtureInstanceId') || pm.collectionVariables.get('sdFixtureOwnedBaseUrl') !== pm.variables.get('sdFixtureBaseUrl'))) pm.execution.skipRequest();",
-              "}"
-            ]
+      "name": "Register test instance",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"service\": \"{{discoveryService}}\",\n  \"instanceId\": \"{{discoveryInstanceId}}\",\n  \"baseUrl\": \"http://map-1:8085\",\n  \"statusPath\": \"/api/v1/status\",\n  \"wsPublicUrl\": \"ws://localhost:18085\",\n  \"version\": \"3.0.0\",\n  \"taskTimeoutMs\": 3000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
           }
         }
-      ],
-      "item": [
-        {
-          "name": "Register isolated fixture",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"baseUrl\": \"{{sdFixtureBaseUrl}}\",\n  \"statusPath\": \"/api/v1/status\",\n  \"version\": \"3.0.0\",\n  \"taskTimeoutMs\": 3000\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+      }
+    },
+    {
+      "name": "Renew test instance lease",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
           },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('sdFixtureOwned', 'false');"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('a new fixture ID is required', () => pm.response.to.have.status(201));",
-                  "const payload = pm.response.json();",
-                  "const owned = pm.response.code === 201 && payload.instanceId === pm.variables.get('sdFixtureInstanceId') && payload.baseUrl === pm.variables.get('sdFixtureBaseUrl');",
-                  "pm.collectionVariables.set('sdFixtureOwned', owned ? 'true' : 'false');",
-                  "pm.collectionVariables.set('sdFixtureOwnedId', owned ? payload.instanceId : '');",
-                  "pm.collectionVariables.set('sdFixtureOwnedBaseUrl', owned ? payload.baseUrl : '');",
-                  "pm.test('registration belongs to the configured fixture', () => pm.expect(owned).to.eql(true));",
-                  "pm.test('registration starts pending', () => pm.expect(payload.state).to.eql('pending'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Repeat identical fixture registration",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"baseUrl\": \"{{sdFixtureBaseUrl}}\",\n  \"statusPath\": \"/api/v1/status\",\n  \"version\": \"3.0.0\",\n  \"taskTimeoutMs\": 3000\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{discoveryInstanceId}}/lease"
+      }
+    },
+    {
+      "name": "Report a test instance failure",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('identical registration is idempotent', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().instanceId).to.eql(pm.variables.get('sdFixtureInstanceId')); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Renew fixture lease",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{sdFixtureInstanceId}}/lease",
-            "auth": {
-              "type": "noauth"
-            }
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('lease is renewed', () => { pm.response.to.have.status(200); const payload = pm.response.json(); pm.expect(payload.instanceId).to.eql(pm.variables.get('sdFixtureInstanceId')); pm.expect(Date.parse(payload.leaseExpiresAt)).to.be.above(Date.parse(payload.registeredAt)); });"
-                ]
-              }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"service\": \"{{discoveryService}}\",\n  \"instanceId\": \"{{discoveryInstanceId}}\",\n  \"attemptId\": \"{{$guid}}\",\n  \"endpoint\": \"POST /api/v1/locations\",\n  \"failure\": \"UPSTREAM_5XX\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
-        },
-        {
-          "name": "Wait for fixture readiness (bounded)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/battle/instances",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('initial lookup succeeds', () => pm.response.to.have.status(200));",
-                  "const wanted = pm.variables.get('sdFixtureInstanceId');",
-                  "const url = pm.variables.replaceIn('{{discoveryUrl}}/api/v1/internal/discovery/services/battle/instances');",
-                  "let tries = 0;",
-                  "function ready(response) {",
-                  "  const found = response.json().instances.some(x => x.instanceId === wanted && x.state === 'ready');",
-                  "  if (found || tries >= 20) { pm.test('the monitor makes the fixture ready', () => pm.expect(found).to.eql(true)); return; }",
-                  "  tries++;",
-                  "  setTimeout(() => pm.sendRequest({url, method:'GET', header:{'X-Service-Token':pm.variables.get('serviceToken'), 'X-Correlation-Id':pm.variables.replaceIn('{{$guid}}')}}, (error, next) => {",
-                  "    if (error || !next || next.code !== 200) { pm.test('bounded readiness poll succeeds', () => { pm.expect(error).to.not.exist; pm.expect(next && next.code).to.eql(200); }); return; }",
-                  "    ready(next);",
-                  "  }), 250);",
-                  "}",
-                  "ready(pm.response);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "409 - same ID cannot change its registration",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"baseUrl\": \"{{sdFixtureBaseUrl}}\",\n  \"statusPath\": \"/api/v1/status\",\n  \"version\": \"3.0.1\",\n  \"taskTimeoutMs\": 3000\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('409 INSTANCE_CONFLICT', () => { pm.response.to.have.status(409); pm.expect(pm.response.json().error.code).to.eql('INSTANCE_CONFLICT'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "First failed fixture attempt",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"attemptId\": \"{{sdFixtureAttemptId}}\",\n  \"endpoint\": \"GET /api/v1/battles/{battleId}\",\n  \"failure\": \"UPSTREAM_5XX\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('sdFixtureAttemptId', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('202 removed=false', () => { pm.response.to.have.status(202); pm.expect(pm.response.json().removed).to.eql(false); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Duplicate of the first attempt",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"attemptId\": \"{{sdFixtureAttemptId}}\",\n  \"endpoint\": \"GET /api/v1/battles/{battleId}\",\n  \"failure\": \"UPSTREAM_5XX\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('202 removed=false', () => { pm.response.to.have.status(202); pm.expect(pm.response.json().removed).to.eql(false); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Second failed fixture attempt",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"attemptId\": \"{{sdFixtureAttemptId}}\",\n  \"endpoint\": \"GET /api/v1/battles/{battleId}\",\n  \"failure\": \"UPSTREAM_5XX\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('sdFixtureAttemptId', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('202 removed=false', () => { pm.response.to.have.status(202); pm.expect(pm.response.json().removed).to.eql(false); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Two distinct failures keep the fixture routable",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/battle/instances",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('two failures do not remove the instance', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().instances.map(x => x.instanceId)).to.include(pm.variables.get('sdFixtureInstanceId')); });",
-                  "pm.collectionVariables.set('sdHealthySiblingIds', JSON.stringify(pm.response.json().instances.filter(x => x.instanceId !== pm.variables.get('sdFixtureInstanceId')).map(x => x.instanceId)));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Third failed fixture attempt removes it",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/failures",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"attemptId\": \"{{sdFixtureAttemptId}}\",\n  \"endpoint\": \"GET /api/v1/battles/{battleId}\",\n  \"failure\": \"UPSTREAM_5XX\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('sdFixtureAttemptId', pm.variables.replaceIn('{{$guid}}')); "
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('third distinct failure removes the fixture', () => { pm.response.to.have.status(202); pm.expect(pm.response.json().removed).to.eql(true); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Lookup excludes only the removed fixture",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/services/battle/instances",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('removed fixture is absent and healthy siblings remain', () => { pm.response.to.have.status(200); const ids = pm.response.json().instances.map(x => x.instanceId); pm.expect(ids).to.not.include(pm.variables.get('sdFixtureInstanceId')); for (const sibling of JSON.parse(pm.collectionVariables.get('sdHealthySiblingIds'))) pm.expect(ids).to.include(sibling); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "409 - a removed fixture cannot renew",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{sdFixtureInstanceId}}/lease",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('409 INSTANCE_REMOVED', () => { pm.response.to.have.status(409); pm.expect(pm.response.json().error.code).to.eql('INSTANCE_REMOVED'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "409 - re-registration cannot revive a removed ID",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances",
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"service\": \"battle\",\n  \"instanceId\": \"{{sdFixtureInstanceId}}\",\n  \"baseUrl\": \"{{sdFixtureBaseUrl}}\",\n  \"statusPath\": \"/api/v1/status\",\n  \"version\": \"3.0.0\",\n  \"taskTimeoutMs\": 3000\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('409 INSTANCE_REMOVED', () => { pm.response.to.have.status(409); pm.expect(pm.response.json().error.code).to.eql('INSTANCE_REMOVED'); });",
-                  "pm.test('common error envelope and correlation', () => { const payload = pm.response.json(); pm.expect(payload.correlationId).to.eql(pm.variables.get('sdCorrelationId')); pm.expect(payload.correlationId).to.eql(pm.response.headers.get('X-Correlation-Id')); pm.expect(Number.isNaN(Date.parse(payload.timestamp))).to.eql(false); pm.expect(payload.error).to.have.property('details'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Idempotent fixture cleanup 1",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{sdFixtureInstanceId}}",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('cleanup is idempotent', () => pm.response.to.have.status(204));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Idempotent fixture cleanup 2",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "X-Service-Token",
-                "value": "{{serviceToken}}"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{sdCorrelationId}}"
-              }
-            ],
-            "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{sdFixtureInstanceId}}",
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('cleanup is idempotent', () => pm.response.to.have.status(204));"
-                ]
-              }
-            }
-          ]
+          }
         }
-      ]
+      }
+    },
+    {
+      "name": "Deregister test instance",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-Service-Token",
+            "value": "{{serviceToken}}"
+          },
+          {
+            "key": "X-Correlation-Id",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": "{{discoveryUrl}}/api/v1/internal/discovery/instances/{{discoveryInstanceId}}"
+      }
     }
   ]
 }

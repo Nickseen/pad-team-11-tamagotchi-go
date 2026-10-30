@@ -1902,9 +1902,7 @@ environment. Domain collections call their service through the Gateway at
 `{{gatewayUrl}}/<serviceSlug>/api/v1/...`: user requests carry a Bearer token, which the Gateway
 validates and replaces with its trusted headers, and service requests carry only
 `X-Service-Token`. Each setup folder registers and logs in its own users, so no credential is
-stored in a collection. SD is an internal control-plane exception: its collection runs from the private service network
-and has no Gateway slug or published client port. Optional Map/Raid status requests use the
-already-exposed live-replica origins. The committed environment contains example URLs and non-working
+stored in a collection. The committed environment contains localhost URLs and non-working
 credential placeholders only. Do not commit exported environments containing real tokens or
 secrets.
 
@@ -1914,21 +1912,20 @@ secrets.
 | Tamagotchi | `tamagotchi.postman_collection.json` | Service routes with `X-Service-Token`; Gateway errors |
 | Package Registry | `package-registry.postman_collection.json` | Packages created by any user; admin requests skipped without `registryAdminToken` |
 | Battle | `battle.postman_collection.json` | Real data set up in Package Registry and Tamagotchi through the Gateway; the lineup checks Battle makes with Tamagotchi |
-| Map | `map.postman_collection.json` | Relationships, dynamic `map.stream` tickets; optional replica status and shared-position/round-robin checks |
+| Map | `map.postman_collection.json` | Map → User Management relationships; `map.stream` ticket negotiation |
 | Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
 | Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history |
-| Monster Raid | `monster-raid.postman_collection.json` | Dynamic `raid.feed` tickets; optional replica status, shared membership/HP and round robin; admin requests skip without `adminToken` |
-| Service Discovery | `service-discovery.postman_collection.json` | Internal status/lookup/auth validation; opt-in isolated registration, lease, report deduplication and three-error removal |
+| Monster Raid | `monster-raid.postman_collection.json` | `raid.feed` ticket negotiation with the participant check; admin requests skipped without `adminToken` |
 
 The environment `tamagotchi-go.postman_environment.json` defines `gatewayUrl`
 (`http://localhost:8080`), `guildUrl` for Guild's health probe, `packageId` for test-user
 registration, `serviceToken` as a placeholder and `battleDependencyMode`, which must match Battle's
 `DEPENDENCY_MODE` (`live` by default).
-Map/Raid additionally use `runReplicaChecks=false`, `expectedReplicaCount=2` and their
-`mapReplica1Url`/`raidReplica1Url` (plus 2/3) origins. Their collections are identical to the
-private repositories' updated files; import them as updates rather than making per-lab copies.
-The shared environment also defines `discoveryUrl=http://service-discovery:8090` for internal
-runs and keeps `sdRunLifecycle=false`; all pre-existing unrelated environment values are retained.
+
+Map/Raid collections include `/api/v1/status` through Gateway. The basic
+`service-discovery.postman_collection.json` runs from the internal network using `discoveryUrl`
+and `serviceToken`, with no public SD port. Use `discoveryService` for lookup; manual control
+requests require a dedicated test instance UUID in `discoveryInstanceId` and matching body.
 
 ### Import and configure
 
@@ -1942,21 +1939,6 @@ runs and keeps `sdRunLifecycle=false`; all pre-existing unrelated environment va
 5. Run a collection with the Collection Runner in its saved order. Collection-scoped variables
    hold scenario identifiers and generated values, so one service cannot overwrite another
    service's state, and every collection can be run repeatedly.
-
-### Optional Map/Raid replica checks and SD
-
-Set `runReplicaChecks=true`, choose 2 or 3 stable healthy replicas and configure their status
-origins (defaults: Map 18085/28085/38085, Raid 18088/28088/38088). Run each collection in saved
-order. The status folder records distinct process IDs; service-context reads use Gateway's
-physical-attempt metadata to prove rotation and shared positions/raid membership. Raid's HP
-check requires no concurrent external attacker. Business routes remain through Gateway.
-WebSocket URLs come from ticket responses and must not be rewritten to one fixed port.
-
-SD's read-only/negative folders require a runner inside the private network. Its lifecycle
-folder skips by default; enable it only for a fresh, explicitly allowlisted test fixture in an
-isolated SD process, never for a shared-stack replica. The SD repository's Postman section
-contains the fixture setup and Newman commands. These synthetic report checks do not replace
-#133/#134's real Gateway failure injection, live Telegram delivery or two-socket fan-out evidence.
 
 ### Run with Newman
 
