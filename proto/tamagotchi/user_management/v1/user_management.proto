@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+// Internal API of the User Management Service over gRPC (Lab 4 Grade 8): the service routes of the
+// REST contract, for other services calling through the Message Broker. Every call needs the shared
+// service token in the `x-service-token` metadata entry. Identifiers are canonical lowercase UUID
+// strings, timestamps RFC 3339 UTC with milliseconds, currency amounts int64. Errors use the gRPC
+// status mapped from the REST status, with the CPR error code first in the message
+// (`NOT_FOUND: USER_NOT_FOUND: No such user.`).
+package tamagotchi.user_management.v1;
+
+option go_package = "github.com/vladas9/tamagotchi-user-management/gen/tamagotchi/user_management/v1;usermanagementv1";
+
+service UserManagementInternal {
+  // GET /api/v1/internal/relationships: how one user relates to up to 100 others.
+  rpc GetRelationships(GetRelationshipsRequest) returns (GetRelationshipsReply);
+  // GET /api/v1/users?ids=: public profiles of up to 100 users, for bulk resolution.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersReply);
+  // GET /api/v1/internal/users/{userId}/balances.
+  rpc GetBalances(GetBalancesRequest) returns (Balances);
+  // GET /api/v1/internal/users/{userId}/balances/check.
+  rpc CheckBalance(CheckBalanceRequest) returns (CheckBalanceReply);
+  // POST /api/v1/internal/users/{userId}/balances/adjust: idempotent on command_id.
+  rpc AdjustBalance(AdjustBalanceRequest) returns (Balances);
+}
+
+message GetRelationshipsRequest {
+  string user_id = 1;
+  repeated string other_user_ids = 2;
+}
+
+message Relationship {
+  // The other user.
+  string user_id = 1;
+  // `friend`, `enemy` or `none`.
+  string relation = 2;
+  // Empty when there is no relationship.
+  string since = 3;
+}
+
+message GetRelationshipsReply {
+  repeated Relationship items = 1;
+}
+
+message ListUsersRequest {
+  repeated string ids = 1;
+}
+
+message User {
+  string user_id = 1;
+  string username = 2;
+  optional string display_name = 3;
+  optional string avatar_ref = 4;
+  string status = 5;
+  string created_at = 6;
+}
+
+message ListUsersReply {
+  repeated User items = 1;
+}
+
+message GetBalancesRequest {
+  string user_id = 1;
+}
+
+message LocalBalance {
+  string package_id = 1;
+  int64 amount = 2;
+}
+
+message Balances {
+  string user_id = 1;
+  int64 global_currency = 2;
+  repeated LocalBalance local_balances = 3;
+  string updated_at = 4;
+}
+
+message CheckBalanceRequest {
+  string user_id = 1;
+  // `global` or `local`.
+  string currency = 2;
+  // Required when currency is `local`.
+  string package_id = 3;
+  int64 amount = 4;
+}
+
+message CheckBalanceReply {
+  bool sufficient = 1;
+  int64 available = 2;
+}
+
+message AdjustBalanceRequest {
+  string user_id = 1;
+  string command_id = 2;
+  string currency = 3;
+  string package_id = 4;
+  int64 delta = 5;
+  string reason = 6;
+}
