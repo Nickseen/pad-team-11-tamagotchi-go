@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+// gRPC interface of the Tamagotchi Go Message Broker.
+//
+// Every call carries the shared service token in the `x-service-token` metadata entry. Calls to
+// other `tamagotchi.<service>.v1` packages sent to the Broker are forwarded to a ready instance of
+// that service (see the README); this file defines only the Broker's own services.
+package tamagotchi.broker.v1;
+
+// Topic publication and inspection: the gRPC twin of the Broker's HTTP topic endpoints.
+service Broker {
+  // Stores one copy of the event for every subscribing service.
+  rpc Publish(PublishRequest) returns (PublishReply);
+  rpc ListTopics(ListTopicsRequest) returns (ListTopicsReply);
+  rpc ListDeadLetters(ListDeadLettersRequest) returns (ListDeadLettersReply);
+}
+
+// Implemented by subscribers that register `eventsTransport: "grpc"` and a `grpcAddress`.
+service EventSink {
+  // Delivers one event. Any OK reply acknowledges it; UNAVAILABLE, DEADLINE_EXCEEDED, INTERNAL,
+  // UNKNOWN and RESOURCE_EXHAUSTED are retried; any other status dead-letters it.
+  rpc Deliver(DeliverRequest) returns (DeliverReply);
+}
+
+message PublishRequest {
+  // Topic such as `battle.finished`; must equal the envelope's `eventType`.
+  string topic = 1;
+  // The CPR event envelope as JSON.
+  string event_json = 2;
+}
+
+message PublishReply {
+  string message_id = 1;
+  repeated string subscribers = 2;
+}
+
+message ListTopicsRequest {}
+
+message TopicSubscriber {
+  string service = 1;
+  string queue = 2;
+  uint64 depth = 3;
+}
+
+message Topic {
+  string pattern = 1;
+  repeated TopicSubscriber subscribers = 2;
+}
+
+message ListTopicsReply {
+  repeated Topic topics = 1;
+}
+
+message ListDeadLettersRequest {
+  // Empty for every queue.
+  string queue = 1;
+  uint32 offset = 2;
+  // At most 100; 0 means 50.
+  uint32 limit = 3;
+}
+
+message DeadLetter {
+  string id = 1;
+  string queue = 2;
+  string reason = 3;
+  string dead_lettered_at = 4;
+  string message_id = 5;
+  string topic = 6;
+  string event_json = 7;
+  uint32 attempts = 8;
+}
+
+message ListDeadLettersReply {
+  repeated DeadLetter items = 1;
+  uint32 total = 2;
+}
+
+message DeliverRequest {
+  string message_id = 1;
+  string topic = 2;
+  // The CPR event envelope exactly as published, as JSON.
+  string event_json = 3;
+  // 1 for the first delivery.
+  uint32 attempt = 4;
+}
+
+message DeliverReply {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    APPLIED = 1;
+    DUPLICATE = 2;
+    IGNORED = 3;
+  }
+  Status status = 1;
+}

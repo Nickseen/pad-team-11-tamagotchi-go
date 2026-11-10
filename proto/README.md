@@ -10,8 +10,7 @@ client without access to the owner's repository.
 | ---- | ------- | ------- | ----- | --------- |
 | [`tamagotchi/user_management/v1/user_management.proto`](tamagotchi/user_management/v1/user_management.proto) | `tamagotchi.user_management.v1` | `UserManagementInternal` | User Management | 4.0.0 and later, `GRPC_PORT` (default `9081`) |
 
-Not published yet: Tamagotchi (#159), Guild (#161), Package Registry (#162), Map (#163), Monster
-Raid (#164) and the Broker's own `tamagotchi/broker/v1/broker.proto` (#151). Until a dependency's
+Not published yet: Tamagotchi (#159), Guild (#161) and Package Registry (#162). Until a dependency's
 proto is here and its service serves it, call that dependency through its Broker HTTP queue.
 
 ## Rules
@@ -80,3 +79,15 @@ reply, err := client.GetRelationships(ctx, &usermanagementv1.GetRelationshipsReq
 ```
 
 Battle 4.0.0 calls `GetRelationships` exactly this way.
+
+## Schemas prepared with #151
+
+- `tamagotchi/broker/v1/broker.proto`: byte-for-byte Broker dev `11d85d9` schema.
+- `tamagotchi/map/v1/map.proto`: MapInternal.GetPosition (#163), proposed for 4.0.0.
+- `tamagotchi/monster_raid/v1/monster_raid.proto`: MonsterRaidInternal.GetParticipant (#164), proposed for 4.0.0.
+
+Map/Raid copies become released schemas only after their reviewed service releases.
+Read [the Broker contract](../docs/lab4-broker-contract.md) for topology, durable events,
+SD metadata, failover and monitoring. The published User Management schema from #166
+is preserved unchanged. Pending dependency schemas must come from their owners; use
+Broker HTTP queues until those schemas and servers are published.

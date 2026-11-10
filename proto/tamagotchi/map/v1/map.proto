@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package tamagotchi.map.v1;
+
+option go_package = "github.com/Nickseen/tamagotchi-map/gen/tamagotchi/map/v1;mapv1";
+
+// Authenticated with the shared x-service-token metadata entry.
+service MapInternal {
+  rpc GetPosition(GetPositionRequest) returns (GetPositionReply);
+}
+
+message GetPositionRequest {
+  string user_id = 1;
+}
+
+message GetPositionReply {
+  string user_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  double accuracy_meters = 4;
+  string recorded_at = 5;
+  string expires_at = 6;
+}
