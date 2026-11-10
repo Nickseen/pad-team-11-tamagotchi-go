@@ -9,14 +9,15 @@ if (!token || token.startsWith('CHANGE_ME') || !Number.isSafeInteger(expected) |
   console.error('Set a valid SERVICE_TOKEN, EXPECTED_REPLICAS and service list.'); process.exit(2);
 }
 for (const origin of [sd, broker]) {
-  const u = new URL(origin);
+  let u;
+  try { u = new URL(origin); } catch { console.error("Discovery/Broker settings must be valid HTTP origins."); process.exit(2); }
   if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.pathname !== '/' || u.search || u.hash) {
     console.error('Discovery/Broker settings must be HTTP origins without credentials or paths.'); process.exit(2);
   }
 }
 let failed = false;
 async function read(base, path) {
-  const response = await fetch(base + path, { headers: {'X-Service-Token': token}, redirect: 'error', signal: AbortSignal.timeout(5000) });
+  const response = await fetch(base.replace(/\/$/, '') + path, { headers: {'X-Service-Token': token}, redirect: 'error', signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error('HTTP ' + response.status);
   return response.json();
 }
