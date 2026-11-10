@@ -28,3 +28,6 @@
 [submodule "services/service-discovery"]
 	path = services/service-discovery
 	url = git@github.com:Nickseen/tamagotchi-service-discovery.git
+[submodule "services/message-broker"]
+	path = services/message-broker
+	url = git@github.com:Nickseen/tamagotchi-message-broker.git

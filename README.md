@@ -8,6 +8,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 
 ## Table of Contents
 
+- [Lab 4 Repository Bootstrap](#lab-4-repository-bootstrap)
 - [Service Boundaries](#service-boundaries)
 - [Architecture Diagram](#architecture-diagram)
 - [Technologies and Communication Patterns](#technologies-and-communication-patterns)
@@ -20,6 +21,15 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Contribution Workflow](#contribution-workflow)
 
 ---
+
+## Lab 4 Repository Bootstrap
+
+The private [Rust Message Broker repository](https://github.com/Nickseen/tamagotchi-message-broker)
+is connected at `services/message-broker` for [bootstrap task #146](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/146).
+Vlad (`@vladas9`) owns the Broker implementation; Nickseen configures access, repository rules and
+CI. The initial submodule pin is the GitHub-created README seed (`c0a45d8`), not a runtime release.
+Repository workflow/templates are prepared through a reviewed Broker PR. Lab 4 protocol, queues,
+gRPC, deployment, monitoring and architecture changes follow separate agreed implementation work.
 
 ## Service Boundaries
 
