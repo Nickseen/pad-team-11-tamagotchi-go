@@ -91,6 +91,8 @@ x-user-management: &user-management
   image: amzavladislav/tamagotchi-user-management:3.0.0
   restart: unless-stopped
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     user-management-db:
       condition: service_healthy
   secrets:
@@ -106,6 +108,8 @@ x-tamagotchi: &tamagotchi
   image: crislp/tamagotchi-tamagotchi:3.0.0
   restart: on-failure
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     tamagotchi-db:
       condition: service_healthy
   healthcheck:
@@ -122,6 +126,8 @@ x-package-registry: &package-registry
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     package-registry-db:
       condition: service_healthy
   healthcheck:
@@ -140,6 +146,8 @@ x-battle: &battle
   image: amzavladislav/tamagotchi-battle:3.0.0
   restart: unless-stopped
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     battle-db:
       condition: service_healthy
 
@@ -161,6 +169,8 @@ x-map: &map
   image: nickseen/tamagotchi-map:3.1.0 # its image declares the /healthz check
   restart: on-failure # a single Redis ping at start-up, no retry
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     map-redis:
       condition: service_healthy
 
@@ -174,6 +184,8 @@ x-notification: &notification
   image: crislp/tamagotchi-notification:3.0.0
   restart: on-failure
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     notification-db:
       condition: service_healthy
   healthcheck:
@@ -196,6 +208,8 @@ x-guild: &guild
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     guild-db:
       condition: service_healthy
     guild-redis:
@@ -223,6 +237,8 @@ x-monster-raid: &monster-raid
   image: nickseen/tamagotchi-monster-raid:3.1.0 # its image declares the /healthz check
   restart: on-failure
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     monster-raid-db:
       condition: service_healthy
     monster-raid-redis:
