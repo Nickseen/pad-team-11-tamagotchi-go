@@ -1960,6 +1960,7 @@ secrets.
 | Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
 | Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history |
 | Monster Raid | `monster-raid.postman_collection.json` | `raid.feed` ticket negotiation with the participant check; admin requests skipped without `adminToken` |
+| Gateway | `gateway-logs.postman_collection.json` | Lab 4 #155: `GET /api/v1/gateway/logs` downloads the system logs as NDJSON (last 15 minutes); set `adminToken` (and optionally `userToken` for the `403` case) |
 
 The environment `tamagotchi-go.postman_environment.json` defines `gatewayUrl`
 (`http://localhost:8080`), `guildUrl` for Guild's health probe, `packageId` for test-user

@@ -1,0 +1,144 @@
+{
+  "info": {
+    "name": "Gateway: system logs",
+    "description": "Lab 4 Grade 3 (#155): GET {{gatewayUrl}}/api/v1/gateway/logs downloads the log lines of every service replica, the Gateway, Service Discovery and the Message Broker for a time range, as NDJSON. Admin only. Set the collection variable adminToken to an access token whose roles include admin; the requests compute a range covering the last 15 minutes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "adminToken", "value": "" },
+    { "key": "userToken", "value": "" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const to = new Date();",
+          "const from = new Date(to.getTime() - 15 * 60 * 1000);",
+          "pm.collectionVariables.set('logsFrom', from.toISOString().replace(/\\.\\d{3}Z$/, 'Z'));",
+          "pm.collectionVariables.set('logsTo', to.toISOString().replace(/\\.\\d{3}Z$/, 'Z'));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Download Guild warnings and errors (admin)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 NDJSON download', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/x-ndjson');",
+              "  pm.expect(pm.response.headers.get('Content-Disposition')).to.match(/attachment; filename=\"logs-guild-\\d{8}T\\d{4}Z\\.ndjson\"/);",
+              "});",
+              "pm.test('every line is a Guild warn or error log line', () => {",
+              "  const lines = pm.response.text().split('\\n').filter(Boolean).map(JSON.parse);",
+              "  lines.forEach((line) => {",
+              "    pm.expect(line.service).to.eql('guild');",
+              "    pm.expect(['warn', 'warning', 'error']).to.include(line.level);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": "{{gatewayUrl}}/api/v1/gateway/logs?service=guild&level=warn&from={{logsFrom}}&to={{logsTo}}&limit=5000"
+      }
+    },
+    {
+      "name": "Download everything (admin)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 with lines from several components', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const services = new Set(pm.response.text().split('\\n').filter(Boolean).map((l) => JSON.parse(l).service));",
+              "  pm.expect(services.size).to.be.above(1);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": "{{gatewayUrl}}/api/v1/gateway/logs?service=all&from={{logsFrom}}&to={{logsTo}}&limit=1000"
+      }
+    },
+    {
+      "name": "Error: range over 24 hours",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 VALIDATION_FAILED', () => {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": "{{gatewayUrl}}/api/v1/gateway/logs?from=2026-11-10T00:00:00Z&to=2026-11-11T00:00:01Z"
+      }
+    },
+    {
+      "name": "Error: not an admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get('userToken')) { pm.test('skipped: set userToken to a non-admin token', () => {}); return; }",
+              "pm.test('403 FORBIDDEN', () => {",
+              "  pm.response.to.have.status(403);",
+              "  pm.expect(pm.response.json().error.code).to.eql('FORBIDDEN');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }],
+        "url": "{{gatewayUrl}}/api/v1/gateway/logs?from={{logsFrom}}&to={{logsTo}}"
+      }
+    },
+    {
+      "name": "Error: no access token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 UNAUTHORIZED', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{gatewayUrl}}/api/v1/gateway/logs?from={{logsFrom}}&to={{logsTo}}"
+      }
+    }
+  ]
+}
