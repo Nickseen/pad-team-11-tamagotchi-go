@@ -277,8 +277,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service, status) (rate(broker_requests_total[1m]))",
-          "legendFormat": "{{service}} {{status}}",
+          "expr": "sum by (exported_service, status) (rate(broker_requests_total[1m]))",
+          "legendFormat": "{{exported_service}} {{status}}",
           "refId": "A"
         }
       ],
@@ -315,8 +315,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(broker_request_duration_seconds_bucket[1m])))",
-          "legendFormat": "{{service}}",
+          "expr": "histogram_quantile(0.95, sum by (le, exported_service) (rate(broker_request_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{exported_service}}",
           "refId": "A"
         }
       ],
@@ -400,8 +400,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service) (broker_request_queue_depth)",
-          "legendFormat": "{{service}}",
+          "expr": "sum by (exported_service) (broker_request_queue_depth)",
+          "legendFormat": "{{exported_service}}",
           "refId": "A"
         }
       ],
@@ -476,8 +476,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service, outcome) (rate(broker_deliveries_total[1m]))",
-          "legendFormat": "{{service}} {{outcome}}",
+          "expr": "sum by (exported_service, outcome) (rate(broker_deliveries_total[1m]))",
+          "legendFormat": "{{exported_service}} {{outcome}}",
           "refId": "A"
         }
       ],
@@ -552,8 +552,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service) (increase(broker_reroutes_total[1m]))",
-          "legendFormat": "reroute {{service}}",
+          "expr": "sum by (exported_service) (increase(broker_reroutes_total[1m]))",
+          "legendFormat": "reroute {{exported_service}}",
           "refId": "A"
         },
         {
@@ -561,8 +561,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service) (increase(broker_circuit_trips_total[1m]))",
-          "legendFormat": "trip {{service}}",
+          "expr": "sum by (exported_service) (increase(broker_circuit_trips_total[1m]))",
+          "legendFormat": "trip {{exported_service}}",
           "refId": "B"
         },
         {
@@ -570,8 +570,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service, failure) (increase(broker_upstream_failures_total[1m]))",
-          "legendFormat": "{{failure}} {{service}}",
+          "expr": "sum by (exported_service, failure) (increase(broker_upstream_failures_total[1m]))",
+          "legendFormat": "{{failure}} {{exported_service}}",
           "refId": "C"
         }
       ],
@@ -608,8 +608,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service, reason) (rate(broker_requests_rejected_total[1m]))",
-          "legendFormat": "{{service}} {{reason}}",
+          "expr": "sum by (exported_service, reason) (rate(broker_requests_rejected_total[1m]))",
+          "legendFormat": "{{exported_service}} {{reason}}",
           "refId": "A"
         }
       ],
@@ -646,8 +646,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(broker_queue_wait_seconds_bucket[1m])))",
-          "legendFormat": "{{service}}",
+          "expr": "histogram_quantile(0.95, sum by (le, exported_service) (rate(broker_queue_wait_seconds_bucket[1m])))",
+          "legendFormat": "{{exported_service}}",
           "refId": "A"
         }
       ],
