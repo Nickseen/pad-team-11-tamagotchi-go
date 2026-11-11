@@ -280,8 +280,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (service, code) (rate(dependency_calls_total{service=~\"$service\"}[1m]))",
-          "legendFormat": "{{service}} {{code}}",
+          "expr": "sum by (service, exported_service, code) (rate(dependency_calls_total{service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}} -> {{exported_service}} {{code}}",
           "refId": "A"
         }
       ],
