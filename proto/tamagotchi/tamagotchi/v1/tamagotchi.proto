@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+// Internal API of the Tamagotchi Service over gRPC (Lab 4 Grade 8): the service routes of the REST
+// contract, for other services calling through the Message Broker. Every call needs the shared
+// service token in the `x-service-token` metadata entry. Identifiers are canonical lowercase UUID
+// strings, timestamps RFC 3339 UTC with milliseconds. Errors use the gRPC status mapped from the
+// REST status, with the CPR error code first in the message
+// (`NOT_FOUND: NO_PRIMARY_TAMAGOTCHI: The user has no primary Tamagotchi.`).
+package tamagotchi.tamagotchi.v1;
+
+option go_package = "github.com/CyberMoonie/tamagotchi-tamagotchi/gen/tamagotchi/tamagotchi/v1;tamagotchiv1";
+
+service TamagotchiInternal {
+  // GET /api/v1/internal/tamagotchis?ids=: up to 50 creatures in one call; unknown ids are left out.
+  rpc ListTamagotchis(ListTamagotchisRequest) returns (ListTamagotchisReply);
+  // GET /api/v1/internal/users/{userId}/primary-tamagotchi.
+  rpc GetPrimary(GetPrimaryRequest) returns (GetPrimaryReply);
+  // GET /api/v1/internal/users/{userId}/secondary-tamagotchis/{tamagotchiId}.
+  rpc GetSecondaryHolding(GetSecondaryHoldingRequest) returns (GetSecondaryHoldingReply);
+  // POST /api/v1/internal/users/{userId}/secondary-tamagotchis: idempotent on command_id.
+  rpc CreateSecondary(CreateSecondaryRequest) returns (CreateSecondaryReply);
+  // POST /api/v1/internal/tamagotchis/{tamagotchiId}/xp: idempotent on command_id.
+  rpc GrantXp(GrantXpRequest) returns (GrantXpReply);
+  // POST /api/v1/internal/tamagotchis/{tamagotchiId}/transfer-owner: applied once per battle_id.
+  rpc TransferOwner(TransferOwnerRequest) returns (TransferOwnerReply);
+  // GET /api/v1/combat-types/advantage.
+  rpc GetTypeAdvantage(GetTypeAdvantageRequest) returns (GetTypeAdvantageReply);
+}
+
+message Tamagotchi {
+  string tamagotchi_id = 1;
+  string owner_id = 2;
+  string origin_package_id = 3;
+  string name = 4;
+  // `flame`, `nature`, `earth`, `electric`, `water` or `shadow`.
+  string combat_type = 5;
+  int32 level = 6;
+  int64 xp = 7;
+  string sprite_ref = 8;
+  // The stat document, as in REST: stat name to value.
+  map<string, double> stats = 9;
+  int32 stats_version = 10;
+  optional string captured_in_battle_id = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+message ListTamagotchisRequest {
+  // 1 to 50 ids.
+  repeated string ids = 1;
+}
+
+message ListTamagotchisReply {
+  repeated Tamagotchi items = 1;
+}
+
+message GetPrimaryRequest {
+  string user_id = 1;
+}
+
+message GetPrimaryReply {
+  Tamagotchi tamagotchi = 1;
+}
+
+message GetSecondaryHoldingRequest {
+  string user_id = 1;
+  string tamagotchi_id = 2;
+}
+
+message GetSecondaryHoldingReply {
+  bool is_held = 1;
+  // Set only when is_held is true.
+  optional string reference_id = 2;
+}
+
+message CreateSecondaryRequest {
+  string command_id = 1;
+  // The user who receives the secondary reference.
+  string user_id = 2;
+  string tamagotchi_id = 3;
+  // `battle`, `trade` or `capture`.
+  string acquired_from = 4;
+}
+
+message SecondaryReference {
+  string reference_id = 1;
+  string holder_id = 2;
+  string tamagotchi_id = 3;
+  string acquired_from = 4;
+  string acquired_at = 5;
+}
+
+message CreateSecondaryReply {
+  SecondaryReference reference = 1;
+}
+
+message GrantXpRequest {
+  string command_id = 1;
+  string tamagotchi_id = 2;
+  // At least 0.
+  int64 amount = 3;
+  // Why the XP is granted, e.g. `battle` or `raid`.
+  string source = 4;
+}
+
+message GrantXpReply {
+  string tamagotchi_id = 1;
+  int32 level = 2;
+  int64 xp = 3;
+  bool leveled_up = 4;
+}
+
+message TransferOwnerRequest {
+  string command_id = 1;
+  string tamagotchi_id = 2;
+  string new_owner_id = 3;
+  string battle_id = 4;
+}
+
+message TransferOwnerReply {
+  Tamagotchi tamagotchi = 1;
+}
+
+message GetTypeAdvantageRequest {
+  string attacker = 1;
+  string defender = 2;
+}
+
+message GetTypeAdvantageReply {
+  // 1.5 when the attacker is strong against the defender, 0.75 when weak, else 1.0.
+  double multiplier = 1;
+}

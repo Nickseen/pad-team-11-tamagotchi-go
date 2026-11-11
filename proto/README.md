@@ -11,9 +11,11 @@ client without access to the owner's repository.
 | [`tamagotchi/user_management/v1/user_management.proto`](tamagotchi/user_management/v1/user_management.proto) | `tamagotchi.user_management.v1` | `UserManagementInternal` | User Management | 4.0.0 and later, `GRPC_PORT` (default `9081`) |
 | [`tamagotchi/guild/v1/guild.proto`](tamagotchi/guild/v1/guild.proto) | `tamagotchi.guild.v1` | `GuildInternal` | Guild | 4.0.0 and later, `GRPC_PORT` (default `9087`) |
 | [`tamagotchi/package_registry/v1/package_registry.proto`](tamagotchi/package_registry/v1/package_registry.proto) | `tamagotchi.package_registry.v1` | `PackageRegistryInternal` | Package Registry | 4.0.0 and later, `GRPC_PORT` (default `9083`) |
+| [`tamagotchi/tamagotchi/v1/tamagotchi.proto`](tamagotchi/tamagotchi/v1/tamagotchi.proto) | `tamagotchi.tamagotchi.v1` | `TamagotchiInternal` | Tamagotchi | 4.0.0 and later, `GRPC_PORT` (default `9082`) |
 
-Not published yet: Tamagotchi (#159), Guild (#161) and Package Registry (#162). Until a dependency's
-proto is here and its service serves it, call that dependency through its Broker HTTP queue.
+Map (#163) and Monster Raid (#164) have proposed schemas, listed under "Schemas prepared with #151"
+below; they become published when their services release them. Until a dependency's proto is here and
+its service serves it, call that dependency through its Broker HTTP queue.
 
 ## Rules
 
