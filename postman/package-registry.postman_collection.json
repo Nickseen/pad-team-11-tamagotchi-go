@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Package Registry Service",
-    "description": "CRUD and lifecycle requests for the Package Registry service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/package-registry. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity and role headers, so the Registry never sees Authorization. Moderator checks use the package's moderatorIds; admin checks use the Gateway-provided roles. Internal routes send X-Service-Token and no user token. Admin-only requests are skipped when no registryAdminToken is set, since User Management only issues the user role.",
+    "description": "CRUD and lifecycle requests for the Package Registry service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/package-registry. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity and role headers, so the Registry never sees Authorization. Moderator checks use the package's moderatorIds; admin checks use the Gateway-provided roles. Internal routes send X-Service-Token and no user token. Admin-only requests are skipped when no registryAdminToken is set, since User Management only issues the user role. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -452,7 +452,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions"
           },
           "response": []
         },
@@ -478,7 +478,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
           },
           "response": []
         }
@@ -817,7 +817,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/raid-definitions/{{raidDefinitionId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/raid-definitions/{{raidDefinitionId}}"
           },
           "response": []
         },
@@ -1054,7 +1054,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{emptyPackageId}}/versions/current"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{emptyPackageId}}/versions/current"
           },
           "response": []
         },
@@ -1126,7 +1126,7 @@
                 "value": "definitely-wrong"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
           },
           "response": []
         }

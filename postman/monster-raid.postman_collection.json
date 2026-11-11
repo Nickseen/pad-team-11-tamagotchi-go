@@ -2,7 +2,7 @@
   "info": {
     "name": "Monster Raid Service (through Gateway)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Run in saved order against the shared stack. User Management registration and all REST requests go through Gateway. The raid lifecycle uses the configured mock Guild/Registry/Tamagotchi IDs unless real fixtures are provided. The raid.feed ticket returns a direct WebSocket URL; open it separately in Postman. Admin-only requests skip without a real admin JWT. Do not commit a real service token or ticket."
+    "description": "Run in saved order against the shared stack. User Management registration and all REST requests go through Gateway. The raid lifecycle uses the configured mock Guild/Registry/Tamagotchi IDs unless real fixtures are provided. The raid.feed ticket returns a direct WebSocket URL; open it separately in Postman. Admin-only requests skip without a real admin JWT. Do not commit a real service token or ticket. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN."
   },
   "item": [
     {
@@ -114,7 +114,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/monster-raid/api/v1/status"
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/status"
           }
         }
       ]
@@ -312,7 +312,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}"
           },
           "response": [],
           "event": [
@@ -553,7 +553,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/internal/raids/{{raidId}}/participants/{{userId}}"
           },
           "response": [],
           "event": [

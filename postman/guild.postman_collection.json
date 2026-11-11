@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Guild Service",
-    "description": "CRUD, membership and Guild Chat negotiation requests for the Guild service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/guild. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity headers, so Guild never sees Authorization. Internal routes send X-Service-Token and no user token. The invitation flow exercises Guild's call to User Management, which also goes through Gateway. WebSocket frames cannot run in the Collection Runner: the negotiation folder checks the ticket URL, and tamagotchi-guild's scripts/ws_chat_client.py walks through the socket contract with it.",
+    "description": "CRUD, membership and Guild Chat negotiation requests for the Guild service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/guild. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity headers, so Guild never sees Authorization. Internal routes send X-Service-Token and no user token. The invitation flow exercises Guild's call to User Management, which also goes through Gateway. WebSocket frames cannot run in the Collection Runner: the negotiation folder checks the ticket URL, and tamagotchi-guild's scripts/ws_chat_client.py walks through the socket contract with it. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -386,7 +386,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/guild/api/v1/internal/guilds/{{guildId}}"
           },
           "response": []
         }
@@ -803,7 +803,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}/members/{{inviteeId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/guild/api/v1/internal/guilds/{{guildId}}/members/{{inviteeId}}"
           },
           "response": []
         },
@@ -829,7 +829,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}/members"
+            "url": "{{brokerUrl}}/api/v1/queues/guild/api/v1/internal/guilds/{{guildId}}/members"
           },
           "response": []
         },
@@ -856,7 +856,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}/members?limit=1"
+            "url": "{{brokerUrl}}/api/v1/queues/guild/api/v1/internal/guilds/{{guildId}}/members?limit=1"
           },
           "response": []
         },
@@ -1075,7 +1075,7 @@
                 "value": "definitely-wrong"
               }
             ],
-            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/{{guildId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/guild/api/v1/internal/guilds/{{guildId}}"
           },
           "response": []
         },
@@ -1101,7 +1101,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/guild/api/v1/internal/guilds/00000000-0000-4000-8000-000000000000"
+            "url": "{{brokerUrl}}/api/v1/queues/guild/api/v1/internal/guilds/00000000-0000-4000-8000-000000000000"
           },
           "response": []
         }
