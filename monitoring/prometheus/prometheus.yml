@@ -1,0 +1,52 @@
+# Prometheus for the Lab 4 stack (#154). Every 5 s it scrapes the Broker, Gateway, Service
+# Discovery and every replica's GET /metrics on the Compose network. The optional third replicas
+# (scale-* profiles) show as down while they are not running; that is expected.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: message-broker
+    static_configs:
+      - targets: ["message-broker:8091"]
+        labels: { service: message-broker }
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:8080"]
+        labels: { service: gateway }
+  - job_name: service-discovery
+    static_configs:
+      - targets: ["service-discovery:8090"]
+        labels: { service: service-discovery }
+  - job_name: user-management
+    static_configs:
+      - targets: ["user-management-1:8081", "user-management-2:8081", "user-management-3:8081"]
+        labels: { service: user-management }
+  - job_name: tamagotchi
+    static_configs:
+      - targets: ["tamagotchi-1:8082", "tamagotchi-2:8082", "tamagotchi-3:8082"]
+        labels: { service: tamagotchi }
+  - job_name: package-registry
+    static_configs:
+      - targets: ["package-registry-1:8083", "package-registry-2:8083", "package-registry-3:8083"]
+        labels: { service: package-registry }
+  - job_name: battle
+    static_configs:
+      - targets: ["battle-1:8084", "battle-2:8084", "battle-3:8084"]
+        labels: { service: battle }
+  - job_name: map
+    static_configs:
+      - targets: ["map-1:8085", "map-2:8085", "map-3:8085"]
+        labels: { service: map }
+  - job_name: notification
+    static_configs:
+      - targets: ["notification-1:8086", "notification-2:8086", "notification-3:8086"]
+        labels: { service: notification }
+  - job_name: guild
+    static_configs:
+      - targets: ["guild-1:8087", "guild-2:8087", "guild-3:8087"]
+        labels: { service: guild }
+  - job_name: monster-raid
+    static_configs:
+      - targets: ["monster-raid-1:8088", "monster-raid-2:8088", "monster-raid-3:8088"]
+        labels: { service: monster-raid }
