@@ -1,6 +1,10 @@
 # Prometheus for the Lab 4 stack (#154). Every 5 s it scrapes the Broker, Gateway, Service
 # Discovery and every replica's GET /metrics on the Compose network. The optional third replicas
 # (scale-* profiles) show as down while they are not running; that is expected.
+#
+# Each target gets a `service` label (the component scraped). Metrics that carry their own `service`
+# label (the Broker's per-service metrics, dependency_calls_total) keep theirs as `exported_service`,
+# so in queries `service` is who reported it and `exported_service` is the service it is about.
 global:
   scrape_interval: 5s
   evaluation_interval: 5s
