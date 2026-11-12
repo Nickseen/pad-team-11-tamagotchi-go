@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+// Internal API of the Package Registry Service over gRPC (Lab 4 Grade 8): the /api/v1/internal routes of
+// the REST contract, for other services calling through the Message Broker. Every call needs the shared
+// service token in the `x-service-token` metadata entry. Identifiers are canonical lowercase UUID
+// strings, timestamps RFC 3339 UTC with milliseconds, currency amounts int64. Free-form JSON objects
+// (growth rules, special properties) travel as JSON text. Errors use the gRPC status mapped from the REST
+// status, with the CPR error code first in the message (`NOT_FOUND: VERSION_NOT_FOUND: ...`).
+package tamagotchi.package_registry.v1;
+
+option go_package = "github.com/gabimiric/tamagotchi-package-registry/gen/tamagotchi/package_registry/v1;packageregistryv1";
+
+service PackageRegistryInternal {
+  // GET /api/v1/internal/packages/{packageId}/versions/{version}/stat-definitions: Battle's stat rules.
+  rpc ListStatDefinitions(ListStatDefinitionsRequest) returns (ListStatDefinitionsReply);
+  // GET /api/v1/internal/packages/{packageId}/versions/current: the package's latest published version.
+  rpc GetCurrentVersion(GetCurrentVersionRequest) returns (GetCurrentVersionReply);
+  // GET /api/v1/internal/raid-definitions/{raidDefinitionId}: a raid definition and its monster.
+  rpc GetRaidDefinition(GetRaidDefinitionRequest) returns (GetRaidDefinitionReply);
+}
+
+message CombatBonus {
+  double threshold = 1;
+  // `gte` or `lte`.
+  string comparison = 2;
+  double multiplier = 3;
+}
+
+message StatDefinition {
+  string key = 1;
+  string label = 2;
+  double min_value = 3;
+  double max_value = 4;
+  bool higher_is_better = 5;
+  // Absent when the stat gives no combat bonus.
+  optional CombatBonus combat_bonus = 6;
+}
+
+message ListStatDefinitionsRequest {
+  string package_id = 1;
+  // SemVer, e.g. `1.0.0`.
+  string version = 2;
+}
+
+message ListStatDefinitionsReply {
+  string version = 1;
+  repeated StatDefinition items = 2;
+}
+
+message GetCurrentVersionRequest {
+  string package_id = 1;
+}
+
+message PackageVersion {
+  string package_id = 1;
+  string version = 2;
+  repeated StatDefinition stat_definitions = 3;
+  // The version's growth rules object as JSON text (`{}` when empty).
+  string growth_rules_json = 4;
+  string published_at = 5;
+}
+
+message GetCurrentVersionReply {
+  PackageVersion version = 1;
+}
+
+message GetRaidDefinitionRequest {
+  string raid_definition_id = 1;
+}
+
+message RewardConfig {
+  int64 global_currency = 1;
+  int64 xp = 2;
+  // `equal` or `damage_weighted`.
+  string distribution = 3;
+}
+
+message Monster {
+  string monster_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string sprite_refs = 4;
+  int32 max_hp = 5;
+  string combat_type = 6;
+  repeated string weaknesses = 7;
+  repeated string resistances = 8;
+  // The monster's special properties object as JSON text (`{}` when empty).
+  string special_properties_json = 9;
+}
+
+message RaidDefinition {
+  string raid_definition_id = 1;
+  string monster_id = 2;
+  int32 duration_seconds = 3;
+  int32 max_participants = 4;
+  int32 min_guild_level = 5;
+  RewardConfig reward_config = 6;
+  // `draft`, `scheduled`, `active`, `cancelled` or `expired`.
+  string status = 7;
+  optional string scheduled_at = 8;
+}
+
+message GetRaidDefinitionReply {
+  RaidDefinition raid_definition = 1;
+  // Absent when the monster no longer exists.
+  optional Monster monster = 2;
+}

@@ -9,6 +9,8 @@ client without access to the owner's repository.
 | File | Package | Service | Owner | Served by |
 | ---- | ------- | ------- | ----- | --------- |
 | [`tamagotchi/user_management/v1/user_management.proto`](tamagotchi/user_management/v1/user_management.proto) | `tamagotchi.user_management.v1` | `UserManagementInternal` | User Management | 4.0.0 and later, `GRPC_PORT` (default `9081`) |
+| [`tamagotchi/guild/v1/guild.proto`](tamagotchi/guild/v1/guild.proto) | `tamagotchi.guild.v1` | `GuildInternal` | Guild | 4.0.0 and later, `GRPC_PORT` (default `9087`) |
+| [`tamagotchi/package_registry/v1/package_registry.proto`](tamagotchi/package_registry/v1/package_registry.proto) | `tamagotchi.package_registry.v1` | `PackageRegistryInternal` | Package Registry | 4.0.0 and later, `GRPC_PORT` (default `9083`) |
 
 Not published yet: Tamagotchi (#159), Guild (#161), Package Registry (#162), Map (#163), Monster
 Raid (#164) and the Broker's own `tamagotchi/broker/v1/broker.proto` (#151). Until a dependency's

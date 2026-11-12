@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+// Internal API of the Guild Service over gRPC (Lab 4 Grade 8): the /api/v1/internal routes of the
+// REST contract, for other services calling through the Message Broker. Every call needs the shared
+// service token in the `x-service-token` metadata entry. Identifiers are canonical lowercase UUID
+// strings, timestamps RFC 3339 UTC with milliseconds. Errors use the gRPC status mapped from the REST
+// status, with the CPR error code first in the message (`NOT_FOUND: GUILD_NOT_FOUND: ...`).
+package tamagotchi.guild.v1;
+
+option go_package = "github.com/gabimiric/tamagotchi-guild/gen/tamagotchi/guild/v1;guildv1";
+
+service GuildInternal {
+  // GET /api/v1/internal/guilds/{guildId}: one guild; Monster Raid reads `level` to gate raids.
+  rpc GetGuild(GetGuildRequest) returns (GetGuildReply);
+  // GET /api/v1/internal/guilds/{guildId}/members/{userId}: whether a user belongs to a guild, and how.
+  rpc GetMembership(GetMembershipRequest) returns (GetMembershipReply);
+  // GET /api/v1/internal/guilds/{guildId}/members: the members of a guild, a page at a time.
+  rpc ListMembers(ListMembersRequest) returns (ListMembersReply);
+}
+
+message GetGuildRequest {
+  string guild_id = 1;
+}
+
+message Guild {
+  string guild_id = 1;
+  string name = 2;
+  // Unique, 2 to 5 characters.
+  string tag = 3;
+  string description = 4;
+  optional string emblem_ref = 5;
+  string owner_id = 6;
+  int32 member_count = 7;
+  int32 max_members = 8;
+  int32 level = 9;
+  string created_at = 10;
+}
+
+message GetGuildReply {
+  Guild guild = 1;
+}
+
+message GetMembershipRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message GetMembershipReply {
+  // False for a user who is not a member, including of a guild that does not exist; not an error.
+  bool is_member = 1;
+  // `owner`, `officer` or `member`; empty when not a member.
+  string role = 2;
+  // Empty when not a member.
+  string joined_at = 3;
+}
+
+message ListMembersRequest {
+  string guild_id = 1;
+  // 1 to 100; 0 means the default of 20.
+  int32 limit = 2;
+  // Opaque; empty for the first page, else `next_cursor` of the previous reply.
+  string cursor = 3;
+}
+
+message Membership {
+  string guild_id = 1;
+  string user_id = 2;
+  // `owner`, `officer` or `member`.
+  string role = 3;
+  string joined_at = 4;
+}
+
+message ListMembersReply {
+  repeated Membership items = 1;
+  // Empty when there is no further page.
+  string next_cursor = 2;
+  bool has_more = 3;
+}
