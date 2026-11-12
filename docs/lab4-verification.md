@@ -91,13 +91,14 @@ Go callers now receive the real trailers-only gRPC status, and duplicate token m
 Their CI and isolated integration receipts do not certify the complete team deployment.
 
 Published and adopted here: Map 4.0.0 (`25699bb`), SD 4.0.0 (`120d0d3`), Message Broker 4.0.0
-(`cd194d5`), User Management 4.0.1 (`70edafc`) and Battle 4.0.1 (`8e369a6`). Map's image revision
-label matches main. SD, the Broker, User Management and Battle each have a successful main
+(`cd194d5`), User Management 4.0.1 (`70edafc`), Battle 4.0.1 (`8e369a6`), Guild 4.0.0 (`c643213`)
+and Package Registry 4.0.1 (`8fb32bd`). Map's, Guild's and Package Registry's image revision labels
+match main. SD, the Broker, User Management and Battle each have a successful main
 publication and an immutable `v4.x.y` tag on that commit. UM/Battle public image provenance records
 the main ref, source SHA and publication run for both architectures, even without private-repository
 access.
 
-Gateway, Raid, Guild, Registry, Tamagotchi and Notification still need published 4.x adoption in CPR.
+Gateway, Raid, Tamagotchi and Notification still need published 4.x adoption in CPR.
 Raid's implementation is merged, but its 3.x selected image/mocked default is not Lab 4 evidence.
 Switch Raid's default to grpc with its 4.x image and released main pin. Existing .env mode overrides
 must also be checked before the rehearsal; Map now defaults to grpc.
