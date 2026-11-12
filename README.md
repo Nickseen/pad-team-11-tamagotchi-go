@@ -2115,11 +2115,11 @@ secrets.
 | ------- | ---------- | ---------------------------- |
 | User Management | `user-management.postman_collection.json` | `403 INTERNAL_ROUTE_FORBIDDEN` for clients, also through an escaped path; forged identity headers replaced by the token's |
 | Tamagotchi | `tamagotchi.postman_collection.json` | Service routes through the Broker's request queue; the Gateway refusing the service token; Gateway errors |
-| Package Registry | `package-registry.postman_collection.json` | Packages created by any user; admin requests skipped without `registryAdminToken` |
+| Package Registry | `package-registry.postman_collection.json` | Packages created by any user; status through the Broker; `registry.*` events checked against the Broker's publication counts; admin requests skipped without `registryAdminToken` |
 | Battle | `battle.postman_collection.json` | Real data set up in Package Registry and Tamagotchi through the Gateway; the lineup checks Battle makes with Tamagotchi |
 | Map | `map.postman_collection.json` | Map → User Management relationships; `map.stream` ticket negotiation |
 | Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
-| Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history |
+| Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history; `guild.*` events reaching the Broker and `user.deleted` removing a member |
 | Monster Raid | `monster-raid.postman_collection.json` | `raid.feed` ticket negotiation with the participant check; admin requests skipped without `adminToken` |
 | Gateway | `gateway-logs.postman_collection.json` | Lab 4 #155: `GET /api/v1/gateway/logs` downloads the system logs as NDJSON (last 15 minutes); set `adminToken` (and optionally `userToken` for the `403` case) |
 | Message Broker | `message-broker.postman_collection.json` | Called directly at `{{brokerUrl}}`: status and metrics; request queues to Battle and Tamagotchi; publishing `user.deleted`; the topic list; a dead letter created, listed and replayed; `400`, `401` and `404` answers |
