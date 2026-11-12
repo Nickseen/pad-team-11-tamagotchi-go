@@ -197,6 +197,8 @@ x-guild-env: &guild-env
   MAX_WEBSOCKET_CONNECTIONS: 100
   DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
   USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-real}
+  # Invitee lookups call UserManagementInternal/ListUsers over gRPC through the Broker (Lab 4 Grade 7).
+  USER_MANAGEMENT_TRANSPORT: grpc
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
   CHAT_BROKER: redis
   REDIS_URL: redis://:${GUILD_REDIS_PASSWORD}@guild-redis:6379/0
