@@ -28,10 +28,9 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 The private [Rust Message Broker repository](https://github.com/Nickseen/tamagotchi-message-broker)
 is connected at `services/message-broker` for [bootstrap task #146](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/146).
 Vlad (`@vladas9`) owns the Broker implementation; Nickseen configures access, repository rules and
-CI. The submodule now pins reviewed dev commit `66ac428`, including the merged gRPC forwarding
-fix (#13). This is a local-build candidate, not a released main commit or published image.
-Broker release is intentionally deferred; adopt its actual main SHA and published image together
-in a later CPR PR. The accepted interfaces are in [the Lab 4 contract](docs/lab4-broker-contract.md).
+CI. The submodule pins the 4.0.0 release commit `cd194d5` (tag `v4.0.0`, including the gRPC
+forwarding fix #13), and Compose runs the published `nickseen/tamagotchi-message-broker:4.0.0`
+image. The accepted interfaces are in [the Lab 4 contract](docs/lab4-broker-contract.md).
 
 ## Service Boundaries
 
@@ -1865,19 +1864,19 @@ Broker counts three failures. Extra Compose files can be passed as `COMPOSE_FILE
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
 and Apple Silicon machines. The table below lists the versions this Compose file selects and
 their publication evidence. Published image tags and submodule pins refer to the same main
-commit. Broker is the explicit local-build exception until its release is authorized. Services
+commit. Services
 still on 3.x must be upgraded before the Lab 4 rehearsal; updating references does not complete
 the shared-stack checks.
 
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `3.0.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/40936010277)) | 8080 | — | `1e64f48` |
-| Message Broker | Local build from `services/message-broker` | candidate `4.0.0` | reviewed dev; release deferred ([#13](https://github.com/Nickseen/tamagotchi-message-broker/pull/13)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals in the `broker-data` volume | `66ac428` (dev candidate) |
+| Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `4.0.0` | published; tag `v4.0.0` on main ([main CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/43297792016)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals in the `broker-data` volume | `cd194d5` |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43289529499)) | — (internal 8090) | In-memory registry | `120d0d3` |
-| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `4.0.0` | published; main SHA confirmed by image provenance ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/42810414536)) | — | PostgreSQL | `3882c39` |
+| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `4.0.1` | published; tag `v4.0.1` on main ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/43303253240)) | — | PostgreSQL | `70edafc` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `6dbc821` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `4.0.0` | published; revision label matches main ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `1ad98fe` |
-| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `4.0.0` | published; main SHA confirmed by image provenance ([main CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/42810433213)) | — | PostgreSQL | `295c0ff` |
+| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `4.0.1` | published; tag `v4.0.1` on main ([main CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/43303217130)) | — | PostgreSQL | `8e369a6` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `4.0.0` | published; revision label matches main ([main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/43289114834)) | 18085, 28085, 38085 (WebSocket) | Redis | `25699bb` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `806a3d7` |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `4.0.0` | published; revision label matches main ([main CI](https://github.com/gabimiric/tamagotchi-guild/actions/workflows/ci.yml?query=branch%3Amain)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL and Redis | `c643213` |

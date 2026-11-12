@@ -12,8 +12,8 @@
 #
 # Lab 4 (#154): the Message Broker carries service-to-service calls and events
 # (docs/lab4-broker-contract.md); Prometheus, Loki, Alloy and Grafana (http://localhost:3000)
-# monitor the Lab 4 components. Broker is a local build of the pinned reviewed dev commit;
-# no Broker release is selected. Demo scripts for Grades 9-10 are in scripts/lab4.
+# monitor the Lab 4 components. The Broker runs its released 4.0.0 image. Demo scripts for
+# Grades 9-10 are in scripts/lab4.
 #
 # Clients reach the system only through the Gateway on localhost:8080, as /<service>/api/v1/...;
 # Lab 4 service calls go through the Broker; remaining 3.x images retain their Lab 3 transport.
@@ -87,7 +87,7 @@ x-user-management-env: &user-management-env
   JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-signing-key.pem # one key for every replica
 
 x-user-management: &user-management
-  image: amzavladislav/tamagotchi-user-management:4.0.0
+  image: amzavladislav/tamagotchi-user-management:4.0.1
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -137,12 +137,12 @@ x-battle-env: &battle-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 50
   DATABASE_URL: postgres://battle:${BATTLE_DB_PASSWORD}@battle-db:5432/battle?sslmode=disable
-  # live calls Tamagotchi, Package Registry and User Management through the Gateway only.
+  # live calls Tamagotchi and Package Registry through the Broker's HTTP queues and User Management
+  # over gRPC through the Broker (BROKER_URL and BROKER_GRPC_ADDR above); Battle 4.x reads no GATEWAY_URL.
   DEPENDENCY_MODE: ${BATTLE_DEPENDENCY_MODE:-live}
-  GATEWAY_URL: http://gateway:8080
 
 x-battle: &battle
-  image: amzavladislav/tamagotchi-battle:4.0.0
+  image: amzavladislav/tamagotchi-battle:4.0.1
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -270,9 +270,8 @@ services:
   # --- Message Broker (Lab 4) -----------------------------------------------------------------------
   # Request queues and topics for every service-to-service call and event, gRPC forwarding,
   # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md).
-  # Local build only until the owner authorizes a release; no unpublished Docker Hub tag is used.
   message-broker:
-    build: services/message-broker
+    image: nickseen/tamagotchi-message-broker:4.0.0
     restart: unless-stopped
     depends_on:
       service-discovery:
