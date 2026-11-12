@@ -4,15 +4,16 @@ const expected = Number(process.env.EXPECTED_REPLICAS ?? 2);
 const token = process.env.SERVICE_TOKEN;
 const sd = process.env.DISCOVERY_URL ?? 'http://localhost:8090';
 const broker = process.env.BROKER_URL ?? 'http://localhost:8091';
+const gateway = process.env.GATEWAY_URL ?? 'http://gateway:8080';
 const allowed = new Set(['user-management','tamagotchi','package-registry','battle','map','notification','guild','monster-raid']);
 if (!token || token.startsWith('CHANGE_ME') || !Number.isSafeInteger(expected) || expected < 1 || services.some(s => !allowed.has(s))) {
   console.error('Set a valid SERVICE_TOKEN, EXPECTED_REPLICAS and service list.'); process.exit(2);
 }
-for (const origin of [sd, broker]) {
+for (const origin of [sd, broker, gateway]) {
   let u;
-  try { u = new URL(origin); } catch { console.error("Discovery/Broker settings must be valid HTTP origins."); process.exit(2); }
+  try { u = new URL(origin); } catch { console.error("Discovery/Broker/Gateway settings must be valid HTTP origins."); process.exit(2); }
   if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.pathname !== '/' || u.search || u.hash) {
-    console.error('Discovery/Broker settings must be HTTP origins without credentials or paths.'); process.exit(2);
+    console.error('Discovery/Broker/Gateway settings must be HTTP origins without credentials or paths.'); process.exit(2);
   }
 }
 let failed = false;
@@ -28,6 +29,14 @@ async function check(label, action) {
 await check('Broker ready on Lab 4 version', async () => {
   const status = await read(broker, '/api/v1/status');
   if (!status.ready || !/^4\.\d+\.\d+$/.test(status.version)) throw new Error();
+});
+await check('Discovery ready on Lab 4 version', async () => {
+  const status = await read(sd, '/api/v1/status');
+  if (!status.ready || !/^4\.\d+\.\d+$/.test(status.version)) throw new Error();
+});
+await check('Gateway on Lab 4 version', async () => {
+  const status = await read(gateway, '/health');
+  if (status.service !== 'gateway' || !/^4\.\d+\.\d+$/.test(status.version)) throw new Error();
 });
 await check('Broker topic inspection', () => read(broker, '/api/v1/topics'));
 for (const service of services) await check(service + ': ready replicas and Lab 4 metadata', async () => {
