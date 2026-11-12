@@ -1,0 +1,11 @@
+# Loads the dashboards in monitoring/grafana/dashboards (mounted at /var/lib/grafana/dashboards).
+apiVersion: 1
+
+providers:
+  - name: lab4
+    folder: Tamagotchi Go
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

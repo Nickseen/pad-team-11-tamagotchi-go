@@ -10,6 +10,11 @@
 #   docker compose up -d                                   # two replicas of every service
 #   docker compose --profile scale-battle up -d            # plus battle-3; scale-all adds every -3
 #
+# Lab 4 (#154): the Message Broker carries service-to-service calls and events
+# (docs/lab4-broker-contract.md); Prometheus, Loki, Alloy and Grafana (http://localhost:3000)
+# monitor everything. Until its 4.0.0 image is published: docker compose build message-broker.
+# Demo scripts for Grades 8-9 are in scripts/lab4 (see README, "Lab 4: Message Broker and monitoring").
+#
 # Clients reach the system only through the Gateway on localhost:8080, as /<service>/api/v1/...;
 # services call each other through it too, at http://gateway:8080. The Gateway routes each request
 # round-robin over the replicas Service Discovery reports ready, so no service has a fixed address.
@@ -65,6 +70,10 @@ x-gateway-context: &gateway-context
   # Lab 3: every replica registers with Discovery on start-up and renews its lease
   # (docs/lab3-discovery-contract.md, "Identity and registration").
   DISCOVERY_URL: http://service-discovery:8090
+  # Lab 4: service-to-service calls and events go through the Message Broker
+  # (docs/lab4-broker-contract.md): HTTP request queues and topics, and its gRPC listener.
+  BROKER_URL: http://message-broker:8091
+  BROKER_GRPC_ADDR: message-broker:9091
 
 # Per-service bases: everything replicas of one service share. Each replica below adds only its
 # own origins, so no two processes ever advertise the same address.
@@ -82,6 +91,8 @@ x-user-management: &user-management
   image: amzavladislav/tamagotchi-user-management:3.0.0
   restart: unless-stopped
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     user-management-db:
       condition: service_healthy
   secrets:
@@ -97,6 +108,8 @@ x-tamagotchi: &tamagotchi
   image: crislp/tamagotchi-tamagotchi:3.0.0
   restart: on-failure
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     tamagotchi-db:
       condition: service_healthy
   healthcheck:
@@ -113,6 +126,8 @@ x-package-registry: &package-registry
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     package-registry-db:
       condition: service_healthy
   healthcheck:
@@ -131,6 +146,8 @@ x-battle: &battle
   image: amzavladislav/tamagotchi-battle:3.0.0
   restart: unless-stopped
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     battle-db:
       condition: service_healthy
 
@@ -152,6 +169,8 @@ x-map: &map
   image: nickseen/tamagotchi-map:3.1.0 # its image declares the /healthz check
   restart: on-failure # a single Redis ping at start-up, no retry
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     map-redis:
       condition: service_healthy
 
@@ -165,6 +184,8 @@ x-notification: &notification
   image: crislp/tamagotchi-notification:3.0.0
   restart: on-failure
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     notification-db:
       condition: service_healthy
   healthcheck:
@@ -187,6 +208,8 @@ x-guild: &guild
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     guild-db:
       condition: service_healthy
     guild-redis:
@@ -214,6 +237,8 @@ x-monster-raid: &monster-raid
   image: nickseen/tamagotchi-monster-raid:3.1.0 # its image declares the /healthz check
   restart: on-failure
   depends_on:
+    message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
+      condition: service_healthy
     monster-raid-db:
       condition: service_healthy
     monster-raid-redis:
@@ -235,11 +260,41 @@ services:
       ALERTS_ENABLED: ${ALERTS_ENABLED:-true}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      # The only origins a replica may register: its internal base URL and, for the three live
-      # services, its own published WebSocket origin. -3 entries serve the optional third replicas.
+      # The only origins a replica may register: its internal base URL, for the three live
+      # services its own published WebSocket origin and, since Lab 4, the gRPC address the Broker
+      # forwards internal RPCs to (same hostname as the base URL). -3 entries serve the third replicas.
       DISCOVERY_ALLOWED_ORIGINS: >-
-        {"user-management":{"baseUrls":["http://user-management-1:8081","http://user-management-2:8081","http://user-management-3:8081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082","http://tamagotchi-3:8082"]},"package-registry":{"baseUrls":["http://package-registry-1:8083","http://package-registry-2:8083","http://package-registry-3:8083"]},"battle":{"baseUrls":["http://battle-1:8084","http://battle-2:8084","http://battle-3:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085","http://map-3:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085","ws://localhost:38085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086","http://notification-3:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087","http://guild-3:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087","ws://localhost:38087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088","http://monster-raid-3:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088","ws://localhost:38088"]}}
+        {"user-management":{"baseUrls":["http://user-management-1:8081","http://user-management-2:8081","http://user-management-3:8081"],"grpcAddresses":["user-management-1:9081","user-management-2:9081","user-management-3:9081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082","http://tamagotchi-3:8082"],"grpcAddresses":["tamagotchi-1:9082","tamagotchi-2:9082","tamagotchi-3:9082"]},"package-registry":{"baseUrls":["http://package-registry-1:8083","http://package-registry-2:8083","http://package-registry-3:8083"],"grpcAddresses":["package-registry-1:9083","package-registry-2:9083","package-registry-3:9083"]},"battle":{"baseUrls":["http://battle-1:8084","http://battle-2:8084","http://battle-3:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085","http://map-3:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085","ws://localhost:38085"],"grpcAddresses":["map-1:9085","map-2:9085","map-3:9085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086","http://notification-3:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087","http://guild-3:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087","ws://localhost:38087"],"grpcAddresses":["guild-1:9087","guild-2:9087","guild-3:9087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088","http://monster-raid-3:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088","ws://localhost:38088"],"grpcAddresses":["monster-raid-1:9088","monster-raid-2:9088","monster-raid-3:9088"]}}
     # Internal only: no host port. Replicas, the Gateway and probes reach it on the Compose network.
+
+  # --- Message Broker (Lab 4) -----------------------------------------------------------------------
+  # Request queues and topics for every service-to-service call and event, gRPC forwarding,
+  # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md). Until the
+  # 4.0.0 image is published, build it from the submodule: docker compose build message-broker.
+  message-broker:
+    image: nickseen/tamagotchi-message-broker:4.0.0
+    build: services/message-broker
+    restart: unless-stopped
+    depends_on:
+      service-discovery:
+        condition: service_healthy
+    environment:
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+      DISCOVERY_URL: http://service-discovery:8090
+      DATA_DIR: /data # durable topic queues and dead letters survive a restart
+      LB_STRATEGY: ${BROKER_LB_STRATEGY:-least-load} # or round-robin
+    volumes:
+      - broker-data:/data
+    healthcheck:
+      # Distroless image: the binary is its own health check (healthy once SD has answered).
+      test: ["CMD", "/usr/local/bin/message-broker", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    ports:
+      # Local inspection only (topics, dead letters, replay need SERVICE_TOKEN); never public.
+      - "127.0.0.1:8091:8091"
 
   # --- API Gateway ----------------------------------------------------------------------------------
   gateway:
@@ -248,7 +303,11 @@ services:
     depends_on:
       service-discovery:
         condition: service_healthy
+      message-broker:
+        condition: service_healthy
     environment:
+      # Lab 4: Gateway forwards client traffic to the Broker's request queues (#153).
+      BROKER_URL: http://message-broker:8091
       # Lab 3: Discovery replaces the eight static service URLs as the routing authority, including
       # the User Management key set and the WebSocket origin a ticket names.
       DISCOVERY_URL: http://service-discovery:8090
@@ -280,12 +339,14 @@ services:
     environment:
       <<: *user-management-env
       INSTANCE_BASE_URL: http://user-management-1:8081
+      INSTANCE_GRPC_ADDRESS: user-management-1:9081
 
   user-management-2:
     <<: *user-management
     environment:
       <<: *user-management-env
       INSTANCE_BASE_URL: http://user-management-2:8081
+      INSTANCE_GRPC_ADDRESS: user-management-2:9081
 
   user-management-3:
     <<: *user-management
@@ -293,6 +354,7 @@ services:
     environment:
       <<: *user-management-env
       INSTANCE_BASE_URL: http://user-management-3:8081
+      INSTANCE_GRPC_ADDRESS: user-management-3:9081
 
   # --- Tamagotchi -----------------------------------------------------------------------------------
   tamagotchi-db:
@@ -312,12 +374,14 @@ services:
     environment:
       <<: *tamagotchi-env
       INSTANCE_BASE_URL: http://tamagotchi-1:8082
+      INSTANCE_GRPC_ADDRESS: tamagotchi-1:9082
 
   tamagotchi-2:
     <<: *tamagotchi
     environment:
       <<: *tamagotchi-env
       INSTANCE_BASE_URL: http://tamagotchi-2:8082
+      INSTANCE_GRPC_ADDRESS: tamagotchi-2:9082
 
   tamagotchi-3:
     <<: *tamagotchi
@@ -325,6 +389,7 @@ services:
     environment:
       <<: *tamagotchi-env
       INSTANCE_BASE_URL: http://tamagotchi-3:8082
+      INSTANCE_GRPC_ADDRESS: tamagotchi-3:9082
 
   # --- Package Registry -----------------------------------------------------------------------------
   package-registry-db:
@@ -344,12 +409,14 @@ services:
     environment:
       <<: *package-registry-env
       INSTANCE_BASE_URL: http://package-registry-1:8083
+      INSTANCE_GRPC_ADDRESS: package-registry-1:9083
 
   package-registry-2:
     <<: *package-registry
     environment:
       <<: *package-registry-env
       INSTANCE_BASE_URL: http://package-registry-2:8083
+      INSTANCE_GRPC_ADDRESS: package-registry-2:9083
 
   package-registry-3:
     <<: *package-registry
@@ -357,6 +424,7 @@ services:
     environment:
       <<: *package-registry-env
       INSTANCE_BASE_URL: http://package-registry-3:8083
+      INSTANCE_GRPC_ADDRESS: package-registry-3:9083
 
   # --- Battle ---------------------------------------------------------------------------------------
   battle-db:
@@ -404,6 +472,7 @@ services:
     environment:
       <<: *map-env
       INSTANCE_BASE_URL: http://map-1:8085
+      INSTANCE_GRPC_ADDRESS: map-1:9085
       INSTANCE_WS_PUBLIC_URL: ws://localhost:18085
     ports:
       - "18085:8085" # this replica's direct WebSocket origin
@@ -413,6 +482,7 @@ services:
     environment:
       <<: *map-env
       INSTANCE_BASE_URL: http://map-2:8085
+      INSTANCE_GRPC_ADDRESS: map-2:9085
       INSTANCE_WS_PUBLIC_URL: ws://localhost:28085
     ports:
       - "28085:8085" # this replica's direct WebSocket origin
@@ -423,6 +493,7 @@ services:
     environment:
       <<: *map-env
       INSTANCE_BASE_URL: http://map-3:8085
+      INSTANCE_GRPC_ADDRESS: map-3:9085
       INSTANCE_WS_PUBLIC_URL: ws://localhost:38085
     ports:
       - "38085:8085" # this replica's direct WebSocket origin
@@ -483,6 +554,7 @@ services:
     environment:
       <<: *guild-env
       INSTANCE_BASE_URL: http://guild-1:8087
+      INSTANCE_GRPC_ADDRESS: guild-1:9087
       INSTANCE_WS_PUBLIC_URL: ws://localhost:18087
     ports:
       - "18087:8087" # this replica's direct WebSocket origin
@@ -492,6 +564,7 @@ services:
     environment:
       <<: *guild-env
       INSTANCE_BASE_URL: http://guild-2:8087
+      INSTANCE_GRPC_ADDRESS: guild-2:9087
       INSTANCE_WS_PUBLIC_URL: ws://localhost:28087
     ports:
       - "28087:8087" # this replica's direct WebSocket origin
@@ -502,6 +575,7 @@ services:
     environment:
       <<: *guild-env
       INSTANCE_BASE_URL: http://guild-3:8087
+      INSTANCE_GRPC_ADDRESS: guild-3:9087
       INSTANCE_WS_PUBLIC_URL: ws://localhost:38087
     ports:
       - "38087:8087" # this replica's direct WebSocket origin
@@ -532,6 +606,7 @@ services:
     environment:
       <<: *monster-raid-env
       INSTANCE_BASE_URL: http://monster-raid-1:8088
+      INSTANCE_GRPC_ADDRESS: monster-raid-1:9088
       INSTANCE_WS_PUBLIC_URL: ws://localhost:18088
     ports:
       - "18088:8088" # this replica's direct WebSocket origin
@@ -541,6 +616,7 @@ services:
     environment:
       <<: *monster-raid-env
       INSTANCE_BASE_URL: http://monster-raid-2:8088
+      INSTANCE_GRPC_ADDRESS: monster-raid-2:9088
       INSTANCE_WS_PUBLIC_URL: ws://localhost:28088
     ports:
       - "28088:8088" # this replica's direct WebSocket origin
@@ -551,9 +627,69 @@ services:
     environment:
       <<: *monster-raid-env
       INSTANCE_BASE_URL: http://monster-raid-3:8088
+      INSTANCE_GRPC_ADDRESS: monster-raid-3:9088
       INSTANCE_WS_PUBLIC_URL: ws://localhost:38088
     ports:
       - "38088:8088" # this replica's direct WebSocket origin
+
+  # --- Monitoring (Lab 4 Grade 10, #154) -------------------------------------------------------------
+  # Prometheus scrapes every /metrics; Alloy ships every container's JSON logs to Loki; Grafana shows
+  # both. Only Grafana (and Prometheus, for ad-hoc queries) are published, on loopback.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  loki:
+    image: grafana/loki:3.3.2
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./monitoring/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+    # Internal only: Grafana and the downloadable-logs endpoint (#155) read http://loki:3100.
+
+  alloy:
+    image: grafana/alloy:v1.5.1
+    restart: unless-stopped
+    depends_on:
+      - loki
+    command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "--storage.path=/var/lib/alloy/data",
+              "/etc/alloy/config.alloy"]
+    environment:
+      # The Compose project whose containers are collected (the default is this folder's name).
+      LOG_PROJECT: ${COMPOSE_PROJECT_NAME:-pad-team-11-tamagotchi-go}
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro # read-only: to discover containers and read their logs
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      # Anyone on this machine can look; only admin can change anything.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/broker.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
 
 secrets:
   jwt-signing-key:
@@ -569,3 +705,7 @@ volumes:
   guild-data:
   raid-data:
   raid-redis-data:
+  broker-data: # the Broker's durable topic queues and dead letters
+  prometheus-data:
+  loki-data:
+  grafana-data:

@@ -1715,6 +1715,93 @@ its `DISCOVERY_ALLOWED_ORIGINS`, which lists `-1`, `-2` and `-3` of every servic
 replicas mount one signing key as the Compose secret `jwt-signing-key`, so a token issued by any
 replica validates against the key set of every other.
 
+### Lab 4: Message Broker and monitoring
+
+[#154](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/154) adds the
+[Message Broker](docs/lab4-broker-contract.md) next to Service Discovery, and the shared monitoring:
+Prometheus scrapes every `/metrics`, Grafana Alloy ships every container's JSON log lines to Loki,
+and Grafana shows both.
+
+| Component | Address | Notes |
+| --- | --- | --- |
+| Message Broker | `http://127.0.0.1:8091` (local inspection only), `message-broker:8091` / `:9091` inside | `GET /api/v1/topics`, `/api/v1/dead-letters`, replay; all need `X-Service-Token` |
+| Grafana | `http://localhost:3000` | Anonymous viewers; admin logs in with `GRAFANA_ADMIN_PASSWORD` from `.env` |
+| Prometheus | `http://localhost:9090` | Scrapes the Broker, Gateway, SD and every replica every 5 s |
+| Loki | `http://loki:3100` (internal) | Log store for Grafana and the downloadable logs (#155) |
+
+Every replica gets `BROKER_URL` and `BROKER_GRPC_ADDR`; replicas that serve internal RPCs also get
+`INSTANCE_GRPC_ADDRESS` (`<replica>:<HTTP port + 1000>`), which is on Service Discovery's
+`grpcAddresses` allowlist. Gateway gets `BROKER_URL` and starts after the Broker is healthy (it is
+healthy once Service Discovery has answered). The Broker keeps its topic queues and dead letters in
+the `broker-data` volume, so they survive a restart; `LB_STRATEGY` is `least-load`
+(`BROKER_LB_STRATEGY=round-robin` switches it).
+
+Until `nickseen/tamagotchi-message-broker:4.0.0` is published, build it from the submodule:
+`docker compose build message-broker`.
+
+**Dashboards** (folder *Tamagotchi Go*):
+
+- *Message Broker* — requests per service and status, p95 response time, request threads against
+  the maximum (Thread-per-Request), request and topic queue depths, deliveries by outcome, events
+  published per topic, reroutes, circuit trips and upstream failures, refusals, dead letters.
+- *Domain services* — request rate, 5xx rate and p95 latency per replica and route, task slots in
+  use against the maximum (the load the Broker routes by), events published and consumed, dependency
+  calls, replicas up.
+- *Logs* — every line from every replica, the Broker, Gateway and SD, filtered by service, level and
+  text. Lines carry the labels `service`, `instanceId`, `level` and `event`.
+
+**Demo scripts** (`scripts/lab4/`, bash; Git Bash works on Windows). They talk to the Broker on
+`127.0.0.1:8091` with `SERVICE_TOKEN` from `.env` and use Guild as the example service:
+
+| Script | Grade | What it shows |
+| --- | --- | --- |
+| `least-load.sh` | 9 | guild-1's task slots fill up while it stays **ready**; new requests go to guild-2 |
+| `failover.sh` | 9 | guild-2 crashes; requests are rerouted, its circuit opens, SD removes it; clients see only 200 |
+| `durability.sh` | 8 | an event waits in `guild.events` while Guild is down, survives a Broker restart, then applies |
+| `dead-letter.sh` | 8 | an event Guild refuses with 422 is dead-lettered, listed and replayed |
+
+Expected output (from a run on the stack; instance IDs differ):
+
+~~~text
+$ bash scripts/lab4/least-load.sh
+== Both Guild replicas idle: requests spread over both instances
+      5   instance 3992d560
+      5   instance 85ca8169
+== Make guild-1 busy for 25s (lock its table, 60 slow requests inside guild-1)
+guild-1 status: ready True load {'activeTasks': 60, 'maxTasks': 64, 'ratio': 0.9375}
+== guild-1 busy: the Broker sends new requests to the idle replica
+     10   instance 85ca8169
+
+$ bash scripts/lab4/failover.sh
+== 40 parallel GET requests through the Broker right away (status, answering instance)
+   40 x status 200 from instance 3992d560
+== What the Broker and Service Discovery did
+  reroutes:      20 -> 39   (broker_reroutes_total)
+  circuit trips: 1 -> 2   (broker_circuit_trips_total)
+        1 "circuit.open"
+        1 "discovery.instance_removed"
+        1 "instance.removed"
+       19 "request.rerouted"
+
+$ bash scripts/lab4/durability.sh
+  guild ..., member ..., memberCount 2
+{"messageId":"...","topic":"user.deleted","subscribers":["guild"]}
+  guild.events depth: 1
+  guild.events depth after restart: 1   (broker_topic_queue_depth)
+  memberCount now 1 (the member was removed)
+
+$ bash scripts/lab4/dead-letter.sh
+  dead letter fc5a4fd6-...
+  reason: rejected by guild with 422 Unprocessable Entity
+{"deadLetterId":"fc5a4fd6-...","messageId":"...","queue":"guild.events"}
+  Guild's answer to the replayed delivery:
+  "status": 422 "code": "UNSUPPORTED_EVENT_VERSION
+~~~
+
+`failover.sh` sends its burst as 40 threads inside guild-1: shell jobs start too slowly on some
+machines, and Service Discovery's 5 s probe would then take guild-2 out of rotation before the
+Broker counts three failures. Extra Compose files can be passed as `COMPOSE_FILES="-f extra.yml"`.
+
 ### Docker Hub images
 
 Released images are public and provide `linux/amd64` and `linux/arm64` manifests for Intel, AMD
