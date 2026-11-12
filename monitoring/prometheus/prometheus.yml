@@ -3,8 +3,8 @@
 # inspect its status/registry with the preflight and its structured logs in Loki/Grafana.
 # Add an SD scrape only after a release actually exposes Prometheus metrics. The optional third replicas
 # (scale-* profiles) show as down while they are not running; that is expected. User Management,
-# Package Registry and Battle run under deploy.replicas and are found through DNS, so they list exactly
-# the running replicas.
+# Tamagotchi, Package Registry, Battle and Notification run under deploy.replicas and are found through
+# DNS, so they list exactly the running replicas.
 #
 # Each target gets a `service` label (the component scraped). Metrics that carry their own `service`
 # label (the Broker's per-service metrics, dependency_calls_total) keep theirs as `exported_service`,
@@ -32,9 +32,14 @@ scrape_configs:
       - target_label: service
         replacement: user-management
   - job_name: tamagotchi
-    static_configs:
-      - targets: ["tamagotchi-1:8082", "tamagotchi-2:8082", "tamagotchi-3:8082"]
-        labels: { service: tamagotchi }
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [tamagotchi]
+        type: A
+        port: 8082
+    relabel_configs:
+      - target_label: service
+        replacement: tamagotchi
   - job_name: package-registry
     # deploy.replicas: Docker's DNS returns every replica's address for the service name.
     dns_sd_configs:
@@ -58,9 +63,14 @@ scrape_configs:
       - targets: ["map-1:8085", "map-2:8085", "map-3:8085"]
         labels: { service: map }
   - job_name: notification
-    static_configs:
-      - targets: ["notification-1:8086", "notification-2:8086", "notification-3:8086"]
-        labels: { service: notification }
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [notification]
+        type: A
+        port: 8086
+    relabel_configs:
+      - target_label: service
+        replacement: notification
   - job_name: guild
     static_configs:
       - targets: ["guild-1:8087", "guild-2:8087", "guild-3:8087"]

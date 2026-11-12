@@ -106,6 +106,11 @@ project name, allowlist and DNS-based Prometheus discovery remain unchanged here
 integration evidence, not the complete eight-service rehearsal. PR #183 adds Registry 4.0.1
 deploy.replicas, DNS metrics discovery and a receipt for two/three ready replicas plus real gRPC
 GetCurrentVersion calls; its layout and five-instance allowlist are preserved too.
+Tamagotchi and Notification 4.0.0 now run under deploy.replicas as well (#176, #177): on the full
+stack, three replicas of each resolved and registered their container names, nine Broker queue
+requests per service and nine TamagotchiInternal calls through message-broker:9091 went 3 + 3 + 3,
+Prometheus found all six through DNS, and scaling Tamagotchi to 2 and then 4 deregistered and
+registered replicas accordingly. Map, Guild and Raid keep their per-replica blocks.
 
 Compose defaults: Map/Raid grpc, Battle live, Guild real with grpc lookup transport. Notification
 uses BROKER_GRPC_ADDR for Guild reads. Existing .env or extra Compose overrides can still select
