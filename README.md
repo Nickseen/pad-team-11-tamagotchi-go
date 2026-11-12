@@ -1752,7 +1752,8 @@ lease/registration diagnostics, but are not Lab 4 acceptance evidence.
 | --------- | ---------------- | ----------------- |
 | API Gateway | `gateway` | Host port `8080`; the selected 3.x release still routes directly. Its 4.x release must queue requests through Broker before the Lab 4 rehearsal |
 | Service Discovery | `service-discovery` | Internal only (`http://service-discovery:8090`); no host port |
-| Each domain service | `<service>-1`, `<service>-2`, optional `<service>-3` | Through the Gateway only; each replica registers its own `INSTANCE_BASE_URL`, e.g. `http://battle-2:8084` |
+| User Management, Battle | one `user-management` / `battle` block with `deploy.replicas` (default 2, up to 5); containers `pad-team-11-tamagotchi-go-<service>-<n>` | Through the Gateway and the Broker only; each replica fills its container name into `INSTANCE_BASE_URL: http://{container}:8084` and registers e.g. `http://pad-team-11-tamagotchi-go-battle-2:8084` |
+| Other domain services | `<service>-1`, `<service>-2`, optional `<service>-3` | Through the Gateway only; each replica registers its own `INSTANCE_BASE_URL`, e.g. `http://tamagotchi-2:8082` |
 | Map, Guild, Monster Raid WebSockets | the same replicas | One host port per replica: `18085`/`28085`/`38085` (Map), `18087`/`28087`/`38087` (Guild), `18088`/`28088`/`38088` (Raid); each replica registers that origin as `INSTANCE_WS_PUBLIC_URL`, so a Gateway ticket names one specific replica |
 | Stores | `<service>-db`, `map-redis`, `guild-redis`, `monster-raid-redis` | Internal only; shared by the replicas of the one service that owns them |
 
@@ -1989,16 +1990,31 @@ the contract's "Overload, timeouts and the last replica" requires.
 ### Start
 
 ```sh
-docker compose up -d                              # two replicas of every service
-docker compose --profile scale-battle up -d       # add battle-3; scale-<service> for any one service
-docker compose --profile scale-all up -d          # a third replica of every service
+docker compose up -d                                 # two replicas of every service
+docker compose up -d --scale battle=3                # User Management and Battle: any count up to 5
+docker compose --profile scale-tamagotchi up -d      # the other services: add their -3 block
+docker compose --profile scale-all up -d             # a third replica of every profile-gated service
 docker compose ps
 ```
 
-A third replica is an ordinary profile-gated block (`battle-3` and so on) with its own allowlisted
-origin, so it registers and becomes routable after its first healthy probe. In Lab 4 the Broker
-selects it by load; the remaining Gateway 3.x uses its old round robin until upgraded. `docker compose stop battle-3` (or
-`docker compose --profile scale-battle down battle-3`) deregisters it again.
+User Management and Battle run under `deploy.replicas`, one block each. Every replica gets the
+same environment, `INSTANCE_BASE_URL: "http://{container}:8084"`, and before registering fills in
+its own container name, which Docker's DNS returns for its address (UM/Battle 4.0.1). The project
+name is fixed (`name: pad-team-11-tamagotchi-go`), so the names are predictable and the Discovery
+allowlist lists `pad-team-11-tamagotchi-go-battle-1` to `-5`. `docker compose up -d --scale battle=3`
+starts `pad-team-11-tamagotchi-go-battle-3`, which registers and becomes routable after its first
+healthy probe; `--scale battle=2` stops it and deregisters it again. Set `USER_MANAGEMENT_REPLICAS`
+and `BATTLE_REPLICAS` in `.env` to change the default.
+
+The other services keep one block per replica, and a third replica is a profile-gated block
+(`tamagotchi-3` and so on) with its own allowlisted origin. Tamagotchi, Notification and Package
+Registry move to `deploy.replicas` once they support `{container}` (#176-#178). Map, Guild and
+Monster Raid keep their blocks: each WebSocket replica publishes its own host port and must know it.
+In Lab 4 the Broker selects a replica by load; the remaining Gateway 3.x uses its old round robin
+until upgraded. `docker compose stop tamagotchi-3` deregisters a profile replica again.
+
+The project name also prefixes the named volumes (`pad-team-11-tamagotchi-go_battle-data`). A
+checkout in a folder with another name starts with empty volumes the first time.
 
 The first start pulls about 520 MB of compressed images. The databases and Redis become healthy
 first; the services that do not retry their database connection wait for that health check, and
@@ -2034,17 +2050,17 @@ docker compose exec service-discovery sh -c 'for s in user-management tamagotchi
   wget -qO- --header "X-Service-Token: $SERVICE_TOKEN" http://localhost:8090/api/v1/internal/discovery/services/$s/instances; echo; done'
 
 # Every replica's own status: live, ready and its load.
-docker compose exec service-discovery wget -qO- http://battle-2:8084/api/v1/status
+docker compose exec service-discovery wget -qO- http://pad-team-11-tamagotchi-go-battle-2:8084/api/v1/status
 ```
 
 | Check | How | Expected |
 | ----- | --- | -------- |
 | Registration and readiness | lookup above | every `-1`/`-2` replica `ready`, each with a distinct `instanceId` |
 | All eight route groups | the Postman collections through `localhost:8080` | every request passes, as in Lab 2 |
-| Round robin | repeat one request, then `docker compose logs battle-1 battle-2 \| grep request.completed` | the requests alternate between the replicas |
-| Scale to three | `docker compose --profile scale-battle up -d`, then the lookup | `battle-3` appears and starts receiving requests |
-| Failed replica, healthy sibling | `docker compose kill battle-2` | lookup drops it within one probe (5 s); requests keep succeeding on `battle-1`; its lease expires after 30 s |
-| Restart | `docker compose start battle-2` | a new `instanceId` registers and rejoins after a healthy probe |
+| Round robin | repeat one request, then `docker compose logs battle \| grep request.completed` | the requests alternate between the replicas (`battle-1`, `battle-2` prefixes) |
+| Scale to three | `docker compose up -d --scale battle=3`, then the lookup | `pad-team-11-tamagotchi-go-battle-3` appears and starts receiving requests |
+| Failed replica, healthy sibling | `docker kill pad-team-11-tamagotchi-go-battle-2` | lookup drops it within one probe (5 s); requests keep succeeding on `pad-team-11-tamagotchi-go-battle-1`; its lease expires after 30 s |
+| Restart | `docker start pad-team-11-tamagotchi-go-battle-2` | a new `instanceId` registers and rejoins after a healthy probe |
 | Cross-replica WebSockets | open Map/Guild/Raid sockets via tickets on `-1` and `-2` | a change made through one replica reaches sockets on the other |
 | Circuit breaker and removal | make one replica fail (for example stop its database) and send 3 requests within 10.5 s | the caller logs `circuit.open`; Discovery removes only that replica, which stays out of lookup |
 | Critical load and alerts | load one replica above 80 % of `MAX_CONCURRENT_TASKS` for two probes | Discovery logs `load.critical` once and the developers' Telegram chat receives one alert; `load.recovered` follows below 60 % |

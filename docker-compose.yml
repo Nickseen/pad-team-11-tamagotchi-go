@@ -8,7 +8,8 @@
 #   openssl genrsa -out secrets/jwt-signing-key.pem 2048   # one key for every User Management replica
 #   chmod 644 secrets/jwt-signing-key.pem                  # the distroless image runs as non-root
 #   docker compose up -d                                   # two replicas of every service
-#   docker compose --profile scale-battle up -d            # plus battle-3; scale-all adds every -3
+#   docker compose up -d --scale battle=3                  # User Management and Battle: deploy.replicas
+#   docker compose --profile scale-tamagotchi up -d        # the others: their -3 block; scale-all adds every -3
 #
 # Lab 4 (#154): the Message Broker carries service-to-service calls and events
 # (docs/lab4-broker-contract.md); Prometheus, Loki, Alloy and Grafana (http://localhost:3000)
@@ -24,7 +25,11 @@
 # included, is reachable from the host.
 #
 # Every replica registers its own INSTANCE_BASE_URL (and INSTANCE_WS_PUBLIC_URL) with Discovery,
-# which accepts only the origins in DISCOVERY_ALLOWED_ORIGINS below. Replicas of one service share
+# which accepts only the origins in DISCOVERY_ALLOWED_ORIGINS below. User Management and Battle run
+# as one deploy.replicas block each: every replica fills its own container name into {container},
+# so their allowlist entries are those names. The other services keep one block per replica until
+# they support {container} (#176-#178); Map, Guild and Raid keep them for their per-replica
+# WebSocket host ports. Replicas of one service share
 # that service's stores; each service owns its stores with its own credentials. Every store keeps
 # its data in a named volume, so `docker compose down` followed by `up` loses nothing; `down -v`
 # is the command that deletes the data.
@@ -32,6 +37,10 @@
 # Map uses gRPC through Broker. Battle 4.x also uses Broker. Remaining 3.x images keep their
 # current modes until their releases are adopted. Monster Raid's mock default must be replaced
 # by grpc together with its 4.x image, before the final rehearsal.
+
+# A fixed project name: replica container names, which User Management and Battle register as
+# their addresses, do not depend on the folder the repository is cloned into.
+name: pad-team-11-tamagotchi-go
 
 x-postgres: &postgres
   image: postgres:17-alpine # 18 moved the data directory; the volume path below is 17's
@@ -262,9 +271,10 @@ services:
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       # The only origins a replica may register: its internal base URL, for the three live
       # services its own published WebSocket origin and, since Lab 4, the gRPC address the Broker
-      # forwards internal RPCs to (same hostname as the base URL). -3 entries serve the third replicas.
+      # forwards internal RPCs to (same hostname as the base URL). -3 entries serve the third replicas;
+      # User Management and Battle list their deploy.replicas container names, -1 to -5.
       DISCOVERY_ALLOWED_ORIGINS: >-
-        {"user-management":{"baseUrls":["http://user-management-1:8081","http://user-management-2:8081","http://user-management-3:8081"],"grpcAddresses":["user-management-1:9081","user-management-2:9081","user-management-3:9081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082","http://tamagotchi-3:8082"],"grpcAddresses":["tamagotchi-1:9082","tamagotchi-2:9082","tamagotchi-3:9082"]},"package-registry":{"baseUrls":["http://package-registry-1:8083","http://package-registry-2:8083","http://package-registry-3:8083"],"grpcAddresses":["package-registry-1:9083","package-registry-2:9083","package-registry-3:9083"]},"battle":{"baseUrls":["http://battle-1:8084","http://battle-2:8084","http://battle-3:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085","http://map-3:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085","ws://localhost:38085"],"grpcAddresses":["map-1:9085","map-2:9085","map-3:9085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086","http://notification-3:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087","http://guild-3:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087","ws://localhost:38087"],"grpcAddresses":["guild-1:9087","guild-2:9087","guild-3:9087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088","http://monster-raid-3:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088","ws://localhost:38088"],"grpcAddresses":["monster-raid-1:9088","monster-raid-2:9088","monster-raid-3:9088"]}}
+        {"user-management":{"baseUrls":["http://pad-team-11-tamagotchi-go-user-management-1:8081","http://pad-team-11-tamagotchi-go-user-management-2:8081","http://pad-team-11-tamagotchi-go-user-management-3:8081","http://pad-team-11-tamagotchi-go-user-management-4:8081","http://pad-team-11-tamagotchi-go-user-management-5:8081"],"grpcAddresses":["pad-team-11-tamagotchi-go-user-management-1:9081","pad-team-11-tamagotchi-go-user-management-2:9081","pad-team-11-tamagotchi-go-user-management-3:9081","pad-team-11-tamagotchi-go-user-management-4:9081","pad-team-11-tamagotchi-go-user-management-5:9081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082","http://tamagotchi-3:8082"],"grpcAddresses":["tamagotchi-1:9082","tamagotchi-2:9082","tamagotchi-3:9082"]},"package-registry":{"baseUrls":["http://package-registry-1:8083","http://package-registry-2:8083","http://package-registry-3:8083"],"grpcAddresses":["package-registry-1:9083","package-registry-2:9083","package-registry-3:9083"]},"battle":{"baseUrls":["http://pad-team-11-tamagotchi-go-battle-1:8084","http://pad-team-11-tamagotchi-go-battle-2:8084","http://pad-team-11-tamagotchi-go-battle-3:8084","http://pad-team-11-tamagotchi-go-battle-4:8084","http://pad-team-11-tamagotchi-go-battle-5:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085","http://map-3:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085","ws://localhost:38085"],"grpcAddresses":["map-1:9085","map-2:9085","map-3:9085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086","http://notification-3:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087","http://guild-3:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087","ws://localhost:38087"],"grpcAddresses":["guild-1:9087","guild-2:9087","guild-3:9087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088","http://monster-raid-3:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088","ws://localhost:38088"],"grpcAddresses":["monster-raid-1:9088","monster-raid-2:9088","monster-raid-3:9088"]}}
     # Internal only: no host port. Replicas, the Gateway and probes reach it on the Compose network.
 
   # --- Message Broker (Lab 4) -----------------------------------------------------------------------
@@ -332,27 +342,18 @@ services:
 
   # Every replica signs access tokens with the same mounted key, so a token from one validates
   # against the key set any other publishes.
-  user-management-1:
+  # One block runs every User Management replica (deploy.replicas, the default 2 or
+  # USER_MANAGEMENT_REPLICAS). Each replica fills its own container name into {container}
+  # (pad-team-11-tamagotchi-go-user-management-<n>) before it registers; the Discovery allowlist
+  # admits up to five. Scale with `docker compose up -d --scale user-management=3`.
+  user-management:
     <<: *user-management
+    deploy:
+      replicas: ${USER_MANAGEMENT_REPLICAS:-2}
     environment:
       <<: *user-management-env
-      INSTANCE_BASE_URL: http://user-management-1:8081
-      INSTANCE_GRPC_ADDRESS: user-management-1:9081
-
-  user-management-2:
-    <<: *user-management
-    environment:
-      <<: *user-management-env
-      INSTANCE_BASE_URL: http://user-management-2:8081
-      INSTANCE_GRPC_ADDRESS: user-management-2:9081
-
-  user-management-3:
-    <<: *user-management
-    profiles: [scale-user-management, scale-all] # the optional third replica
-    environment:
-      <<: *user-management-env
-      INSTANCE_BASE_URL: http://user-management-3:8081
-      INSTANCE_GRPC_ADDRESS: user-management-3:9081
+      INSTANCE_BASE_URL: "http://{container}:8081"
+      INSTANCE_GRPC_ADDRESS: "{container}:9081"
 
   # --- Tamagotchi -----------------------------------------------------------------------------------
   tamagotchi-db:
@@ -437,24 +438,15 @@ services:
       <<: *postgres-healthcheck
       test: ["CMD-SHELL", "pg_isready -U battle -d battle"]
 
-  battle-1:
+  # One block runs every Battle replica (deploy.replicas, the default 2 or BATTLE_REPLICAS), as
+  # for User Management above: pad-team-11-tamagotchi-go-battle-<n>, up to five.
+  battle:
     <<: *battle
+    deploy:
+      replicas: ${BATTLE_REPLICAS:-2}
     environment:
       <<: *battle-env
-      INSTANCE_BASE_URL: http://battle-1:8084
-
-  battle-2:
-    <<: *battle
-    environment:
-      <<: *battle-env
-      INSTANCE_BASE_URL: http://battle-2:8084
-
-  battle-3:
-    <<: *battle
-    profiles: [scale-battle, scale-all] # the optional third replica
-    environment:
-      <<: *battle-env
-      INSTANCE_BASE_URL: http://battle-3:8084
+      INSTANCE_BASE_URL: "http://{container}:8084"
 
   # --- Map ------------------------------------------------------------------------------------------
   map-redis:
