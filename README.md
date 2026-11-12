@@ -596,17 +596,22 @@ Content-Type: application/json
 
 `channel` is one of `map.stream`, `guild.chat` or `raid.feed`. `resourceId` is `null` for
 `map.stream`, a `guildId` for `guild.chat`, and a `raidId` for `raid.feed`. Gateway checks the user's
-role or membership required by the target channel. For `raid.feed`, Gateway calls Raid's
-`GET /api/v1/internal/raids/{raidId}/participants/{userId}` with the validated JWT subject as
-`userId` and its configured `X-Gateway-Token` and `X-Service-Token`. It issues a ticket only when
-Raid returns `{ "isParticipant": true }`; `false` becomes `403 FORBIDDEN`. Gateway never trusts a client-supplied
-`userId` for this check. For `guild.chat`, Gateway calls Guild's
-`GET /api/v1/internal/guilds/{guildId}/members/{userId}` the same way, with the validated JWT subject
-and both tokens, and issues a ticket only when Guild returns `{ "isMember": true }`; `false` becomes
-`403 FORBIDDEN`. Guild answers `isMember: false` rather than `404` for an unknown guild, so the check
-does not reveal which guilds exist, and Guild checks membership again at upgrade time. `map.stream`
-needs no check beyond a valid access token. When Guild or Raid cannot be reached, or answers with any
-other status or without the expected boolean, Gateway returns `503 DEPENDENCY_UNAVAILABLE`. It then
+role or membership required by the target channel. Gateway 4.0.1 makes these internal checks over
+gRPC through `BROKER_GRPC_ADDR=message-broker:9091`, using the published schemas in `proto/`:
+
+- `guild.chat`: `tamagotchi.guild.v1.GuildInternal/GetMembership`, with `guild_id` and the validated
+  JWT subject as `user_id`. A ticket requires `is_member: true`; false (including an unknown guild)
+  becomes `403 FORBIDDEN`.
+- `raid.feed`: `tamagotchi.monster_raid.v1.MonsterRaidInternal/GetParticipant`, with `raid_id` and
+  the validated JWT subject as `user_id`. A ticket requires `is_participant: true`; false or
+  `NOT_FOUND` becomes `403 FORBIDDEN`, without revealing whether the raid exists.
+
+Calls reuse one Broker channel, carry exactly one `x-service-token` and the `x-correlation-id`,
+and use the Gateway request's deadline. No user JWT, client-supplied user ID or Gateway token is
+sent as internal-call authentication. Other gRPC errors or an unusable reply become
+`503 DEPENDENCY_UNAVAILABLE`. Guild/Raid verify membership again at WebSocket upgrade.
+`map.stream` needs only a valid access token. The public User Management JWKS is still read over
+HTTP through the Broker queue. A successful negotiation
 returns `201 Created`:
 
 ```json
@@ -1527,12 +1532,12 @@ sends a message.
 
 Joining is refused with `403 NOT_A_GUILD_MEMBER` (checked against Guild), `409 RAID_FULL` when
 `participantCount` has reached `maxParticipants`, and `409 RAID_NOT_ACTIVE` once the raid has ended.
-The internal participant check requires both Gateway's trusted `X-Gateway-Token` and the matching
-`X-Service-Token`; no user `Authorization` header is accepted. It returns `false` for a user who
-never joined or has left the raid, and `400 VALIDATION_FAILED` for malformed UUIDs. The check uses
-the current joined state, while damage history remains available after leaving. Gateway uses this
-response for `raid.feed` ticket eligibility, and Raid checks participation again at WebSocket
-upgrade time.
+The compatibility HTTP participant check accepts the matching `X-Service-Token` without a user
+`Authorization` header; gRPC authenticates with exactly one `x-service-token` metadata value.
+The check returns false for a user who never joined or has left and validates UUIDs. It uses the
+current joined state, while damage history remains available after leaving. Gateway 4.0.1 uses
+MonsterRaidInternal/GetParticipant through Broker for `raid.feed` eligibility; Raid checks
+participation again at WebSocket upgrade time.
 
 ##### Attacks
 
@@ -1873,7 +1878,7 @@ Every component below selects 4.x; updating references does not complete the sha
 
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
-| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/43302757632)) | 8080 | — | `0285312` |
+| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/43326608468)) | 8080 | — | `aa7b0b9` |
 | Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/43297792016)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals in the `broker-data` volume | `cd194d5` |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43289529499)) | — (internal 8090) | In-memory registry | `120d0d3` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `4.0.2` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/43313002797)) | — | PostgreSQL | `e0fabc2` |
@@ -2094,18 +2099,17 @@ the Gateway. Give the shared environment's `serviceToken` the `SERVICE_TOKEN` fr
 
 ### Mock and live modes
 
-With the defaults, Battle, Map and Guild call their neighbours for real through the Gateway, and
-Notification always reads guild members from Guild the same way. Battle's Postman collection
-prepares real data for it: a package with published stat definitions, players registered with it,
-their primary creatures in Tamagotchi and a secondary lent through Tamagotchi's service route.
+With the defaults, Battle, Map, Guild, Notification and Monster Raid call real dependencies through
+Broker. Map/Raid use grpc; Guild uses real lookups with grpc transport. Battle's Postman collection
+prepares a package with published stat definitions, registered players, their primary creatures and
+a secondary lent through Tamagotchi's service route.
 
-Monster Raid starts with its neighbours mocked. A real raid needs an active raid definition from
-the Registry, and creating one requires the `admin` role, which User Management does not issue in
-this stack (see [item 1](#compatibility-and-open-alignment-work)). In mock mode the raid lifecycle
-uses the fixture guild, raid definition and primary Tamagotchi in Raid's collection variables;
-Raid's internal participant check for `raid.feed` tickets runs through the Gateway either way.
-Setting a `*_MODE` variable to its mocked value makes that service answer from in-process mocks,
-which keeps it runnable on its own.
+A real raid also needs an active Registry raid definition and the permissions to create it; prepare
+those fixtures before running the collection (admin-only requests are skipped without an admin
+access token). Mock mode is an explicit local override, not the default: it uses the fixture guild,
+raid definition and primary creature in Raid's collection variables. Gateway's gRPC participation
+check still asks the actual Raid service in either mode. Mock/HTTP compatibility dependency modes
+do not establish the complete grade-8 evidence.
 
 ---
 
