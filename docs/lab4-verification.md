@@ -66,8 +66,11 @@ integration can set `SERVICES=map,monster-raid` for diagnosis; that is not a fin
 
 The implementation PRs for #151/#152/#163/#164 record their own exact tests, coverage and isolated
 integration scope. Their candidate `4.0.0` versions do not establish published images. The existing
-UM schema from #166 is the released UM 4.0.0 source; Guild/Tamagotchi/Registry schemas must be
-published by their owners before their callers can finish the all-gRPC grade 8 migration.
+UM (#166), Guild/Registry (#169) and Tamagotchi (#172) schemas are now published by their owners.
+Contract #167 and the SD/Map implementation PRs are merged into dev. Raid can complete its
+remaining dependency clients using these schemas. These source merges do not establish released
+images or complete the shared-stack grade 8/10 checks. Broker gRPC forwarding regressions noted
+in the #167 review must be fixed and verified with both Go and Rust clients before that rehearsal.
 
 No grade above is checked off until its actual shared-stack receipt is recorded on #165.
 Keep #165 open and the Project item out of Done until all checks and publication are complete.
