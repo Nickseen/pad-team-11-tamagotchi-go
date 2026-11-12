@@ -304,7 +304,7 @@ services:
 
   # --- API Gateway ----------------------------------------------------------------------------------
   gateway:
-    image: nickseen/tamagotchi-gateway:4.0.0 # Broker queues and system-log download; declares /health
+    image: nickseen/tamagotchi-gateway:4.0.1 # Broker queues, gRPC ticket checks and system logs
     restart: unless-stopped
     depends_on:
       service-discovery:
@@ -314,6 +314,7 @@ services:
     environment:
       # Lab 4: Gateway forwards client traffic to the Broker's request queues (#153).
       BROKER_URL: http://message-broker:8091
+      BROKER_GRPC_ADDR: message-broker:9091
       LOKI_URL: http://loki:3100
       # Discovery selects the replica for a direct WebSocket URL; REST and JWKS use Broker queues.
       DISCOVERY_URL: http://service-discovery:8090

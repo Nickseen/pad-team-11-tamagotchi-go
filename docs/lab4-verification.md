@@ -92,7 +92,7 @@ Their CI and isolated integration receipts do not certify the complete team depl
 
 All eleven selected application components now use published Lab 4 images with matching main
 source pins; the README's image table links each publication run. UM and Battle use 4.0.2, which
-stores each event in the transaction of its change; Map and Registry use their 4.0.1 fixes; the
+stores each event in the transaction of its change; Map, Registry and Gateway use their 4.0.1 fixes; the
 other components select 4.0.0. Broker is the owner's published release from #14,
 not a local build or another release created by this CPR change.
 
@@ -125,8 +125,11 @@ existing collections still require a real run on the final image set.
 Remaining transport and observability qualifications before final evidence:
 - CPR #181 records Battle 4.0.1 using Broker HTTP queues for Tamagotchi/Registry and gRPC for UM.
   The remaining HTTP dependency reads still need migration to the published RPCs for strict grade 8.
-- Gateway dev still performs Guild/Raid WebSocket eligibility reads through Broker HTTP queues;
-  demonstrate the required internal gRPC migration or agree the infrastructure exception explicitly.
+- Gateway 4.0.1 now uses the published Guild GetMembership and Raid GetParticipant RPCs through
+  Broker. Its required BROKER_GRPC_ADDR is deployed with the image. Gateway #20 records real-stack
+  checks for a guild member/nonmember and unknown resources, with Broker grpc.completed logs;
+  the release adds port-range and lockfile corrections (80 tests, 96.6% lines). These scoped receipts
+  do not replace the complete grade-8/10 rehearsal.
 - SD 4.0.0 has no /metrics endpoint (401 without a service token, 404 with one). Do not scrape a
   nonexistent route. Its status/registry and structured Loki logs remain available; an SD metrics
   scrape requires an actual released endpoint.
