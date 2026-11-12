@@ -91,7 +91,7 @@ Go callers now receive the real trailers-only gRPC status, and duplicate token m
 Their CI and isolated integration receipts do not certify the complete team deployment.
 
 All eleven selected application components now use published Lab 4 images with matching main
-source pins; the README's image table links each publication run. UM/Battle use their newer
+source pins; the README's image table links each publication run. UM/Battle and Registry use their newer
 4.0.1 fixes; the other components select 4.0.0. Broker is the owner's published release from #14,
 not a local build or another release created by this CPR change.
 
@@ -102,7 +102,9 @@ release selection; it does not establish cross-service behavior or certify a com
 PR #181's partial-stack receipt covers SD/Broker with UM/Battle 4.0.1, address resolution, both
 ready replicas, balanced HTTP requests and gRPC GetBalances. Its deploy.replicas layout, fixed
 project name, allowlist and DNS-based Prometheus discovery remain unchanged here. This is partial
-integration evidence, not the complete eight-service rehearsal.
+integration evidence, not the complete eight-service rehearsal. PR #183 adds Registry 4.0.1
+deploy.replicas, DNS metrics discovery and a receipt for two/three ready replicas plus real gRPC
+GetCurrentVersion calls; its layout and five-instance allowlist are preserved too.
 
 Compose defaults: Map/Raid grpc, Battle live, Guild real with grpc lookup transport. Notification
 uses BROKER_GRPC_ADDR for Guild reads. Existing .env or extra Compose overrides can still select

@@ -2,8 +2,9 @@
 # every replica's GET /metrics on the Compose network. SD 4.0.0 has no /metrics endpoint:
 # inspect its status/registry with the preflight and its structured logs in Loki/Grafana.
 # Add an SD scrape only after a release actually exposes Prometheus metrics. The optional third replicas
-# (scale-* profiles) show as down while they are not running; that is expected. User Management and
-# Battle run under deploy.replicas and are found through DNS, so they list exactly the running replicas.
+# (scale-* profiles) show as down while they are not running; that is expected. User Management,
+# Package Registry and Battle run under deploy.replicas and are found through DNS, so they list exactly
+# the running replicas.
 #
 # Each target gets a `service` label (the component scraped). Metrics that carry their own `service`
 # label (the Broker's per-service metrics, dependency_calls_total) keep theirs as `exported_service`,
@@ -35,9 +36,14 @@ scrape_configs:
       - targets: ["tamagotchi-1:8082", "tamagotchi-2:8082", "tamagotchi-3:8082"]
         labels: { service: tamagotchi }
   - job_name: package-registry
-    static_configs:
-      - targets: ["package-registry-1:8083", "package-registry-2:8083", "package-registry-3:8083"]
-        labels: { service: package-registry }
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [package-registry]
+        type: A
+        port: 8083
+    relabel_configs:
+      - target_label: service
+        replacement: package-registry
   - job_name: battle
     # deploy.replicas: Docker's DNS returns every replica's address for the service name.
     dns_sd_configs:
