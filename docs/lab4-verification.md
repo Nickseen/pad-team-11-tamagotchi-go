@@ -91,8 +91,9 @@ Go callers now receive the real trailers-only gRPC status, and duplicate token m
 Their CI and isolated integration receipts do not certify the complete team deployment.
 
 All eleven selected application components now use published Lab 4 images with matching main
-source pins; the README's image table links each publication run. Map, UM/Battle and Registry use their newer
-4.0.1 fixes; the other components select 4.0.0. Broker is the owner's published release from #14,
+source pins; the README's image table links each publication run. UM and Battle use 4.0.2, which
+stores each event in the transaction of its change; Map and Registry use their 4.0.1 fixes; the
+other components select 4.0.0. Broker is the owner's published release from #14,
 not a local build or another release created by this CPR change.
 
 The public image provenance for both amd64 and arm64 agrees on the source main SHA and build run.
