@@ -9,8 +9,11 @@ Private service unit tests or an isolated fake consumer do not prove the complet
 1. Merge the reviewed #151 contract after all four owners confirm it. Publish dependency protos
    from their actual owner implementations. Pending schemas use Broker HTTP queues, not invented RPCs.
 2. Merge SD/Gateway/Broker and each domain implementation through protected dev PRs.
-3. Release each image from dev via release/v4.x.y into main with two approvals. Check successful
-   main publication, immutable Git tag and the image's revision/version labels.
+3. Release each image from dev via release/v4.x.y into main under its repository's approval policy.
+   Map/Raid use Nickseen's explicit solo-merge policy; shared repositories retain their review gates.
+   Check successful main publication, immutable Git tag and the image's revision/version evidence.
+   Broker release is currently deferred by its owner: local builds may be prepared, but they do not
+   complete the published-release gate.
 4. Adopt actual released main SHAs in CPR submodules and matching image versions in Compose.
    Integrate #154 (Compose/metrics), #155 (logs) and #156 (README/diagram/Postman).
 5. Bring up two ready replicas per domain on the private network. Keep client REST through Gateway;
@@ -50,11 +53,12 @@ docker compose logs --since 2m map-1 map-2 monster-raid-1 monster-raid-2
 Use `grep -E` if `rg` is not installed. Keep original JSON log lines for correlation; avoid filtering
 away the event that identifies why a breaker tripped.
 
-The following preflight is read-only and checks only SD/Broker prerequisites, not grades 2–10:
+The following preflight is read-only and checks Gateway/SD/Broker and registration prerequisites,
+not the full grades 2–10 behavior:
 
 ```sh
 # Export SERVICE_TOKEN privately. Do not paste it into the terminal command history.
-DISCOVERY_URL=http://localhost:8090 BROKER_URL=http://localhost:8091 \
+DISCOVERY_URL=http://localhost:8090 BROKER_URL=http://localhost:8091 GATEWAY_URL=http://localhost:8080 \
   node scripts/verify-lab4.mjs
 ```
 
@@ -62,15 +66,47 @@ SD may stay private. Run the script on the Compose network or use an explicit lo
 binding. `EXPECTED_REPLICAS=2` and all eight services are checked by default. A partial local
 integration can set `SERVICES=map,monster-raid` for diagnosis; that is not a final release check.
 
+With a running stack, the Gateway container already has the private origins and SERVICE_TOKEN:
+
+```sh
+docker compose exec -T gateway node --input-type=module < scripts/verify-lab4.mjs
+```
+
+The script checks Gateway/SD/Broker versions as well as domain registrations; a 3.x Gateway must
+fail even if ready 4.x domain replicas are registered. The current staged rollout is expected to
+fail until the remaining releases are adopted. Do not run disruptive demos as acceptance checks
+before this preflight passes.
+
+The preflight regression fixtures can be checked without starting the stack:
+
+```sh
+node --test scripts/verify-lab4.test.mjs
+```
+
 ## Current evidence and remaining gates
 
-The implementation PRs for #151/#152/#163/#164 record their own exact tests, coverage and isolated
-integration scope. Their candidate `4.0.0` versions do not establish published images. The existing
-UM (#166), Guild/Registry (#169) and Tamagotchi (#172) schemas are now published by their owners.
-Contract #167 and the SD/Map implementation PRs are merged into dev. Raid can complete its
-remaining dependency clients using these schemas. These source merges do not establish released
-images or complete the shared-stack grade 8/10 checks. Broker gRPC forwarding regressions noted
-in the #167 review must be fixed and verified with both Go and Rust clients before that rehearsal.
+The accepted contract (#167) and all dependency schemas (#166/#169/#172) are merged. Map #19,
+Raid #22 and SD #10 implementations are merged into their dev branches. Broker #13 is also merged:
+Go callers now receive the real trailers-only gRPC status, and duplicate token metadata is rejected.
+Their CI and isolated integration receipts do not certify the complete team deployment.
+
+Published and adopted here: Map 4.0.0 (`25699bb`), SD 4.0.0 (`120d0d3`), User Management 4.0.0
+(`3882c39`) and Battle 4.0.0 (`295c0ff`). Map's image revision label matches main. SD has a successful
+main publication and immutable v4.0.0 tag. UM/Battle public image provenance records the main ref,
+source SHA and publication run for both architectures, even without private-repository access.
+
+Broker pins reviewed dev `66ac428` for a local build only; its release is intentionally deferred.
+Gateway, Raid, Guild, Registry, Tamagotchi and Notification still need published 4.x adoption in CPR.
+Raid's implementation is merged, but its 3.x selected image/mocked default is not Lab 4 evidence.
+Switch Raid's default to grpc with its 4.x image and released main pin. Existing .env mode overrides
+must also be checked before the rehearsal; Map now defaults to grpc.
+
+Two limitations to settle before recording final evidence:
+- Gateway dev still performs Guild/Raid WebSocket eligibility reads through Broker HTTP queues;
+  demonstrate the required internal gRPC migration or agree the infrastructure exception explicitly.
+- SD 4.0.0 has no /metrics endpoint (401 without a service token, 404 with one). Do not scrape a
+  nonexistent route. Its status/registry and structured Loki logs remain available; an SD metrics
+  scrape requires an actual released endpoint.
 
 No grade above is checked off until its actual shared-stack receipt is recorded on #165.
 Keep #165 open and the Project item out of Done until all checks and publication are complete.

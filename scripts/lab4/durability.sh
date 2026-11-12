@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Grade 8: durable queues. With every Guild replica stopped, a user.deleted event waits in the
+# Grade 9: durable queues. With every Guild replica stopped, a user.deleted event waits in the
 # guild.events queue; it survives a Broker restart (journal in DATA_DIR) and is delivered once a
 # Guild replica is back.
 source "$(dirname "$0")/common.sh"

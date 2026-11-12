@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Grade 9: the Broker routes by service load. guild-1 is made busy (its task slots fill up while
+# Grade 10: the Broker routes by service load. guild-1 is made busy (its task slots fill up while
 # its requests wait on a database lock); new requests then go to the idle guild-2.
 source "$(dirname "$0")/common.sh"
 SECONDS_BUSY=25

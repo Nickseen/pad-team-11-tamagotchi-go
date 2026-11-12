@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Grade 8: the dead letter channel. A user.deleted with eventVersion 2 is refused by Guild with
+# Grade 9: the dead letter channel. A user.deleted with eventVersion 2 is refused by Guild with
 # 422 UNSUPPORTED_EVENT_VERSION, so the Broker dead-letters it at once. It is listed, then replayed.
 source "$(dirname "$0")/common.sh"
 member="$(uuid)"

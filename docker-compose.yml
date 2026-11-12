@@ -12,12 +12,12 @@
 #
 # Lab 4 (#154): the Message Broker carries service-to-service calls and events
 # (docs/lab4-broker-contract.md); Prometheus, Loki, Alloy and Grafana (http://localhost:3000)
-# monitor everything. Until its 4.0.0 image is published: docker compose build message-broker.
-# Demo scripts for Grades 8-9 are in scripts/lab4 (see README, "Lab 4: Message Broker and monitoring").
+# monitor the Lab 4 components. Broker is a local build of the pinned reviewed dev commit;
+# no Broker release is selected. Demo scripts for Grades 9-10 are in scripts/lab4.
 #
 # Clients reach the system only through the Gateway on localhost:8080, as /<service>/api/v1/...;
-# services call each other through it too, at http://gateway:8080. The Gateway routes each request
-# round-robin over the replicas Service Discovery reports ready, so no service has a fixed address.
+# Lab 4 service calls go through the Broker; remaining 3.x images retain their Lab 3 transport.
+# This is a staged rollout, not a certified Lab 4 deployment; run scripts/verify-lab4.mjs before demos.
 # Map, Guild and Monster Raid replicas also publish one host port each (map-1 18085, map-2 28085,
 # map-3 38085, likewise 1808x/2808x/3808x for Guild and Raid), because clients open their
 # WebSockets directly to the replica named in their Gateway ticket. Nothing else, Service Discovery
@@ -29,10 +29,9 @@
 # its data in a named volume, so `docker compose down` followed by `up` loses nothing; `down -v`
 # is the command that deletes the data.
 #
-# Dependency modes: Battle, Map and Guild call their neighbours for real through the Gateway, and
-# Notification asks Guild for members the same way. Monster Raid starts with its neighbours mocked,
-# because a real raid needs an admin-created raid definition and User Management issues no admin
-# role. Each *_MODE variable in .env switches one service between mocked and real neighbours.
+# Map uses gRPC through Broker. Battle 4.x also uses Broker. Remaining 3.x images keep their
+# current modes until their releases are adopted. Monster Raid's mock default must be replaced
+# by grpc together with its 4.x image, before the final rehearsal.
 
 x-postgres: &postgres
   image: postgres:17-alpine # 18 moved the data directory; the volume path below is 17's
@@ -88,7 +87,7 @@ x-user-management-env: &user-management-env
   JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-signing-key.pem # one key for every replica
 
 x-user-management: &user-management
-  image: amzavladislav/tamagotchi-user-management:3.0.0
+  image: amzavladislav/tamagotchi-user-management:4.0.0
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -143,7 +142,7 @@ x-battle-env: &battle-env
   GATEWAY_URL: http://gateway:8080
 
 x-battle: &battle
-  image: amzavladislav/tamagotchi-battle:3.0.0
+  image: amzavladislav/tamagotchi-battle:4.0.0
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -162,11 +161,11 @@ x-map-env: &map-env
   MAP_REDIS_ADDR: map-redis:6379
   MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
   MAP_REDIS_DB: 0
-  MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-http}
+  MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-grpc}
   MAP_EVENTS_MODE: disabled # the stack has no RabbitMQ yet
 
 x-map: &map
-  image: nickseen/tamagotchi-map:3.1.0 # its image declares the /healthz check
+  image: nickseen/tamagotchi-map:4.0.0 # its image declares the /healthz check
   restart: on-failure # a single Redis ping at start-up, no retry
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -247,7 +246,7 @@ x-monster-raid: &monster-raid
 services:
   # --- Service Discovery ----------------------------------------------------------------------------
   service-discovery:
-    image: nickseen/tamagotchi-service-discovery:3.1.1 # monitor, Telegram and removal; its image declares the status check
+    image: nickseen/tamagotchi-service-discovery:4.0.0 # Lab 4 topics/gRPC registrations, monitor and alerts
     restart: unless-stopped
     environment:
       PORT: 8090
@@ -269,10 +268,9 @@ services:
 
   # --- Message Broker (Lab 4) -----------------------------------------------------------------------
   # Request queues and topics for every service-to-service call and event, gRPC forwarding,
-  # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md). Until the
-  # 4.0.0 image is published, build it from the submodule: docker compose build message-broker.
+  # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md).
+  # Local build only until the owner authorizes a release; no unpublished Docker Hub tag is used.
   message-broker:
-    image: nickseen/tamagotchi-message-broker:4.0.0
     build: services/message-broker
     restart: unless-stopped
     depends_on:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Grade 9: high availability. guild-2 crashes; the Broker reroutes the requests that hit it to
+# Grade 10: high availability. guild-2 crashes; the Broker reroutes the requests that hit it to
 # guild-1, its circuit for guild-2 opens after the failures, and Service Discovery removes that
 # instance. Clients see no errors.
 #
