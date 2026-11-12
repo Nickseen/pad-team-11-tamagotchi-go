@@ -1713,7 +1713,7 @@ events, and each event reaches one of them.
 | Queue | Subscriber | Registered topics |
 | ----- | ---------- | ----------------- |
 | `tamagotchi.events` | Tamagotchi | `battle.finished`, `raid.monster_defeated` |
-| `user-management.events` | User Management | `registry.package_version_published`, `battle.finished`, `raid.monster_defeated` |
+| `user-management.events` | User Management | `battle.finished`, `raid.monster_defeated` |
 | `notification.events` | Notification | `user.*`, `battle.*`, `tamagotchi.owner_transferred`, `map.players_nearby`, `guild.*`, `raid.*` |
 | `guild.events` | Guild | `user.deleted` |
 | `monster-raid.events` | Monster Raid | `registry.raid_definition_activated` |
