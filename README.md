@@ -15,6 +15,7 @@ packages meet, battle, trade creatures, form guilds and fight cooperative monste
 - [Communication Overview](#communication-overview)
 - [Communication Contract](#communication-contract)
 - [Lab 3 Discovery Contract](docs/lab3-discovery-contract.md)
+- [Lab 4 Broker Contract (proposal)](docs/lab4-broker-contract.md)
 - [Running the Stack](#running-the-stack)
 - [Postman Collections](#postman-collections)
 - [Open Boundary Decisions](#open-boundary-decisions)
@@ -205,6 +206,11 @@ redelivered event cannot hand over the same creature twice.
 
 ## Technologies and Communication Patterns
 
+The [Lab 4 Broker contract proposal](docs/lab4-broker-contract.md), tracked by #151, specifies
+the next migration: Broker request/topic queues, gRPC internal calls and Broker-owned balancing,
+breakers and failover. Shared schemas live in [proto/](proto/README.md). It requires all-owner
+confirmation before dependent PRs merge; the released topology described below is still Lab 3.
+
 The Lab 1 implementation deliberately uses exactly **two languages: Go and Python**. Go is assigned to
 the services whose load is dominated by concurrent requests, timers or latency-sensitive state
 transitions. Python with FastAPI is assigned to data-oriented services where flexible JSON models,
@@ -274,6 +280,10 @@ each negotiated with a Gateway ticket and then connected directly to its service
 ---
 
 ## Communication Overview
+
+For the proposed Broker routing and topic catalogue, see the
+[Lab 4 contract](docs/lab4-broker-contract.md). This supersedes the Gateway/RabbitMQ service
+transport only when the reviewed Lab 4 implementations and deployment are adopted.
 
 **Synchronous** where a decision cannot proceed without the answer — Battle cannot compute damage
 without creature stats and their package interpretation; Raid cannot admit a player without
