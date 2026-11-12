@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "User Management Service",
-    "description": "Every route of the User Management Service, called the way Lab 2 clients and services call it: through the API Gateway at {{gatewayUrl}}/user-management/api/v1/.... The Gateway validates the access token, removes Authorization and forwards the trusted identity; service routes carry X-Service-Token. Run the folders from top to bottom: each request feeds the next through collection variables, and no credential is stored in the collection, because the run registers its own users.\n\nSet gatewayUrl and serviceToken in the environment; serviceToken must equal the stack's SERVICE_TOKEN.",
+    "description": "Every route of the User Management Service, called the way Lab 2 clients and services call it: through the API Gateway at {{gatewayUrl}}/user-management/api/v1/.... The Gateway validates the access token, removes Authorization and forwards the trusted identity; service routes carry X-Service-Token. Run the folders from top to bottom: each request feeds the next through collection variables, and no credential is stored in the collection, because the run registers its own users.\n\nSet gatewayUrl and serviceToken in the environment; serviceToken must equal the stack's SERVICE_TOKEN. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -663,7 +663,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/users?ids={{userAId}},{{userBId}}",
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/users?ids={{userAId}},{{userBId}}",
             "description": "The batched read Guild, Battle and Notification use instead of one call per user."
           },
           "event": [
@@ -740,7 +740,7 @@
                 "value": "not-the-configured-token"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/users?ids={{userAId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/users?ids={{userAId}}"
           },
           "event": [
             {
@@ -974,7 +974,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/relationships?userId={{userAId}}&otherUserIds={{userBId}}",
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/relationships?userId={{userAId}}&otherUserIds={{userBId}}",
             "description": "This is the call the Battle Service makes before it accepts a challenge."
           },
           "event": [
@@ -1197,7 +1197,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances"
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances"
           },
           "event": [
             {
@@ -1221,7 +1221,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": 250,\n  \"reason\": \"battle_reward\"\n}",
@@ -1265,7 +1265,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": 250,\n  \"reason\": \"battle_reward\"\n}",
@@ -1299,7 +1299,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100"
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100"
           },
           "event": [
             {
@@ -1324,7 +1324,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100000"
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances/check?currency=global&amount=100000"
           },
           "event": [
             {
@@ -1349,7 +1349,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"global\",\n  \"packageId\": null,\n  \"delta\": -100000,\n  \"reason\": \"battle_loss\"\n}",
@@ -1392,7 +1392,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"local\",\n  \"packageId\": null,\n  \"delta\": 10,\n  \"reason\": \"package_reward\"\n}",
@@ -1435,7 +1435,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
+            "url": "{{brokerUrl}}/api/v1/queues/user-management/api/v1/internal/users/{{userAId}}/balances/adjust",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{commandId}}\",\n  \"currency\": \"doubloons\",\n  \"packageId\": null,\n  \"delta\": 10,\n  \"reason\": \"typo\"\n}",

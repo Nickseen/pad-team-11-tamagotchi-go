@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Map Service (through Gateway)",
-    "description": "Run in saved order against the shared stack. User Management registration and all REST requests go through Gateway. The map.stream ticket returns a direct WebSocket URL; open it separately in Postman and send a location.update frame. Do not commit a real service token or ticket.",
+    "description": "Run in saved order against the shared stack. User Management registration and all REST requests go through Gateway. The map.stream ticket returns a direct WebSocket URL; open it separately in Postman and send a location.update frame. Do not commit a real service token or ticket. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -114,7 +114,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/map/api/v1/status"
+            "url": "{{brokerUrl}}/api/v1/queues/map/api/v1/status"
           }
         }
       ]
@@ -240,8 +240,8 @@
                 "type": "text"
               }
             ],
-            "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}",
-            "description": "Expected: 200. This service-context request uses X-Service-Token through Gateway, without a user bearer token."
+            "url": "{{brokerUrl}}/api/v1/queues/map/api/v1/internal/positions/{{userId}}",
+            "description": "Expected: 200. This service-context request uses X-Service-Token through the Message Broker, without a user bearer token."
           },
           "event": [
             {
@@ -465,8 +465,8 @@
                 "type": "text"
               }
             ],
-            "url": "{{gatewayUrl}}/map/api/v1/internal/positions/{{userId}}",
-            "description": "Expected: 401 UNAUTHORIZED for an invalid X-Service-Token through Gateway."
+            "url": "{{brokerUrl}}/api/v1/queues/map/api/v1/internal/positions/{{userId}}",
+            "description": "Expected: 401 UNAUTHORIZED for an invalid X-Service-Token through the Message Broker."
           },
           "event": [
             {

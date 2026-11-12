@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Tamagotchi Service",
-    "description": "Every route of the Tamagotchi service, called through the API Gateway (Lab 2), in the order the Runner should run them. Setup registers and logs in through the Gateway. User requests carry the access token, which the Gateway validates and replaces with its trusted headers; service requests carry only X-Service-Token. Uses the shared environment's gatewayUrl and serviceToken.",
+    "description": "Every route of the Tamagotchi service, called through the API Gateway (Lab 2), in the order the Runner should run them. Setup registers and logs in through the Gateway. User requests carry the access token, which the Gateway validates and replaces with its trusted headers; service requests carry only X-Service-Token. Uses the shared environment's gatewayUrl and serviceToken. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -864,7 +864,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{secondaryCommandId}}\",\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n  \"acquiredFrom\": \"trade\"\n}",
@@ -907,7 +907,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{secondaryCommandId}}\",\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n  \"acquiredFrom\": \"trade\"\n}",
@@ -1015,7 +1015,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/combat-types/advantage?attacker=flame&defender=nature"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/combat-types/advantage?attacker=flame&defender=nature"
           },
           "event": [
             {
@@ -1040,7 +1040,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/combat-types/advantage?attacker=flame&defender=shadow"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/combat-types/advantage?attacker=flame&defender=shadow"
           },
           "event": [
             {
@@ -1059,7 +1059,7 @@
     },
     {
       "name": "Internal routes",
-      "description": "Called by Battle and Monster Raid through the Gateway; need X-Service-Token.",
+      "description": "Called by Battle and Monster Raid through the Message Broker's request queue; need X-Service-Token.",
       "item": [
         {
           "name": "Bulk read",
@@ -1071,7 +1071,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/tamagotchis?ids={{tamagotchiId}},{{secondTamagotchiId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/tamagotchis?ids={{tamagotchiId}},{{secondTamagotchiId}}"
           },
           "event": [
             {
@@ -1096,7 +1096,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/xp",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/xp",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{xpCommandId}}\",\n  \"amount\": 120,\n  \"source\": \"raid\"\n}",
@@ -1139,7 +1139,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/xp",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/xp",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{xpCommandId}}\",\n  \"amount\": 120,\n  \"source\": \"raid\"\n}",
@@ -1173,7 +1173,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/transfer-owner",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/tamagotchis/{{secondTamagotchiId}}/transfer-owner",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{transferCommandId}}\",\n  \"newOwnerId\": \"{{userBId}}\",\n  \"battleId\": \"{{transferBattleId}}\"\n}",
@@ -1217,7 +1217,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{userAId}}/primary-tamagotchi"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{userAId}}/primary-tamagotchi"
           },
           "event": [
             {
@@ -1242,7 +1242,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/00000000-0000-4000-8000-000000000000/primary-tamagotchi"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/00000000-0000-4000-8000-000000000000/primary-tamagotchi"
           },
           "event": [
             {
@@ -1269,7 +1269,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{holdingCommandId}}\",\n  \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n  \"acquiredFrom\": \"capture\"\n}",
@@ -1311,7 +1311,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/{{opponentTamagotchiId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/{{opponentTamagotchiId}}"
           },
           "event": [
             {
@@ -1337,7 +1337,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{userBId}}/secondary-tamagotchis/{{secondTamagotchiId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{userBId}}/secondary-tamagotchis/{{secondTamagotchiId}}"
           },
           "event": [
             {
@@ -1363,7 +1363,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/00000000-0000-4000-8000-000000000000"
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{userAId}}/secondary-tamagotchis/00000000-0000-4000-8000-000000000000"
           },
           "event": [
             {
@@ -1406,12 +1406,40 @@
               }
             }
           ]
+        },
+        {
+          "name": "Error: the Gateway refuses the service token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/tamagotchis?ids={{tamagotchiId}}",
+            "description": "Service calls go through the Message Broker; the Gateway serves clients only, so it refuses any request carrying X-Service-Token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 INTERNAL_ROUTE_FORBIDDEN from the Gateway\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('INTERNAL_ROUTE_FORBIDDEN');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Events (mock of RabbitMQ)",
-      "description": "Events other services would publish, delivered by hand.",
+      "name": "Events (as the Broker delivers them)",
+      "description": "The envelopes the Message Broker delivers from its topics, sent by hand through the Broker's request queue to the event intake.",
       "item": [
         {
           "name": "battle.finished: user B beats user A",
@@ -1423,7 +1451,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userBId}}\",\n    \"loserId\": \"{{userAId}}\",\n    \"outcome\": \"knockout\",\n    \"turnCount\": 9,\n    \"transferredTamagotchiId\": \"{{tamagotchiId}}\",\n    \"currency\": {\n      \"winnerDelta\": 250,\n      \"loserDelta\": -100\n    },\n    \"xp\": {\n      \"winner\": {\n        \"primaryTamagotchiId\": \"{{opponentTamagotchiId}}\",\n        \"primaryXp\": 180,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      },\n      \"loser\": {\n        \"primaryTamagotchiId\": \"{{tamagotchiId}}\",\n        \"primaryXp\": 60,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      }\n    },\n    \"finishedAt\": \"2026-09-22T12:00:00.000Z\"\n  }\n}",
@@ -1522,7 +1550,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userBId}}\",\n    \"loserId\": \"{{userAId}}\",\n    \"outcome\": \"knockout\",\n    \"turnCount\": 9,\n    \"transferredTamagotchiId\": \"{{tamagotchiId}}\",\n    \"currency\": {\n      \"winnerDelta\": 250,\n      \"loserDelta\": -100\n    },\n    \"xp\": {\n      \"winner\": {\n        \"primaryTamagotchiId\": \"{{opponentTamagotchiId}}\",\n        \"primaryXp\": 180,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      },\n      \"loser\": {\n        \"primaryTamagotchiId\": \"{{tamagotchiId}}\",\n        \"primaryXp\": 60,\n        \"secondaryTamagotchiId\": null,\n        \"secondaryXp\": 0\n      }\n    },\n    \"finishedAt\": \"2026-09-22T12:00:00.000Z\"\n  }\n}",
@@ -1556,7 +1584,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"raid.monster_defeated\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidId}}\",\n    \"guildId\": \"{{raidId}}\",\n    \"monsterId\": \"{{raidId}}\",\n    \"totalDamage\": 9000,\n    \"durationSeconds\": 600,\n    \"defeatedAt\": \"2026-09-22T12:30:00.000Z\",\n    \"rewards\": [\n      {\n        \"userId\": \"{{userBId}}\",\n        \"tamagotchiId\": \"{{opponentTamagotchiId}}\",\n        \"globalCurrency\": 500,\n        \"xp\": 300,\n        \"damageShare\": 1.0\n      }\n    ]\n  }\n}",
@@ -1602,7 +1630,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 2,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {}\n}",

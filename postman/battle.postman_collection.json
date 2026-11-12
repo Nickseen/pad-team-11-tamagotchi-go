@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Battle Service",
-    "description": "Every route of the Battle Service, called through the API Gateway at {{gatewayUrl}}/battle/api/v1/..., in run order: a challenge is issued, accepted, fought turn by turn and resolved. The Gateway validates the access token, removes Authorization and forwards the trusted identity; Battle sees only that.\n\nThe Setup folder prepares real data through the Gateway, so the same run passes whether Battle's dependencies are live or mocked: a package with published stat definitions, players registered with it, their primary creatures in Tamagotchi and a secondary lent to the challenger through Tamagotchi's service route. No credential is stored in the collection.\n\nSet gatewayUrl and serviceToken in the environment, and battleDependencyMode to Battle's DEPENDENCY_MODE (live by default in the team stack; with mock, the unrelated-users refusal cannot be produced and is checked accordingly).",
+    "description": "Every route of the Battle Service, called through the API Gateway at {{gatewayUrl}}/battle/api/v1/..., in run order: a challenge is issued, accepted, fought turn by turn and resolved. The Gateway validates the access token, removes Authorization and forwards the trusted identity; Battle sees only that.\n\nThe Setup folder prepares real data through the Gateway, so the same run passes whether Battle's dependencies are live or mocked: a package with published stat definitions, players registered with it, their primary creatures in Tamagotchi and a secondary lent to the challenger through Tamagotchi's service route. No credential is stored in the collection.\n\nSet gatewayUrl and serviceToken in the environment, and battleDependencyMode to Battle's DEPENDENCY_MODE (live by default in the team stack; with mock, the unrelated-users refusal cannot be produced and is checked accordingly). Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -655,7 +655,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/users/{{challengerId}}/secondary-tamagotchis",
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/{{challengerId}}/secondary-tamagotchis",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"commandId\": \"{{$guid}}\",\n  \"tamagotchiId\": \"{{secondaryA}}\",\n  \"acquiredFrom\": \"trade\"\n}",

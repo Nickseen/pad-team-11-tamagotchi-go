@@ -1,0 +1,725 @@
+{
+  "info": {
+    "name": "Message Broker",
+    "description": "The Message Broker's own HTTP API (Lab 4), called directly at {{brokerUrl}}: Compose publishes it on 127.0.0.1:8091 for inspection, outside the Gateway. Status and metrics need no credentials; every other route needs X-Service-Token. Covers the request queues (Gateway-to-service to Battle, service-to-service to Tamagotchi), topic publication, the topic list, and a dead letter created, listed and replayed. Uses the shared environment's brokerUrl and serviceToken. Run it against the Lab 4 stack in the saved order.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{brokerUrl}}/api/v1/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"the Broker is live and ready\", () => {",
+                  "  pm.expect(body.service).to.eql(\"message-broker\");",
+                  "  pm.expect(body.live).to.be.true;",
+                  "  pm.expect(body.ready).to.be.true;",
+                  "});",
+                  "pm.test(\"load is reported\", () => pm.expect(body.load).to.have.keys(\"activeTasks\", \"maxTasks\", \"ratio\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{brokerUrl}}/metrics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Prometheus text with the Broker's counters\", () => {",
+                  "  pm.expect(pm.response.text()).to.include(\"# TYPE\");",
+                  "  pm.expect(pm.response.text()).to.include(\"broker_\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Topics without the service token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{brokerUrl}}/api/v1/topics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request queue with a wrong service token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "wrong-service-token"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/combat-types/advantage?attacker=flame&defender=nature"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Request queues",
+      "item": [
+        {
+          "name": "Service call through Tamagotchi's queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/combat-types/advantage?attacker=flame&defender=nature",
+            "description": "A service-authenticated route, as Battle calls it: the Broker picks the least loaded ready replica."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK from a Tamagotchi replica\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the service's own answer\", () => pm.expect(pm.response.json().multiplier).to.eql(1.5));",
+                  "const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;",
+                  "pm.test(\"the Broker names the instance and the attempt\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Upstream-Instance-Id\")).to.match(uuid);",
+                  "  pm.expect(pm.response.headers.get(\"X-Upstream-Attempt-Id\")).to.match(uuid);",
+                  "  pm.expect(Number(pm.response.headers.get(\"X-Upstream-Task-Timeout-Ms\"))).to.be.above(0);",
+                  "  pm.expect(Number(pm.response.headers.get(\"X-Broker-Queue-Wait-Ms\"))).to.be.at.least(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gateway-to-service queue: a Battle",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/battle/api/v1/battles/{{battleId}}",
+            "description": "The queue the Gateway sends client requests to. The Gateway adds X-Gateway-Token and the user's trusted headers; sent here with the service token only, the request reaches a Battle replica, which refuses a client route without them."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answered by a Battle replica, not by the Broker\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Upstream-Instance-Id\")).to.be.a(\"string\");",
+                  "  pm.expect(pm.response.headers.get(\"X-Upstream-Attempt-Id\")).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"Battle's own 401: this request lacks the Gateway's trusted headers\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Internal route through the queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/users/00000000-0000-4000-8000-000000000000/primary-tamagotchi"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"the replica's own 404 is passed through\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"NO_PRIMARY_TAMAGOTCHI\");",
+                  "});",
+                  "pm.test(\"answered by an instance\", () => pm.expect(pm.response.headers.get(\"X-Upstream-Instance-Id\")).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown service",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/no-such-service/api/v1/anything"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ROUTE_NOT_FOUND\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"ROUTE_NOT_FOUND\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Path outside /api/v1",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ROUTE_NOT_FOUND\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"ROUTE_NOT_FOUND\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Topics",
+      "item": [
+        {
+          "name": "Publish user.deleted",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics/user.deleted/messages",
+            "description": "A user nobody knows is deleted: subscribers acknowledge it without changing anything.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{userDeletedEnvelope}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const now = new Date().toISOString();",
+                  "const payload = { userId: pm.variables.replaceIn(\"{{$guid}}\"), purgeAt: new Date(Date.now() + 30 * 864e5).toISOString() };",
+                  "pm.collectionVariables.set(\"userDeletedEnvelope\", JSON.stringify({",
+                  "  eventId: pm.variables.replaceIn(\"{{$guid}}\"),",
+                  "  eventType: \"user.deleted\",",
+                  "  eventVersion: 1,",
+                  "  occurredAt: now,",
+                  "  producer: \"postman\",",
+                  "  correlationId: pm.variables.replaceIn(\"{{$guid}}\"),",
+                  "  idempotencyKey: pm.variables.replaceIn(\"{{$guid}}\"),",
+                  "  payload,",
+                  "}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"202 Accepted: stored for every subscriber\", () => pm.response.to.have.status(202));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"names the message, the topic and the subscribers\", () => {",
+                  "  pm.expect(body.messageId).to.be.a(\"string\");",
+                  "  pm.expect(body.topic).to.eql(\"user.deleted\");",
+                  "  pm.expect(body.subscribers).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"Notification subscribes through user.*\", () => pm.expect(body.subscribers).to.include(\"notification\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publish with eventType different from the topic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics/user.registered/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{{userDeletedEnvelope}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 VALIDATION_FAILED\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_FAILED\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publish without the service token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics/user.deleted/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{{userDeletedEnvelope}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List topics, subscribers and queue depths",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"topics, publication counts and request queues\", () => {",
+                  "  pm.expect(body.topics).to.be.an(\"array\");",
+                  "  pm.expect(body.published).to.be.an(\"array\");",
+                  "  pm.expect(body.requestQueues).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"Notification's queue is subscribed to user.*\", () => {",
+                  "  const users = body.topics.find((topic) => topic.pattern === \"user.*\");",
+                  "  pm.expect(users.subscribers.map((s) => s.queue)).to.include(\"notification.events\");",
+                  "});",
+                  "pm.test(\"the publication above is counted\", () => {",
+                  "  pm.expect(body.published.find((p) => p.topic === \"user.deleted\").published).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dead letters",
+      "item": [
+        {
+          "name": "Publish an event version Notification does not understand",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics/user.friend_request_created/messages",
+            "description": "Notification, its only subscriber, answers 422 UNSUPPORTED_EVENT_VERSION, a 4xx, so the Broker dead-letters it at once.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{unsupportedEnvelope}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const now = new Date().toISOString();",
+                  "const payload = {};",
+                  "pm.collectionVariables.set(\"unsupportedEnvelope\", JSON.stringify({",
+                  "  eventId: pm.variables.replaceIn(\"{{$guid}}\"),",
+                  "  eventType: \"user.friend_request_created\",",
+                  "  eventVersion: 99,",
+                  "  occurredAt: now,",
+                  "  producer: \"postman\",",
+                  "  correlationId: pm.variables.replaceIn(\"{{$guid}}\"),",
+                  "  idempotencyKey: pm.variables.replaceIn(\"{{$guid}}\"),",
+                  "  payload,",
+                  "}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"202 Accepted\", () => pm.response.to.have.status(202));",
+                  "pm.collectionVariables.set(\"rejectedMessageId\", pm.response.json().messageId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Notification's dead letters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/dead-letters?queue=notification.events&offset=0&limit=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The Broker delivers in the background: give it a moment before reading the dead letters.",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"a page of dead letters of that queue\", () => {",
+                  "  pm.expect(body.items).to.be.an(\"array\");",
+                  "  pm.expect(body.items.every((item) => item.queue === \"notification.events\")).to.be.true;",
+                  "  pm.expect(body.limit).to.eql(100);",
+                  "});",
+                  "const ours = body.items.find((item) => item.message.id === pm.collectionVariables.get(\"rejectedMessageId\"));",
+                  "pm.test(\"the rejected event is dead-lettered, with the reason\", () => {",
+                  "  pm.expect(ours).to.be.an(\"object\");",
+                  "  pm.expect(ours.reason).to.include(\"422\");",
+                  "});",
+                  "if (ours) pm.collectionVariables.set(\"deadLetterId\", ours.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay the dead letter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/dead-letters/{{deadLetterId}}/replay"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"202 Accepted: back at the end of its queue\", () => pm.response.to.have.status(202));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"names the dead letter, the message and the queue\", () => {",
+                  "  pm.expect(body.deadLetterId).to.eql(pm.collectionVariables.get(\"deadLetterId\"));",
+                  "  pm.expect(body.messageId).to.eql(pm.collectionVariables.get(\"rejectedMessageId\"));",
+                  "  pm.expect(body.queue).to.eql(\"notification.events\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay the same dead letter again",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/dead-letters/{{deadLetterId}}/replay",
+            "description": "Each dead letter is replayed once. Still unsupported, the replayed event is dead-lettered again under a new id."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 DEAD_LETTER_NOT_FOUND\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"DEAD_LETTER_NOT_FOUND\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay an unknown dead letter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/dead-letters/00000000-0000-4000-8000-000000000000/replay"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 DEAD_LETTER_NOT_FOUND\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"DEAD_LETTER_NOT_FOUND\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dead letters without the service token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{brokerUrl}}/api/v1/dead-letters"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "battleId",
+      "value": "00000000-0000-4000-8000-000000000000"
+    },
+    {
+      "key": "userDeletedEnvelope",
+      "value": ""
+    },
+    {
+      "key": "unsupportedEnvelope",
+      "value": ""
+    },
+    {
+      "key": "rejectedMessageId",
+      "value": ""
+    },
+    {
+      "key": "deadLetterId",
+      "value": ""
+    }
+  ]
+}
