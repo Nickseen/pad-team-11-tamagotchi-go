@@ -110,7 +110,7 @@ the transaction and mark sent only after 202. Publication retries preserve event
 | user.deleted | User Management | Guild, Notification |
 | tamagotchi.created, tamagotchi.leveled_up | Tamagotchi | none |
 | tamagotchi.owner_transferred | Tamagotchi | Notification |
-| registry.package_version_published | Package Registry | User Management |
+| registry.package_version_published | Package Registry | none: User Management caches no package data, so it does not subscribe |
 | registry.raid_definition_activated | Package Registry | Monster Raid |
 | battle.created | Battle | Notification |
 | battle.finished | Battle | Tamagotchi, User Management, Notification |
