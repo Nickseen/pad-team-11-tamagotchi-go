@@ -13,16 +13,16 @@
 #
 # Lab 4 (#154): the Message Broker carries service-to-service calls and events
 # (docs/lab4-broker-contract.md); Prometheus, Loki, Alloy and Grafana (http://localhost:3000)
-# monitor the Lab 4 components. The Broker runs its released 4.0.0 image. Demo scripts for
-# Grades 9-10 are in scripts/lab4.
+# monitor the Lab 4 components. Every application image is a published 4.x release pinned
+# to its actual main commit. Demo scripts for Grades 9-10 are in scripts/lab4.
 #
 # Clients reach the system only through the Gateway on localhost:8080, as /<service>/api/v1/...;
-# Lab 4 service calls go through the Broker; remaining 3.x images retain their Lab 3 transport.
-# This is a staged rollout, not a certified Lab 4 deployment; run scripts/verify-lab4.mjs before demos.
+# Lab 4 service calls go through the Broker, which selects replicas by load and owns their breakers.
+# Run scripts/verify-lab4.mjs before demos; release adoption is not a full-stack acceptance receipt.
 # Map, Guild and Monster Raid replicas also publish one host port each (map-1 18085, map-2 28085,
 # map-3 38085, likewise 1808x/2808x/3808x for Guild and Raid), because clients open their
-# WebSockets directly to the replica named in their Gateway ticket. Nothing else, Service Discovery
-# included, is reachable from the host.
+# WebSockets directly to the replica named in their Gateway ticket. Broker diagnostics are on
+# 127.0.0.1:8091; Grafana/Prometheus use 3000/9090. SD, stores and domain gRPC stay private.
 #
 # Every replica registers its own INSTANCE_BASE_URL (and INSTANCE_WS_PUBLIC_URL) with Discovery,
 # which accepts only the origins in DISCOVERY_ALLOWED_ORIGINS below. User Management and Battle run
@@ -34,9 +34,9 @@
 # its data in a named volume, so `docker compose down` followed by `up` loses nothing; `down -v`
 # is the command that deletes the data.
 #
-# Map uses gRPC through Broker. Battle 4.x also uses Broker. Remaining 3.x images keep their
-# current modes until their releases are adopted. Monster Raid's mock default must be replaced
-# by grpc together with its 4.x image, before the final rehearsal.
+# Battle, Map, Guild, Monster Raid and Notification use real dependencies through Broker.
+# Map/Raid select grpc; Guild's real lookup transport is grpc. .env can override the mock/live
+# switches for local diagnosis, but mock/compatibility modes do not prove the final gRPC checks.
 
 # A fixed project name: replica container names, which User Management and Battle register as
 # their addresses, do not depend on the folder the repository is cloned into.
@@ -113,7 +113,7 @@ x-tamagotchi-env: &tamagotchi-env
   DATABASE_URL: postgresql+psycopg://tamagotchi:${TAMAGOTCHI_DB_PASSWORD}@tamagotchi-db:5432/tamagotchi
 
 x-tamagotchi: &tamagotchi
-  image: crislp/tamagotchi-tamagotchi:3.0.0
+  image: crislp/tamagotchi-tamagotchi:4.0.0
   restart: on-failure
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -164,14 +164,12 @@ x-map-env: &map-env
   MAX_CONCURRENT_TASKS: 50
   MAX_WEBSOCKET_CONNECTIONS: 100
   PORT: 8085
-  GATEWAY_URL: http://gateway:8080
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
   MAP_STORAGE: redis
   MAP_REDIS_ADDR: map-redis:6379
   MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
   MAP_REDIS_DB: 0
   MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-grpc}
-  MAP_EVENTS_MODE: disabled # the stack has no RabbitMQ yet
 
 x-map: &map
   image: nickseen/tamagotchi-map:4.0.0 # its image declares the /healthz check
@@ -186,10 +184,10 @@ x-notification-env: &notification-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 10
   DATABASE_URL: postgresql+psycopg://notification:${NOTIFICATION_DB_PASSWORD}@notification-db:5432/notification
-  GATEWAY_URL: http://gateway:8080 # guild members are read from Guild through it
+  # Guild member reads use BROKER_GRPC_ADDR; event publication/delivery uses Broker topics.
 
 x-notification: &notification
-  image: crislp/tamagotchi-notification:3.0.0
+  image: crislp/tamagotchi-notification:4.0.0
   restart: on-failure
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -206,7 +204,7 @@ x-guild-env: &guild-env
   MAX_WEBSOCKET_CONNECTIONS: 100
   DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
   USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-real}
-  # Invitee lookups call UserManagementInternal/ListUsers over gRPC through the Broker (Lab 4 Grade 7).
+  # Invitee lookups call UserManagementInternal/ListUsers over gRPC through the Broker (Lab 4 Grade 8).
   USER_MANAGEMENT_TRANSPORT: grpc
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
   CHAT_BROKER: redis
@@ -237,13 +235,12 @@ x-monster-raid-env: &monster-raid-env
   RAID_REDIS_ADDR: monster-raid-redis:6379
   RAID_REDIS_PASSWORD: ${RAID_REDIS_PASSWORD}
   RAID_REDIS_DB: 0
-  RAID_DEPENDENCY_MODE: ${RAID_DEPENDENCY_MODE:-mock}
+  RAID_DEPENDENCY_MODE: ${RAID_DEPENDENCY_MODE:-grpc}
   RAID_MOCK_FAILURE: "false"
-  GATEWAY_URL: http://gateway:8080
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
 
 x-monster-raid: &monster-raid
-  image: nickseen/tamagotchi-monster-raid:3.1.0 # its image declares the /healthz check
+  image: nickseen/tamagotchi-monster-raid:4.0.0 # its image declares the /healthz check
   restart: on-failure
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -280,6 +277,7 @@ services:
   # --- Message Broker (Lab 4) -----------------------------------------------------------------------
   # Request queues and topics for every service-to-service call and event, gRPC forwarding,
   # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md).
+  # Published release; the matching main source is pinned in services/message-broker.
   message-broker:
     image: nickseen/tamagotchi-message-broker:4.0.0
     restart: unless-stopped
@@ -306,7 +304,7 @@ services:
 
   # --- API Gateway ----------------------------------------------------------------------------------
   gateway:
-    image: nickseen/tamagotchi-gateway:3.0.0 # discovery and round-robin (#132); its image declares the /health check
+    image: nickseen/tamagotchi-gateway:4.0.0 # Broker queues and system-log download; declares /health
     restart: unless-stopped
     depends_on:
       service-discovery:
@@ -316,8 +314,8 @@ services:
     environment:
       # Lab 4: Gateway forwards client traffic to the Broker's request queues (#153).
       BROKER_URL: http://message-broker:8091
-      # Lab 3: Discovery replaces the eight static service URLs as the routing authority, including
-      # the User Management key set and the WebSocket origin a ticket names.
+      LOKI_URL: http://loki:3100
+      # Discovery selects the replica for a direct WebSocket URL; REST and JWKS use Broker queues.
       DISCOVERY_URL: http://service-discovery:8090
       GATEWAY_TOKEN: ${GATEWAY_TOKEN:?set GATEWAY_TOKEN in .env}
       SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}

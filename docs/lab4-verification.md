@@ -12,8 +12,8 @@ Private service unit tests or an isolated fake consumer do not prove the complet
 3. Release each image from dev via release/v4.x.y into main under its repository's approval policy.
    Map/Raid use Nickseen's explicit solo-merge policy; shared repositories retain their review gates.
    Check successful main publication, immutable Git tag and the image's revision/version evidence.
-   Broker release is currently deferred by its owner: local builds may be prepared, but they do not
-   complete the published-release gate.
+   Broker release #14 is now published as 4.0.0; select its actual main SHA cd194d5 and image
+   together. No local-build exception is needed for the selected deployment.
 4. Adopt actual released main SHAs in CPR submodules and matching image versions in Compose.
    Integrate #154 (Compose/metrics), #155 (logs) and #156 (README/diagram/Postman).
 5. Bring up two ready replicas per domain on the private network. Keep client REST through Gateway;
@@ -72,10 +72,10 @@ With a running stack, the Gateway container already has the private origins and 
 docker compose exec -T gateway node --input-type=module < scripts/verify-lab4.mjs
 ```
 
-The script checks Gateway/SD/Broker versions as well as domain registrations; a 3.x Gateway must
-fail even if ready 4.x domain replicas are registered. The current staged rollout is expected to
-fail until the remaining releases are adopted. Do not run disruptive demos as acceptance checks
-before this preflight passes.
+The script checks Gateway/SD/Broker versions as well as domain registrations; a stale 3.x component
+must fail even if other 4.x replicas are ready. All selected releases are now 4.x; run this check
+after pulling/recreating containers, rather than assuming existing containers changed with Git.
+Do not run disruptive demos as acceptance checks before this preflight passes.
 
 The preflight regression fixtures can be checked without starting the stack:
 
@@ -90,19 +90,33 @@ Raid #22 and SD #10 implementations are merged into their dev branches. Broker #
 Go callers now receive the real trailers-only gRPC status, and duplicate token metadata is rejected.
 Their CI and isolated integration receipts do not certify the complete team deployment.
 
-Published and adopted here: Map 4.0.0 (`25699bb`), SD 4.0.0 (`120d0d3`), Message Broker 4.0.0
-(`cd194d5`), User Management 4.0.1 (`70edafc`) and Battle 4.0.1 (`8e369a6`). Map's image revision
-label matches main. SD, the Broker, User Management and Battle each have a successful main
-publication and an immutable `v4.x.y` tag on that commit. UM/Battle public image provenance records
-the main ref, source SHA and publication run for both architectures, even without private-repository
-access.
+All eleven selected application components now use published Lab 4 images with matching main
+source pins; the README's image table links each publication run. UM/Battle use their newer
+4.0.1 fixes; the other components select 4.0.0. Broker is the owner's published release from #14,
+not a local build or another release created by this CPR change.
 
-Gateway, Raid, Guild, Registry, Tamagotchi and Notification still need published 4.x adoption in CPR.
-Raid's implementation is merged, but its 3.x selected image/mocked default is not Lab 4 evidence.
-Switch Raid's default to grpc with its 4.x image and released main pin. Existing .env mode overrides
-must also be checked before the rehearsal; Map now defaults to grpc.
+The public image provenance for both amd64 and arm64 agrees on the source main SHA and build run.
+Map/Raid and Guild/Registry also carry matching image revision/version labels. This verifies
+release selection; it does not establish cross-service behavior or certify a complete deployment.
 
-Two limitations to settle before recording final evidence:
+PR #181's partial-stack receipt covers SD/Broker with UM/Battle 4.0.1, address resolution, both
+ready replicas, balanced HTTP requests and gRPC GetBalances. Its deploy.replicas layout, fixed
+project name, allowlist and DNS-based Prometheus discovery remain unchanged here. This is partial
+integration evidence, not the complete eight-service rehearsal.
+
+Compose defaults: Map/Raid grpc, Battle live, Guild real with grpc lookup transport. Notification
+uses BROKER_GRPC_ADDR for Guild reads. Existing .env or extra Compose overrides can still select
+mocks/HTTP, so inspect those mode values before the rehearsal without printing shared credentials.
+The obsolete MAP_EVENTS_MODE=disabled setting and domain GATEWAY_URL settings are removed;
+Map's durable outbox publishes to the Broker, and GATEWAY_JWKS_URL remains only for ticket checks.
+
+The Guild/Registry event-coverage collection updates in CPR #179 remain a separate PR until merged;
+do not infer that importing collections from an older checkout includes them. Both that PR and the
+existing collections still require a real run on the final image set.
+
+Remaining transport and observability qualifications before final evidence:
+- CPR #181 records Battle 4.0.1 using Broker HTTP queues for Tamagotchi/Registry and gRPC for UM.
+  The remaining HTTP dependency reads still need migration to the published RPCs for strict grade 8.
 - Gateway dev still performs Guild/Raid WebSocket eligibility reads through Broker HTTP queues;
   demonstrate the required internal gRPC migration or agree the infrastructure exception explicitly.
 - SD 4.0.0 has no /metrics endpoint (401 without a service token, 404 with one). Do not scrape a
