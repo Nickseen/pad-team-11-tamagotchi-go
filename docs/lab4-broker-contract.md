@@ -1,8 +1,9 @@
 # Lab 4: Message Broker and gRPC contract
 
-Status: **proposed**, CPR #151. Adoption requires confirmation from Nickseen, vladas9,
-gabimiric and CyberMoonie before dependent implementation PRs merge. Implementations may be
-prepared and tested against this proposal in parallel. This document does not claim released support.
+Status: **accepted** for CPR #151 on 2026-11-12. Nickseen, vladas9, gabimiric and
+CyberMoonie confirmed the contract in [PR #167](https://github.com/Nickseen/pad-team-11-tamagotchi-go/pull/167),
+which is merged. Acceptance specifies the interface; it does not certify unreleased images or
+the complete shared-stack rehearsal. Implementations still require their own reviews and releases.
 
 Protocol baseline: Message Broker dev commit 11d85d99c5d50ae4f8d972c09c3a35e853d19570.
 The Broker README and proto at that commit define its current wire behavior.
@@ -185,9 +186,9 @@ Broker proto has no Go option; Go consumers supply a protoc M mapping when gener
 | Map | MapInternal.GetPosition: user_id -> position fields |
 | Monster Raid | MonsterRaidInternal.GetParticipant: raid_id, user_id -> is_participant |
 | User Management | Published in PR #166; GetRelationships, ListUsers, GetBalances, CheckBalance, AdjustBalance |
-| Guild | Owner supplies guild-read/member RPC schemas |
-| Tamagotchi | Owner supplies creature/bulk/primary/holding/type-advantage schemas |
-| Package Registry | Owner supplies package/version/stat/raid-definition schemas |
+| Guild | Published by #169: GetGuild, GetMembership, ListMembers |
+| Tamagotchi | Published by #172: ListTamagotchis, GetPrimary, GetSecondaryHolding, CreateSecondary, GrantXp, TransferOwner, GetTypeAdvantage |
+| Package Registry | Published by #169: ListStatDefinitions, GetCurrentVersion, GetRaidDefinition |
 | Battle, Notification | No domain internal RPC server required; implement dependency clients |
 
 Map/Raid schemas accompany their own work. Dependency client interoperability requires the
@@ -246,13 +247,11 @@ Rollout order:
 
 Do not mark implementation/release evidence complete from stub tests or image publication alone.
 
-## Proposed Raid reward-pool clarification
+## Accepted Raid reward-pool clarification
 
 For #164, `rewardConfig.globalCurrency` and `rewardConfig.xp` are total integer pools.
 Distribute over participants with positive damage, equally or by damage depending on
 `distribution`. Use largest integer remainders; ties use ascending canonical userId.
 This preserves every currency/XP unit, includes players who contributed before leaving,
 and never pays zero-damage spectators. `damageShare` always describes actual damage.
-Historical definitions without rewardConfig have zero pools. This clarification is proposed
-and requires the same all-owner confirmation as the rest of this contract before merging
-implementations. Raid emits the reward list; only UM/Tamagotchi apply their respective rewards.
+Historical definitions without rewardConfig have zero pools. This clarification was accepted with the rest of the contract in PR #167. Raid emits the reward list; only UM/Tamagotchi apply their respective rewards.
