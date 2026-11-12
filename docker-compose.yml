@@ -172,7 +172,7 @@ x-map-env: &map-env
   MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-grpc}
 
 x-map: &map
-  image: nickseen/tamagotchi-map:4.0.0 # its image declares the /healthz check
+  image: nickseen/tamagotchi-map:4.0.1 # its image declares the /healthz check
   restart: on-failure # a single Redis ping at start-up, no retry
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)

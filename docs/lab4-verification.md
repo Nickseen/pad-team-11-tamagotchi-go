@@ -91,7 +91,7 @@ Go callers now receive the real trailers-only gRPC status, and duplicate token m
 Their CI and isolated integration receipts do not certify the complete team deployment.
 
 All eleven selected application components now use published Lab 4 images with matching main
-source pins; the README's image table links each publication run. UM/Battle and Registry use their newer
+source pins; the README's image table links each publication run. Map, UM/Battle and Registry use their newer
 4.0.1 fixes; the other components select 4.0.0. Broker is the owner's published release from #14,
 not a local build or another release created by this CPR change.
 
@@ -135,3 +135,7 @@ summary/testing/breaking-change/checklist template, link completed issues with c
 obtain two independent approvals, resolve all conversations and wait for required CI. Squash merge
 without bypass, tag the actual main release commit, and synchronize main's release metadata back
 into dev through a reviewed PR. Do not tag feature commits or rewrite immutable release tags.
+
+Map patch 4.0.1 is published from main `3ca778c` (CI 43310895212, tag v4.0.1). It includes the
+corrected existing Postman collection/environment from Map #21; runtime/API remain unchanged.
+CPR #184's correction is retained: registry.package_version_published currently has no subscriber.
