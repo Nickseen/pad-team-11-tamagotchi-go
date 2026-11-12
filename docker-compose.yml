@@ -121,7 +121,7 @@ x-package-registry-env: &package-registry-env
   DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@package-registry-db:5432/registry
 
 x-package-registry: &package-registry
-  image: gabimiric/tamagotchi-package-registry:3.0.0
+  image: gabimiric/tamagotchi-package-registry:4.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
@@ -197,13 +197,14 @@ x-guild-env: &guild-env
   MAX_WEBSOCKET_CONNECTIONS: 100
   DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
   USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-real}
-  GATEWAY_URL: http://gateway:8080
+  # Invitee lookups call UserManagementInternal/ListUsers over gRPC through the Broker (Lab 4 Grade 7).
+  USER_MANAGEMENT_TRANSPORT: grpc
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
   CHAT_BROKER: redis
   REDIS_URL: redis://:${GUILD_REDIS_PASSWORD}@guild-redis:6379/0
 
 x-guild: &guild
-  image: gabimiric/tamagotchi-guild:3.0.0
+  image: gabimiric/tamagotchi-guild:4.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
