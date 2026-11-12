@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Guild Service",
-    "description": "CRUD, membership and Guild Chat negotiation requests for the Guild service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/guild. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity headers, so Guild never sees Authorization. Internal routes send X-Service-Token and no user token. The invitation flow exercises Guild's call to User Management, which also goes through Gateway. WebSocket frames cannot run in the Collection Runner: the negotiation folder checks the ticket URL, and tamagotchi-guild's scripts/ws_chat_client.py walks through the socket contract with it. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
+    "description": "CRUD, membership and Guild Chat negotiation requests for the Guild service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/guild. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity headers, so Guild never sees Authorization. Internal routes send X-Service-Token and no user token. The invitation flow exercises Guild's dependency call to User Management; Lab 4 routes it through Broker. The status request also uses the Broker, so no direct Guild REST port is required. WebSocket frames cannot run in the Collection Runner: the negotiation folder checks the ticket URL, and tamagotchi-guild's scripts/ws_chat_client.py walks through the socket contract with it. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -212,7 +212,7 @@
       "name": "Health",
       "item": [
         {
-          "name": "Health check",
+          "name": "Status through Broker",
           "event": [
             {
               "listen": "test",
@@ -220,15 +220,20 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('database ok', () => pm.expect(pm.response.json().database).to.eql('ok'));"
+                  "pm.test('Guild is ready', () => { const status = pm.response.json(); pm.expect(status.service).to.eql('guild'); pm.expect(status.ready).to.eql(true); });"
                 ]
               }
             }
           ],
           "request": {
             "method": "GET",
-            "header": [],
-            "url": "{{guildUrl}}/health"
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/guild/api/v1/status"
           },
           "response": []
         }
