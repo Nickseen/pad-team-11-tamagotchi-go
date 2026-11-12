@@ -8,7 +8,7 @@
 #   openssl genrsa -out secrets/jwt-signing-key.pem 2048   # one key for every User Management replica
 #   chmod 644 secrets/jwt-signing-key.pem                  # the distroless image runs as non-root
 #   docker compose up -d                                   # two replicas of every service
-#   docker compose up -d --scale battle=3                  # User Management and Battle: deploy.replicas
+#   docker compose up -d --scale battle=3                  # UM, Package Registry, Battle: deploy.replicas
 #   docker compose --profile scale-tamagotchi up -d        # the others: their -3 block; scale-all adds every -3
 #
 # Lab 4 (#154): the Message Broker carries service-to-service calls and events
@@ -25,10 +25,10 @@
 # included, is reachable from the host.
 #
 # Every replica registers its own INSTANCE_BASE_URL (and INSTANCE_WS_PUBLIC_URL) with Discovery,
-# which accepts only the origins in DISCOVERY_ALLOWED_ORIGINS below. User Management and Battle run
-# as one deploy.replicas block each: every replica fills its own container name into {container},
-# so their allowlist entries are those names. The other services keep one block per replica until
-# they support {container} (#176-#178); Map, Guild and Raid keep them for their per-replica
+# which accepts only the origins in DISCOVERY_ALLOWED_ORIGINS below. User Management, Package
+# Registry and Battle run as one deploy.replicas block each: every replica fills its own container
+# name into {container}, so their allowlist entries are those names. The other services keep one
+# block per replica until they support {container} (#176, #177); Map, Guild and Raid keep them for their per-replica
 # WebSocket host ports. Replicas of one service share
 # that service's stores; each service owns its stores with its own credentials. Every store keeps
 # its data in a named volume, so `docker compose down` followed by `up` loses nothing; `down -v`
@@ -130,7 +130,7 @@ x-package-registry-env: &package-registry-env
   DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@package-registry-db:5432/registry
 
 x-package-registry: &package-registry
-  image: gabimiric/tamagotchi-package-registry:4.0.0
+  image: gabimiric/tamagotchi-package-registry:4.0.1
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
@@ -272,9 +272,9 @@ services:
       # The only origins a replica may register: its internal base URL, for the three live
       # services its own published WebSocket origin and, since Lab 4, the gRPC address the Broker
       # forwards internal RPCs to (same hostname as the base URL). -3 entries serve the third replicas;
-      # User Management and Battle list their deploy.replicas container names, -1 to -5.
+      # User Management, Package Registry and Battle list their deploy.replicas container names, -1 to -5.
       DISCOVERY_ALLOWED_ORIGINS: >-
-        {"user-management":{"baseUrls":["http://pad-team-11-tamagotchi-go-user-management-1:8081","http://pad-team-11-tamagotchi-go-user-management-2:8081","http://pad-team-11-tamagotchi-go-user-management-3:8081","http://pad-team-11-tamagotchi-go-user-management-4:8081","http://pad-team-11-tamagotchi-go-user-management-5:8081"],"grpcAddresses":["pad-team-11-tamagotchi-go-user-management-1:9081","pad-team-11-tamagotchi-go-user-management-2:9081","pad-team-11-tamagotchi-go-user-management-3:9081","pad-team-11-tamagotchi-go-user-management-4:9081","pad-team-11-tamagotchi-go-user-management-5:9081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082","http://tamagotchi-3:8082"],"grpcAddresses":["tamagotchi-1:9082","tamagotchi-2:9082","tamagotchi-3:9082"]},"package-registry":{"baseUrls":["http://package-registry-1:8083","http://package-registry-2:8083","http://package-registry-3:8083"],"grpcAddresses":["package-registry-1:9083","package-registry-2:9083","package-registry-3:9083"]},"battle":{"baseUrls":["http://pad-team-11-tamagotchi-go-battle-1:8084","http://pad-team-11-tamagotchi-go-battle-2:8084","http://pad-team-11-tamagotchi-go-battle-3:8084","http://pad-team-11-tamagotchi-go-battle-4:8084","http://pad-team-11-tamagotchi-go-battle-5:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085","http://map-3:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085","ws://localhost:38085"],"grpcAddresses":["map-1:9085","map-2:9085","map-3:9085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086","http://notification-3:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087","http://guild-3:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087","ws://localhost:38087"],"grpcAddresses":["guild-1:9087","guild-2:9087","guild-3:9087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088","http://monster-raid-3:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088","ws://localhost:38088"],"grpcAddresses":["monster-raid-1:9088","monster-raid-2:9088","monster-raid-3:9088"]}}
+        {"user-management":{"baseUrls":["http://pad-team-11-tamagotchi-go-user-management-1:8081","http://pad-team-11-tamagotchi-go-user-management-2:8081","http://pad-team-11-tamagotchi-go-user-management-3:8081","http://pad-team-11-tamagotchi-go-user-management-4:8081","http://pad-team-11-tamagotchi-go-user-management-5:8081"],"grpcAddresses":["pad-team-11-tamagotchi-go-user-management-1:9081","pad-team-11-tamagotchi-go-user-management-2:9081","pad-team-11-tamagotchi-go-user-management-3:9081","pad-team-11-tamagotchi-go-user-management-4:9081","pad-team-11-tamagotchi-go-user-management-5:9081"]},"tamagotchi":{"baseUrls":["http://tamagotchi-1:8082","http://tamagotchi-2:8082","http://tamagotchi-3:8082"],"grpcAddresses":["tamagotchi-1:9082","tamagotchi-2:9082","tamagotchi-3:9082"]},"package-registry":{"baseUrls":["http://pad-team-11-tamagotchi-go-package-registry-1:8083","http://pad-team-11-tamagotchi-go-package-registry-2:8083","http://pad-team-11-tamagotchi-go-package-registry-3:8083","http://pad-team-11-tamagotchi-go-package-registry-4:8083","http://pad-team-11-tamagotchi-go-package-registry-5:8083"],"grpcAddresses":["pad-team-11-tamagotchi-go-package-registry-1:9083","pad-team-11-tamagotchi-go-package-registry-2:9083","pad-team-11-tamagotchi-go-package-registry-3:9083","pad-team-11-tamagotchi-go-package-registry-4:9083","pad-team-11-tamagotchi-go-package-registry-5:9083"]},"battle":{"baseUrls":["http://pad-team-11-tamagotchi-go-battle-1:8084","http://pad-team-11-tamagotchi-go-battle-2:8084","http://pad-team-11-tamagotchi-go-battle-3:8084","http://pad-team-11-tamagotchi-go-battle-4:8084","http://pad-team-11-tamagotchi-go-battle-5:8084"]},"map":{"baseUrls":["http://map-1:8085","http://map-2:8085","http://map-3:8085"],"wsPublicUrls":["ws://localhost:18085","ws://localhost:28085","ws://localhost:38085"],"grpcAddresses":["map-1:9085","map-2:9085","map-3:9085"]},"notification":{"baseUrls":["http://notification-1:8086","http://notification-2:8086","http://notification-3:8086"]},"guild":{"baseUrls":["http://guild-1:8087","http://guild-2:8087","http://guild-3:8087"],"wsPublicUrls":["ws://localhost:18087","ws://localhost:28087","ws://localhost:38087"],"grpcAddresses":["guild-1:9087","guild-2:9087","guild-3:9087"]},"monster-raid":{"baseUrls":["http://monster-raid-1:8088","http://monster-raid-2:8088","http://monster-raid-3:8088"],"wsPublicUrls":["ws://localhost:18088","ws://localhost:28088","ws://localhost:38088"],"grpcAddresses":["monster-raid-1:9088","monster-raid-2:9088","monster-raid-3:9088"]}}
     # Internal only: no host port. Replicas, the Gateway and probes reach it on the Compose network.
 
   # --- Message Broker (Lab 4) -----------------------------------------------------------------------
@@ -403,27 +403,18 @@ services:
       <<: *postgres-healthcheck
       test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
 
-  package-registry-1:
+  # One block runs every Package Registry replica (deploy.replicas, the default 2 or
+  # PACKAGE_REGISTRY_REPLICAS). Each replica fills its own container name into {container}
+  # (pad-team-11-tamagotchi-go-package-registry-<n>) before it registers (4.0.1, #178); the
+  # Discovery allowlist admits up to five. Scale with `docker compose up -d --scale package-registry=3`.
+  package-registry:
     <<: *package-registry
+    deploy:
+      replicas: ${PACKAGE_REGISTRY_REPLICAS:-2}
     environment:
       <<: *package-registry-env
-      INSTANCE_BASE_URL: http://package-registry-1:8083
-      INSTANCE_GRPC_ADDRESS: package-registry-1:9083
-
-  package-registry-2:
-    <<: *package-registry
-    environment:
-      <<: *package-registry-env
-      INSTANCE_BASE_URL: http://package-registry-2:8083
-      INSTANCE_GRPC_ADDRESS: package-registry-2:9083
-
-  package-registry-3:
-    <<: *package-registry
-    profiles: [scale-package-registry, scale-all] # the optional third replica
-    environment:
-      <<: *package-registry-env
-      INSTANCE_BASE_URL: http://package-registry-3:8083
-      INSTANCE_GRPC_ADDRESS: package-registry-3:9083
+      INSTANCE_BASE_URL: "http://{container}:8083"
+      INSTANCE_GRPC_ADDRESS: "{container}:9083"
 
   # --- Battle ---------------------------------------------------------------------------------------
   battle-db:

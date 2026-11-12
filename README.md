@@ -1752,7 +1752,7 @@ lease/registration diagnostics, but are not Lab 4 acceptance evidence.
 | --------- | ---------------- | ----------------- |
 | API Gateway | `gateway` | Host port `8080`; the selected 3.x release still routes directly. Its 4.x release must queue requests through Broker before the Lab 4 rehearsal |
 | Service Discovery | `service-discovery` | Internal only (`http://service-discovery:8090`); no host port |
-| User Management, Battle | one `user-management` / `battle` block with `deploy.replicas` (default 2, up to 5); containers `pad-team-11-tamagotchi-go-<service>-<n>` | Through the Gateway and the Broker only; each replica fills its container name into `INSTANCE_BASE_URL: http://{container}:8084` and registers e.g. `http://pad-team-11-tamagotchi-go-battle-2:8084` |
+| User Management, Package Registry, Battle | one `user-management` / `package-registry` / `battle` block with `deploy.replicas` (default 2, up to 5); containers `pad-team-11-tamagotchi-go-<service>-<n>` | Through the Gateway and the Broker only; each replica fills its container name into `INSTANCE_BASE_URL: http://{container}:8084` and registers e.g. `http://pad-team-11-tamagotchi-go-battle-2:8084` |
 | Other domain services | `<service>-1`, `<service>-2`, optional `<service>-3` | Through the Gateway only; each replica registers its own `INSTANCE_BASE_URL`, e.g. `http://tamagotchi-2:8082` |
 | Map, Guild, Monster Raid WebSockets | the same replicas | One host port per replica: `18085`/`28085`/`38085` (Map), `18087`/`28087`/`38087` (Guild), `18088`/`28088`/`38088` (Raid); each replica registers that origin as `INSTANCE_WS_PUBLIC_URL`, so a Gateway ticket names one specific replica |
 | Stores | `<service>-db`, `map-redis`, `guild-redis`, `monster-raid-redis` | Internal only; shared by the replicas of the one service that owns them |
@@ -1876,7 +1876,7 @@ the shared-stack checks.
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.0` | published ([main CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43289529499)) | — (internal 8090) | In-memory registry | `120d0d3` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `4.0.1` | published; tag `v4.0.1` on main ([main CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/43303253240)) | — | PostgreSQL | `70edafc` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `6dbc821` |
-| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `4.0.0` | published; revision label matches main ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `1ad98fe` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `4.0.1` | published; revision label matches main ([main CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/workflows/ci.yml?query=branch%3Amain)) | — | PostgreSQL | `8fb32bd` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `4.0.1` | published; tag `v4.0.1` on main ([main CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/43303217130)) | — | PostgreSQL | `8e369a6` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `4.0.0` | published; revision label matches main ([main CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/43289114834)) | 18085, 28085, 38085 (WebSocket) | Redis | `25699bb` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `3.0.0` | published (#141) | — | PostgreSQL | `806a3d7` |
@@ -1991,24 +1991,25 @@ the contract's "Overload, timeouts and the last replica" requires.
 
 ```sh
 docker compose up -d                                 # two replicas of every service
-docker compose up -d --scale battle=3                # User Management and Battle: any count up to 5
+docker compose up -d --scale battle=3                # UM, Package Registry, Battle: any count up to 5
 docker compose --profile scale-tamagotchi up -d      # the other services: add their -3 block
 docker compose --profile scale-all up -d             # a third replica of every profile-gated service
 docker compose ps
 ```
 
-User Management and Battle run under `deploy.replicas`, one block each. Every replica gets the
-same environment, `INSTANCE_BASE_URL: "http://{container}:8084"`, and before registering fills in
-its own container name, which Docker's DNS returns for its address (UM/Battle 4.0.1). The project
+User Management, Package Registry and Battle run under `deploy.replicas`, one block each. Every
+replica gets the same environment, `INSTANCE_BASE_URL: "http://{container}:8084"`, and before
+registering fills in its own container name, which Docker's DNS returns for its address (UM/Battle
+4.0.1, Package Registry 4.0.1). The project
 name is fixed (`name: pad-team-11-tamagotchi-go`), so the names are predictable and the Discovery
 allowlist lists `pad-team-11-tamagotchi-go-battle-1` to `-5`. `docker compose up -d --scale battle=3`
 starts `pad-team-11-tamagotchi-go-battle-3`, which registers and becomes routable after its first
-healthy probe; `--scale battle=2` stops it and deregisters it again. Set `USER_MANAGEMENT_REPLICAS`
-and `BATTLE_REPLICAS` in `.env` to change the default.
+healthy probe; `--scale battle=2` stops it and deregisters it again. Set `USER_MANAGEMENT_REPLICAS`,
+`PACKAGE_REGISTRY_REPLICAS` and `BATTLE_REPLICAS` in `.env` to change the default.
 
 The other services keep one block per replica, and a third replica is a profile-gated block
-(`tamagotchi-3` and so on) with its own allowlisted origin. Tamagotchi, Notification and Package
-Registry move to `deploy.replicas` once they support `{container}` (#176-#178). Map, Guild and
+(`tamagotchi-3` and so on) with its own allowlisted origin. Tamagotchi and Notification move to
+`deploy.replicas` once they support `{container}` (#176, #177). Map, Guild and
 Monster Raid keep their blocks: each WebSocket replica publishes its own host port and must know it.
 In Lab 4 the Broker selects a replica by load; the remaining Gateway 3.x uses its old round robin
 until upgraded. `docker compose stop tamagotchi-3` deregisters a profile replica again.
