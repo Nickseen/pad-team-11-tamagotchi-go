@@ -1,8 +1,9 @@
 # Lab 4 verification and release gate (#165)
 
-Status: preparation only. The shared stack has not been certified for grades 2–10.
-Use the reviewed Lab 4 images and actual released main commits before recording final evidence.
-Private service unit tests or an isolated fake consumer do not prove the complete team deployment.
+Status: the full published-image rehearsal was completed on 2026-11-13. See the
+[acceptance receipt](lab4-acceptance-2026-11-13.md) for the collection results, controlled failures,
+durability and maximum log-download regression. CPR publication still requires the reviewed
+release PR and a tag on its actual main commit; keep #165 open until those steps finish.
 
 ## Before the rehearsal
 
@@ -119,9 +120,8 @@ mocks/HTTP, so inspect those mode values before the rehearsal without printing s
 The obsolete MAP_EVENTS_MODE=disabled setting and domain GATEWAY_URL settings are removed;
 Map's durable outbox publishes to the Broker, and GATEWAY_JWKS_URL remains only for ticket checks.
 
-The Guild/Registry event-coverage collection updates in CPR #179 remain a separate PR until merged;
-do not infer that importing collections from an older checkout includes them. Both that PR and the
-existing collections still require a real run on the final image set.
+The Guild/Registry event-coverage collection updates in CPR #179 are merged. Both collections
+passed on the final image set in the 2026-11-13 rehearsal, including Registry's admin scenarios.
 
 Remaining transport and observability qualifications before final evidence:
 - Battle 4.1.0 calls Tamagotchi (ListTamagotchis, GetPrimary, GetSecondaryHolding, GetTypeAdvantage),

@@ -1747,7 +1747,9 @@ The repository root holds [`docker-compose.yml`](docker-compose.yml): two replic
 service, optional third replicas, the Gateway, SD, Broker and monitoring. All eleven application
 components use **published Lab 4 releases** with matching released-main submodule pins.
 The versions are listed below; adopting them prepares the stack for rehearsal and does not certify
-that every cross-service scenario has passed.
+that every cross-service scenario has passed. The
+[2026-11-13 acceptance receipt](docs/lab4-acceptance-2026-11-13.md) records the completed published-image
+rehearsal and log-download fix; CPR publication remains subject to the release PR and approvals.
 
 Before the shared rehearsal, update the local checkout/submodules, check environment overrides and run
 [the Lab 4 preflight and evidence checks](docs/lab4-verification.md). A successful Compose validation
