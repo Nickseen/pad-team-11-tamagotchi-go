@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package tamagotchi.monster_raid.v1;
+
+option go_package = "github.com/Nickseen/tamagotchi-monster-raid/gen/tamagotchi/monster_raid/v1;monsterraidv1";
+
+// Authenticated with the shared x-service-token metadata entry.
+service MonsterRaidInternal {
+  rpc GetParticipant(GetParticipantRequest) returns (GetParticipantReply);
+}
+
+message GetParticipantRequest {
+  string raid_id = 1;
+  string user_id = 2;
+}
+
+message GetParticipantReply {
+  bool is_participant = 1;
+}

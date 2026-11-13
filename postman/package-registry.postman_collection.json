@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Package Registry Service",
-    "description": "CRUD and lifecycle requests for the Package Registry service, sent through the Lab 2 API Gateway at {{gatewayUrl}}/package-registry. Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity and role headers, so the Registry never sees Authorization. Moderator checks use the package's moderatorIds; admin checks use the Gateway-provided roles. Internal routes send X-Service-Token and no user token. Admin-only requests are skipped when no registryAdminToken is set, since User Management only issues the user role.",
+    "description": "CRUD and lifecycle requests for the Package Registry service, sent through the API Gateway at {{gatewayUrl}}/package-registry, which hands them to the Registry's request queue on the Message Broker (Lab 4). Run top-to-bottom with the Collection Runner. Setup registers and logs in two real users through Gateway; Gateway validates each Bearer token and forwards only trusted identity and role headers, so the Registry never sees Authorization. Moderator checks use the package's moderatorIds; admin checks use the Gateway-provided roles. Internal routes send X-Service-Token and no user token. Admin-only requests are skipped when no registryAdminToken is set, since User Management only issues the user role. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN. Events: the Registry publishes registry.package_version_published and registry.raid_definition_activated to the Broker's topics through its outbox; the checks compare the Broker's publication counts with those taken at the start (the raid check is skipped with the other admin requests).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -65,6 +65,10 @@
       "key": "registryAdminToken",
       "value": "",
       "type": "secret"
+    },
+    {
+      "key": "brokerPublishedBefore",
+      "value": ""
     }
   ],
   "event": [
@@ -214,7 +218,65 @@
     },
     {
       "name": "Health",
-      "item": []
+      "item": [
+        {
+          "name": "Status through Broker",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const status = pm.response.json();",
+                  "pm.test('package-registry is ready', () => { pm.expect(status.service).to.eql('package-registry'); pm.expect(status.ready).to.eql(true); });",
+                  "pm.test('load is reported (the Broker routes by it)', () => pm.expect(status.load).to.have.keys('activeTasks', 'maxTasks', 'ratio'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/status"
+          },
+          "response": []
+        },
+        {
+          "name": "Broker publication counts before the run",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const counts = {};",
+                  "(pm.response.json().published || []).forEach((entry) => { counts[entry.topic] = entry.published; });",
+                  "pm.collectionVariables.set('brokerPublishedBefore', JSON.stringify(counts));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics",
+            "description": "Remembers how many events of each topic the Broker has accepted so far, so the events folder can check that this run's changes were published."
+          },
+          "response": []
+        }
+      ]
     },
     {
       "name": "Packages & Versions",
@@ -452,7 +514,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/{{version}}/stat-definitions"
           },
           "response": []
         },
@@ -478,7 +540,49 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+          },
+          "response": []
+        },
+        {
+          "name": "registry.package_version_published reached the Broker",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The outbox publisher and the Broker's delivery run in the background: give them a moment.",
+                  "setTimeout(() => {}, 2500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const before = JSON.parse(pm.collectionVariables.get('brokerPublishedBefore') || '{}');",
+                  "const now = {};",
+                  "(pm.response.json().published || []).forEach((entry) => { now[entry.topic] = entry.published; });",
+                  "[\"registry.package_version_published\"].forEach((topic) => {",
+                  "  pm.test(`${topic} was published to the Broker`, () => pm.expect(now[topic] || 0).to.be.above(before[topic] || 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics",
+            "description": "The service writes each event to its outbox in the same transaction as the change and publishes it to the Broker's topic afterwards; the Broker counts every accepted publication."
           },
           "response": []
         }
@@ -817,7 +921,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/raid-definitions/{{raidDefinitionId}}"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/raid-definitions/{{raidDefinitionId}}"
           },
           "response": []
         },
@@ -853,6 +957,49 @@
               }
             ],
             "url": "{{gatewayUrl}}/package-registry/api/v1/raid-definitions/{{raidDefinitionId}}/activate"
+          },
+          "response": []
+        },
+        {
+          "name": "registry.raid_definition_activated reached the Broker (admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('registryAdminToken')) { pm.execution.skipRequest(); }",
+                  "// The outbox publisher and the Broker's delivery run in the background: give them a moment.",
+                  "setTimeout(() => {}, 2500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const before = JSON.parse(pm.collectionVariables.get('brokerPublishedBefore') || '{}');",
+                  "const now = {};",
+                  "(pm.response.json().published || []).forEach((entry) => { now[entry.topic] = entry.published; });",
+                  "[\"registry.raid_definition_activated\"].forEach((topic) => {",
+                  "  pm.test(`${topic} was published to the Broker`, () => pm.expect(now[topic] || 0).to.be.above(before[topic] || 0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/topics",
+            "description": "The service writes each event to its outbox in the same transaction as the change and publishes it to the Broker's topic afterwards; the Broker counts every accepted publication."
           },
           "response": []
         },
@@ -1054,7 +1201,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{emptyPackageId}}/versions/current"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{emptyPackageId}}/versions/current"
           },
           "response": []
         },
@@ -1126,7 +1273,7 @@
                 "value": "definitely-wrong"
               }
             ],
-            "url": "{{gatewayUrl}}/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
+            "url": "{{brokerUrl}}/api/v1/queues/package-registry/api/v1/internal/packages/{{registryPackageId}}/versions/current"
           },
           "response": []
         }

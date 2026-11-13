@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Notification Service",
-    "description": "Every route of the Notification service, called through the API Gateway (Lab 2), in the order the Runner should run them. Setup registers and logs in through the Gateway. User requests carry the access token, which the Gateway validates and replaces with its trusted headers; service requests carry only X-Service-Token. Uses the shared environment's gatewayUrl and serviceToken.",
+    "description": "Every route of the Notification service, called through the API Gateway (Lab 2), in the order the Runner should run them. Setup registers and logs in through the Gateway. User requests carry the access token, which the Gateway validates and replaces with its trusted headers; service requests carry only X-Service-Token. Uses the shared environment's gatewayUrl and serviceToken. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -602,8 +602,8 @@
       ]
     },
     {
-      "name": "Events (mock of RabbitMQ)",
-      "description": "Events other services would publish, delivered by hand.",
+      "name": "Events (as the Broker delivers them)",
+      "description": "The envelopes the Message Broker delivers from its topics, sent by hand through the Broker's request queue to the event intake.",
       "item": [
         {
           "name": "battle.finished: user A beats user B",
@@ -615,7 +615,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
@@ -737,7 +737,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
@@ -771,7 +771,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.registered\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"userId\": \"{{userAId}}\"\n  }\n}",
@@ -864,7 +864,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"raid.started\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidId}}\",\n    \"guildId\": \"{{guildId}}\",\n    \"monsterId\": \"{{raidId}}\",\n    \"expiresAt\": \"2026-09-22T13:00:00.000Z\"\n  }\n}",
@@ -938,7 +938,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"challengerId\": \"{{userAId}}\",\n    \"opponentId\": \"{{userBId}}\"\n  }\n}",
@@ -984,7 +984,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"battle.finished\",\n  \"eventVersion\": 2,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"battleId\": \"{{battleId}}\",\n    \"winnerId\": \"{{userAId}}\",\n    \"loserId\": \"{{userBId}}\",\n    \"outcome\": \"knockout\"\n  }\n}",
@@ -1123,7 +1123,7 @@
                 "value": "{{serviceToken}}"
               }
             ],
-            "url": "{{gatewayUrl}}/notification/api/v1/internal/events",
+            "url": "{{brokerUrl}}/api/v1/queues/notification/api/v1/internal/events",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventType\": \"user.friend_request_created\",\n  \"eventVersion\": 1,\n  \"occurredAt\": \"2026-09-22T12:00:00.000Z\",\n  \"producer\": \"postman\",\n  \"correlationId\": \"{{correlationId}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\",\n  \"payload\": {\n    \"requestId\": \"{{requestId}}\",\n    \"fromUserId\": \"{{userBId}}\",\n    \"toUserId\": \"{{userAId}}\"\n  }\n}",

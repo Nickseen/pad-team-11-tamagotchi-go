@@ -1,0 +1,66 @@
+// Grafana Alloy for the Lab 4 stack (#154): collects the stdout of every container of this Compose
+// project and pushes it to Loki. Every service logs one JSON object per line (CPR log contract), so
+// the lines are parsed and labelled by service, instanceId, level and event; the line itself is kept
+// unchanged, which is what Grafana shows and the downloadable-logs endpoint (#155) returns.
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "compose" {
+  targets = discovery.docker.containers.targets
+
+  // Only this Compose project's containers (LOG_PROJECT is set by docker-compose.yml).
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = sys.env("LOG_PROJECT")
+    action        = "keep"
+  }
+  // The Compose service (e.g. guild-1) as `container`, for lines that are not JSON (databases).
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.compose.output
+  forward_to = [loki.process.json.receiver]
+}
+
+loki.process "json" {
+  stage.json {
+    expressions = {
+      service    = "service",
+      instanceId = "instanceId",
+      level      = "level",
+      event      = "event",
+    }
+  }
+  // One spelling for queries: lower case (some services write INFO), and `warn` for Python's `warning`.
+  stage.template {
+    source   = "level"
+    template = "{{ ToLower .Value }}"
+  }
+  stage.replace {
+    source     = "level"
+    expression = "^(warning)$"
+    replace    = "warn"
+  }
+  stage.labels {
+    values = {
+      service    = "",
+      instanceId = "",
+      level      = "",
+      event      = "",
+    }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

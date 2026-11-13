@@ -1,0 +1,81 @@
+# Prometheus for the Lab 4 stack (#154). Every 5 s it scrapes the Broker, Gateway and
+# every replica's GET /metrics on the Compose network. SD 4.0.0 has no /metrics endpoint:
+# inspect its status/registry with the preflight and its structured logs in Loki/Grafana.
+# Add an SD scrape only after a release actually exposes Prometheus metrics. The optional third replicas
+# (scale-* profiles) show as down while they are not running; that is expected. User Management,
+# Tamagotchi, Package Registry, Battle and Notification run under deploy.replicas and are found through
+# DNS, so they list exactly the running replicas.
+#
+# Each target gets a `service` label (the component scraped). Metrics that carry their own `service`
+# label (the Broker's per-service metrics, dependency_calls_total) keep theirs as `exported_service`,
+# so in queries `service` is who reported it and `exported_service` is the service it is about.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: message-broker
+    static_configs:
+      - targets: ["message-broker:8091"]
+        labels: { service: message-broker }
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:8080"]
+        labels: { service: gateway }
+  - job_name: user-management
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [user-management]
+        type: A
+        port: 8081
+    relabel_configs:
+      - target_label: service
+        replacement: user-management
+  - job_name: tamagotchi
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [tamagotchi]
+        type: A
+        port: 8082
+    relabel_configs:
+      - target_label: service
+        replacement: tamagotchi
+  - job_name: package-registry
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [package-registry]
+        type: A
+        port: 8083
+    relabel_configs:
+      - target_label: service
+        replacement: package-registry
+  - job_name: battle
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [battle]
+        type: A
+        port: 8084
+    relabel_configs:
+      - target_label: service
+        replacement: battle
+  - job_name: map
+    static_configs:
+      - targets: ["map-1:8085", "map-2:8085", "map-3:8085"]
+        labels: { service: map }
+  - job_name: notification
+    # deploy.replicas: Docker's DNS returns every replica's address for the service name.
+    dns_sd_configs:
+      - names: [notification]
+        type: A
+        port: 8086
+    relabel_configs:
+      - target_label: service
+        replacement: notification
+  - job_name: guild
+    static_configs:
+      - targets: ["guild-1:8087", "guild-2:8087", "guild-3:8087"]
+        labels: { service: guild }
+  - job_name: monster-raid
+    static_configs:
+      - targets: ["monster-raid-1:8088", "monster-raid-2:8088", "monster-raid-3:8088"]
+        labels: { service: monster-raid }
