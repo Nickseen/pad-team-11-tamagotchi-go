@@ -252,7 +252,7 @@ x-monster-raid: &monster-raid
 services:
   # --- Service Discovery ----------------------------------------------------------------------------
   service-discovery:
-    image: nickseen/tamagotchi-service-discovery:4.0.0 # Lab 4 topics/gRPC registrations, monitor and alerts
+    image: nickseen/tamagotchi-service-discovery:4.0.1 # Lab 4 topics/gRPC registrations, monitor and alerts
     restart: unless-stopped
     environment:
       PORT: 8090
