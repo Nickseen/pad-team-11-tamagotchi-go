@@ -91,9 +91,10 @@ Go callers now receive the real trailers-only gRPC status, and duplicate token m
 Their CI and isolated integration receipts do not certify the complete team deployment.
 
 All eleven selected application components now use published Lab 4 images with matching main
-source pins; the README's image table links each publication run. UM and Battle use 4.0.2, which
-stores each event in the transaction of its change; Map, Registry and Gateway use their 4.0.1 fixes; the
-other components select 4.0.0. Broker is the owner's published release from #14,
+source pins; the README's image table links each publication run. UM uses 4.0.2 and Battle 4.1.0:
+both store each event in the transaction of its change, and Battle 4.1.0 also calls all three of its
+dependencies over gRPC. Map, Registry and Gateway use their 4.0.1 fixes; the other components select
+4.0.0. Broker is the owner's published release from #14,
 not a local build or another release created by this CPR change.
 
 The public image provenance for both amd64 and arm64 agrees on the source main SHA and build run.
@@ -123,8 +124,10 @@ do not infer that importing collections from an older checkout includes them. Bo
 existing collections still require a real run on the final image set.
 
 Remaining transport and observability qualifications before final evidence:
-- CPR #181 records Battle 4.0.1 using Broker HTTP queues for Tamagotchi/Registry and gRPC for UM.
-  The remaining HTTP dependency reads still need migration to the published RPCs for strict grade 8.
+- Battle 4.1.0 calls Tamagotchi (ListTamagotchis, GetPrimary, GetSecondaryHolding, GetTypeAdvantage),
+  Package Registry (GetCurrentVersion, ListStatDefinitions) and User Management (GetRelationships)
+  over their published RPCs through the Broker; no Battle dependency read remains on HTTP.
+  vladas9/tamagotchi-battle#17 records every RPC against the real services on the full stack.
 - Gateway 4.0.1 now uses the published Guild GetMembership and Raid GetParticipant RPCs through
   Broker. Its required BROKER_GRPC_ADDR is deployed with the image. Gateway #20 records real-stack
   checks for a guild member/nonmember and unknown resources, with Broker grpc.completed logs;
