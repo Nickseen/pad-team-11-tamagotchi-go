@@ -1915,6 +1915,22 @@ their release commit is tagged `v<version>` by hand. The Lab 1 images stay on Do
 The stores use `postgres:17-alpine` and `redis:7.4-alpine`. PostgreSQL is pinned to 17 on purpose:
 version 18 moved the data directory, so the volumes below would silently stop persisting.
 
+#### Verify release references
+
+Before running release acceptance, check the Docker Hub table, pinned submodule commits and
+Compose application images, including optional replicas:
+
+```sh
+node scripts/check-release-pins.mjs
+node scripts/check-release-pins.mjs --major 5
+```
+
+The first command checks the current configuration. Use `--major 5` during the 5.x release
+handoff once the service owners have supplied their updated releases. The check reads the Git
+index and uses `.env.example` to render Compose. Attach results to the
+[CPR acceptance issue](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/200) alongside
+Docker Hub publication provenance and shared-stack runtime evidence.
+
 ### Prerequisites
 
 - Docker with Compose v2 — Docker Desktop, or Docker Engine with the `docker compose` plugin.
