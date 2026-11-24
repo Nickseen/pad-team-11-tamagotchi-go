@@ -1948,6 +1948,7 @@ others' key sets reject. Replace the file and restart the replicas to rotate it.
 | `GATEWAY_TOKEN` | Gateway and all eight services | Sent by the Gateway as `X-Gateway-Token`; services trust identity headers only when it matches. At least 16 characters |
 | `SERVICE_TOKEN` | Broker, Gateway and all eight services | Shared HTTP header / gRPC metadata credential for internal traffic. At least 16 characters |
 | `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
+| `RAID_REPLICATION_PASSWORD` | Monster Raid PostgreSQL | Dedicated credential used by the PostgreSQL standbys |
 | `MAP_REDIS_PASSWORD`, `GUILD_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Guild, Monster Raid | Redis passwords |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Service Discovery | Telegram bot and developers' chat for critical-load and health alerts; required unless `ALERTS_ENABLED=false` |
 
@@ -2069,6 +2070,109 @@ docker compose exec service-discovery wget -qO- http://pad-team-11-tamagotchi-go
 
 Each result, with the commands' output, is recorded in #133 before this stack is promoted.
 
+### Database replication and failover
+
+[Docker Compose](docker-compose.yml) provisions a primary and two standbys for Monster Raid
+PostgreSQL and Map Redis. PostgreSQL uses streaming replication
+and an operator-triggered promotion with fencing. Map uses three Redis Sentinels with quorum
+two and a stable `map-redis-writer:6379` endpoint. The endpoint selects a primary with a
+connected replica and disconnects clients from a demoted backend.
+
+#### Start and verify
+
+1. Back up existing `raid-data` and `map-redis-data` volumes before changing their topology.
+   Compose reuses these volumes for the initial primaries in the same project.
+   The standbys and Sentinels get new volumes. Keep the existing database and Redis passwords.
+2. Add a separate `RAID_REPLICATION_PASSWORD` to the local `.env` using the placeholder in
+   `.env.example`. Use the same Compose project name for every subsequent command.
+3. Start the stack:
+
+   ```sh
+   docker compose up -d
+   ```
+
+   Wait for both PostgreSQL standbys to report recovery and for Redis Sentinel quorum to form.
+   The PostgreSQL initialization job creates a dedicated replication login. Each standby takes a
+   base backup on its first boot and resumes its existing volume on subsequent boots.
+
+The reproducible storage rehearsal provisions its own temporary project and removes that project's test
+containers and volumes at the end:
+
+```sh
+bash scripts/ha/check-replication.sh
+```
+
+It checks the existing-volume upgrade, a read and new write after both failovers, TTL expiry and
+rejoining the original PostgreSQL/Redis nodes. Repeat service-level checks for any rollout in the full
+shared stack and attach per-service results to #193.
+
+#### PostgreSQL promotion and rejoin
+
+During normal operation Raid's existing connection string lists all three nodes and selects a
+read-write session. A failed primary is stopped with Compose and its data volume is fenced before
+promoting a standby. The promotion helper refuses a candidate that has replayed less WAL than the
+other standby. Wait for both standbys to replay a test write before deliberately stopping the primary.
+Streaming replication is asynchronous, so promotion can lose writes that never reached a standby.
+
+On the test or deployment project, set `COMPOSE_PROJECT_NAME` to the project used to start the stack
+if it differs from the name in Compose. Set `HA_ENV_FILE` when using a separate env file.
+
+```sh
+bash scripts/ha/postgres-promote.sh \
+  monster-raid-db monster-raid-db-1 monster-raid-db-2
+```
+
+The second node becomes writable and the third follows it. To rejoin the original Compose name as a
+standby, persist these values in the same local env file. Set the source to the promoted node if it
+differs from the example. Use the original volume as a fenced copy and use a fresh named volume for
+the rejoined node:
+
+```dotenv
+RAID_POSTGRES_VOLUME=raid-rejoined-data
+RAID_POSTGRES_DATA_DIR=/var/lib/postgresql/data/pgdata
+RAID_POSTGRES_UPSTREAM=monster-raid-db-1
+```
+
+```sh
+docker compose up -d --no-deps --wait monster-raid-db
+```
+
+The rejoined node takes a base backup from the promoted writer. Check `pg_is_in_recovery()` returns
+true on it and `pg_stat_replication` shows both standbys on the new writer. Persist the rejoin settings
+so later deployments use the new volume. For another rejoin, select a fresh named volume before
+changing the old node's mapping.
+
+#### Service owner rollout
+
+Use the Raid PostgreSQL node, role initialization, standby definitions and promotion helper as the
+shared template. For your service, substitute the three Compose hostnames, its database credentials
+and volume names, and a dedicated replication password. Preserve its startup migration path. Use
+the driver-supported list of hosts with `target_session_attrs=read-write`. For pgx use the URL host
+list shown for Raid. For SQLAlchemy/psycopg use the libpq host list in the query, for example
+`postgresql+psycopg://user:password@/dbname?host=db,db-1,db-2&target_session_attrs=read-write`.
+Verify real service reads and writes through that connection after promotion.
+
+The Redis replication group serves Map. Readiness and WebSocket or command recovery for the separate
+Raid and Guild Redis instances are tracked in #193. Sentinel quorum and the database replicas in this
+setup share one local Docker host.
+
+#### Local verification
+
+The storage rehearsal passed on disposable volumes, including an upgrade from standalone primary
+volumes, writes after both failovers and rejoining both original nodes as standbys. Separate checks
+used the released Map 4.0.1 and Monster Raid 4.0.0 images, real PostgreSQL and Redis, and fixture
+domain dependencies and WebSocket tickets:
+
+- Map read a position written before Redis primary loss and wrote an updated position through the same
+  endpoint after automatic promotion. Both replicas held the position with its TTL.
+- Raid read an existing raid and committed another attack after PostgreSQL promotion without changing
+  the application connection settings.
+- Stopping Raid's own Redis made readiness report 503 and prevented another attack from being
+  persisted. The direct attack path took about ten seconds to report failure in one run. The
+  existing feed closed. After Redis returned, a new connection with a fresh ticket received the
+  current snapshot and the next attack's `raid.damage` frame. Retrying that attack did not add a
+  second damage record.
+
 ### Data and volumes
 
 Every durable store keeps its data in a named volume, so `docker compose down` followed by `up`
@@ -2080,10 +2184,12 @@ loses nothing. `docker compose down -v` deletes the volumes and starts everythin
 | `tamagotchi-data` | Tamagotchi database |
 | `registry-data` | Package Registry database |
 | `battle-data` | Battle database |
-| `map-redis-data` | Map Redis, append-only |
+| `map-redis-data`, `map-redis-1-data`, `map-redis-2-data` | Map Redis data, append-only |
+| `map-sentinel-1-data` through `map-sentinel-3-data` | Map Redis Sentinel election and topology state |
 | `notification-data` | Notification database |
 | `guild-data` | Guild database |
-| `raid-data` | Monster Raid database |
+| `raid-data`, `raid-db-1-data`, `raid-db-2-data` | Monster Raid PostgreSQL data |
+| `raid-rejoined-data` | Fresh data volume for the original Raid database name after rejoining as a standby |
 | `raid-redis-data` | Monster Raid Redis, append-only |
 
 Guild's Redis keeps no volume: it carries chat fan-out between Guild instances and single-use
