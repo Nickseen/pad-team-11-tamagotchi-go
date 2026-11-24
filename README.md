@@ -1925,11 +1925,11 @@ node scripts/check-release-pins.mjs
 node scripts/check-release-pins.mjs --major 5
 ```
 
-The first command checks the current configuration. Use `--major 5` during the 5.x release
-handoff once the service owners have supplied their updated releases. The check reads the Git
-index and uses `.env.example` to render Compose. Attach results to the
-[CPR acceptance issue](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/200) alongside
-Docker Hub publication provenance and shared-stack runtime evidence.
+The first command checks the selected images and source pins, including services that retain
+an earlier release. Use the optional `--major 5` gate when every selected service must be on
+the 5.x release line. The check reads the Git index and uses `.env.example` to render Compose.
+Attach the results, Docker Hub publication provenance and shared-stack runtime evidence to the
+[CPR acceptance issue](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/200).
 
 ### Prerequisites
 
