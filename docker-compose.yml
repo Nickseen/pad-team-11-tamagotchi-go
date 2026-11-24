@@ -1,8 +1,6 @@
-# The whole Tamagotchi Go ecosystem for Lab 3: the API Gateway, Service Discovery, two replicas of
-# each of the eight services and the stores each service owns, run from versioned images. Nothing
-# is built locally. DRAFT for #133: it selects the planned Lab 3 releases; README ("Lab 3 rollout
-# status") lists which are published. Do not merge until every image exists and the shared-stack
-# checks in #133 pass.
+# Tamagotchi Go deployment. Compose runs versioned images for Gateway, Discovery, Broker,
+# the eight domain services, their stores and monitoring.
+# See README for credentials, database replication and failover.
 #
 #   cp .env.example .env                                   # replace every CHANGE_ME
 #   openssl genrsa -out secrets/jwt-signing-key.pem 2048   # one key for every User Management replica
@@ -165,7 +163,7 @@ x-map-env: &map-env
   PORT: 8085
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
   MAP_STORAGE: redis
-  MAP_REDIS_ADDR: map-redis:6379
+  MAP_REDIS_ADDR: map-redis-writer:6379
   MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
   MAP_REDIS_DB: 0
   MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-grpc}
@@ -176,8 +174,8 @@ x-map: &map
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
-    map-redis:
-      condition: service_healthy
+    map-redis-writer:
+      condition: service_started
 
 x-notification-env: &notification-env
   <<: *gateway-context
@@ -230,7 +228,7 @@ x-monster-raid-env: &monster-raid-env
   MAX_WEBSOCKET_CONNECTIONS: 100
   RAID_ADDR: ":8088"
   RAID_STORAGE: postgres-redis
-  DATABASE_URL: postgres://raid:${RAID_DB_PASSWORD}@monster-raid-db:5432/raid?sslmode=disable
+  DATABASE_URL: postgres://raid:${RAID_DB_PASSWORD}@monster-raid-db:5432,monster-raid-db-1:5432,monster-raid-db-2:5432/raid?sslmode=disable&target_session_attrs=read-write&connect_timeout=2
   RAID_REDIS_ADDR: monster-raid-redis:6379
   RAID_REDIS_PASSWORD: ${RAID_REDIS_PASSWORD}
   RAID_REDIS_DB: 0
@@ -244,10 +242,63 @@ x-monster-raid: &monster-raid
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
-    monster-raid-db:
+    monster-raid-db-1:
       condition: service_healthy
+      required: false
+    monster-raid-db-2:
+      condition: service_healthy
+      required: false
     monster-raid-redis:
       condition: service_healthy
+
+x-postgres-node: &postgres-node
+  <<: *postgres
+  entrypoint: ["/bin/sh", "/ha/postgres-start.sh"]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+    <<: *postgres-healthcheck
+
+x-raid-db-env: &raid-db-env
+  POSTGRES_DB: raid
+  POSTGRES_USER: raid
+  POSTGRES_PASSWORD: ${RAID_DB_PASSWORD:?set RAID_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${RAID_REPLICATION_PASSWORD:?set RAID_REPLICATION_PASSWORD in .env}
+
+x-raid-standby: &raid-standby
+  <<: *postgres-node
+  environment:
+    <<: *raid-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: monster-raid-db
+  depends_on:
+    monster-raid-replication-init:
+      condition: service_completed_successfully
+
+x-map-redis-node: &map-redis-node
+  <<: *redis
+  entrypoint: ["/bin/sh", "/ha/redis-start.sh"]
+  environment:
+    MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD:?set MAP_REDIS_PASSWORD in .env}
+    REDISCLI_AUTH: ${MAP_REDIS_PASSWORD}
+
+x-map-replica: &map-replica
+  <<: *map-redis-node
+  command: ["replica"]
+  depends_on:
+    map-redis:
+      condition: service_started
+
+x-map-sentinel: &map-sentinel
+  <<: *map-redis-node
+  command: ["sentinel"]
+  healthcheck:
+    test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+  depends_on:
+    map-redis:
+      condition: service_started
 
 services:
   # --- Service Discovery ----------------------------------------------------------------------------
@@ -431,12 +482,62 @@ services:
 
   # --- Map ------------------------------------------------------------------------------------------
   map-redis:
-    <<: *redis
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${MAP_REDIS_PASSWORD:?set MAP_REDIS_PASSWORD in .env}"]
-    environment:
-      REDISCLI_AUTH: ${MAP_REDIS_PASSWORD}
+    <<: *map-redis-node
+    hostname: map-redis
+    command: ["primary"]
     volumes:
+      - ./scripts/ha:/ha:ro
       - map-redis-data:/data
+
+  map-redis-1:
+    <<: *map-replica
+    hostname: map-redis-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-redis-1-data:/data
+
+  map-redis-2:
+    <<: *map-replica
+    hostname: map-redis-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-redis-2-data:/data
+
+  map-sentinel-1:
+    <<: *map-sentinel
+    hostname: map-sentinel-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-sentinel-1-data:/data
+
+  map-sentinel-2:
+    <<: *map-sentinel
+    hostname: map-sentinel-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-sentinel-2-data:/data
+
+  map-sentinel-3:
+    <<: *map-sentinel
+    hostname: map-sentinel-3
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-sentinel-3-data:/data
+
+  map-redis-writer:
+    image: haproxy:3.2-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/ha/redis-writer.sh"]
+    environment:
+      MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      - map-redis-1
+      - map-redis-2
+      - map-sentinel-1
+      - map-sentinel-2
+      - map-sentinel-3
 
   map-1:
     <<: *map
@@ -546,16 +647,43 @@ services:
 
   # --- Monster Raid ---------------------------------------------------------------------------------
   monster-raid-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: monster-raid-db
     environment:
-      POSTGRES_DB: raid
-      POSTGRES_USER: raid
-      POSTGRES_PASSWORD: ${RAID_DB_PASSWORD:?set RAID_DB_PASSWORD in .env}
+      <<: *raid-db-env
+      PGDATA: ${RAID_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${RAID_POSTGRES_UPSTREAM:-}
     volumes:
-      - raid-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U raid -d raid"]
+      - ./scripts/ha:/ha:ro
+      - ${RAID_POSTGRES_VOLUME:-raid-data}:/var/lib/postgresql/data
+
+  monster-raid-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *raid-db-env
+      PGHOST: monster-raid-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      monster-raid-db:
+        condition: service_healthy
+
+  monster-raid-db-1:
+    <<: *raid-standby
+    hostname: monster-raid-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - raid-db-1-data:/var/lib/postgresql/data
+
+  monster-raid-db-2:
+    <<: *raid-standby
+    hostname: monster-raid-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - raid-db-2-data:/var/lib/postgresql/data
 
   monster-raid-redis:
     <<: *redis
@@ -665,9 +793,17 @@ volumes:
   registry-data:
   battle-data:
   map-redis-data:
+  map-redis-1-data:
+  map-redis-2-data:
+  map-sentinel-1-data:
+  map-sentinel-2-data:
+  map-sentinel-3-data:
   notification-data:
   guild-data:
   raid-data:
+  raid-db-1-data:
+  raid-db-2-data:
+  raid-rejoined-data:
   raid-redis-data:
   broker-data: # the Broker's durable topic queues and dead letters
   prometheus-data:

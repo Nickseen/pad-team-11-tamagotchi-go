@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 old=${1:?provide the failed primary Compose service}
 candidate=${2:?provide the standby to promote}
 remaining=${3:?provide the other standby}
@@ -12,8 +12,7 @@ if [[ "$old" == "$candidate" || "$old" == "$remaining" || "$candidate" == "$rema
 fi
 
 compose() {
-    docker compose --env-file "${LAB5_HA_ENV_FILE:-$root/.env}" \
-        -f "$root/docker-compose.yml" -f "$root/docker-compose.lab5-ha.yml" "$@"
+    docker compose --env-file "${HA_ENV_FILE:-$root/.env}" -f "$root/docker-compose.yml" "$@"
 }
 
 query() {
@@ -34,7 +33,7 @@ fi
 # will refuse to start that volume, including after a retry of this command.
 compose stop "$old"
 compose run -T --rm --no-deps --entrypoint sh "$old" -ec \
-    'test -s "$PGDATA/PG_VERSION"; touch "$PGDATA/.lab5-fenced"'
+    'test -s "$PGDATA/PG_VERSION"; touch "$PGDATA/.ha-fenced"'
 
 if [[ "$candidate_role" == t ]]; then
     candidate_lsn=$(query "$candidate" 'SELECT pg_last_wal_replay_lsn()')
@@ -50,12 +49,12 @@ fi
 # Atomically record the chosen candidate on the fenced volume so two operators
 # cannot promote different standbys. Retrying the same choice is supported.
 compose run -T --rm --no-deps --entrypoint sh "$old" -ec '
-    test -f "$PGDATA/.lab5-fenced"
-    choice=$(mktemp "$PGDATA/.lab5-choice.XXXXXXXX")
+    test -f "$PGDATA/.ha-fenced"
+    choice=$(mktemp "$PGDATA/.ha-choice.XXXXXXXX")
     trap "rm -f \"$choice\"" EXIT
     printf "%s\n" "$1" > "$choice"
-    if ! ln "$choice" "$PGDATA/.lab5-promotion" 2>/dev/null; then
-        if [ "$(cat "$PGDATA/.lab5-promotion")" != "$1" ]; then
+    if ! ln "$choice" "$PGDATA/.ha-promotion" 2>/dev/null; then
+        if [ "$(cat "$PGDATA/.ha-promotion")" != "$1" ]; then
             echo "A different standby has already been selected for this failover" >&2
             exit 1
         fi
@@ -67,5 +66,5 @@ if [[ $(query "$candidate" 'SELECT pg_is_in_recovery()') == t ]]; then
 fi
 
 compose exec -T -u postgres "$remaining" sh -ec \
-    'sh /lab5-ha/postgres-upstream.sh "$1" "$PGDATA"; pg_ctl -D "$PGDATA" reload' sh "$candidate"
+    'sh /ha/postgres-upstream.sh "$1" "$PGDATA"; pg_ctl -D "$PGDATA" reload' sh "$candidate"
 echo "PostgreSQL writer: $candidate. Following it: $remaining. Fenced: $old."

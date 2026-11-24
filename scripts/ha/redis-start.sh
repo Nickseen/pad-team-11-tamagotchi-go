@@ -9,10 +9,10 @@ esac
 
 umask 077
 password=$(printf '%s' "$MAP_REDIS_PASSWORD" | sed 's/[\\"]/\\&/g')
-config=/data/lab5-redis.conf
+config=/data/redis-ha.conf
 
 if [ ! -s "$config" ]; then
-    pending_config=$(mktemp /data/.lab5-redis.XXXXXXXX)
+    pending_config=$(mktemp /data/.ha-redis.XXXXXXXX)
     trap 'rm -f "$pending_config"' EXIT
     if [ "$1" = sentinel ]; then
         cat > "$pending_config" <<EOF

@@ -1948,6 +1948,7 @@ others' key sets reject. Replace the file and restart the replicas to rotate it.
 | `GATEWAY_TOKEN` | Gateway and all eight services | Sent by the Gateway as `X-Gateway-Token`; services trust identity headers only when it matches. At least 16 characters |
 | `SERVICE_TOKEN` | Broker, Gateway and all eight services | Shared HTTP header / gRPC metadata credential for internal traffic. At least 16 characters |
 | `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
+| `RAID_REPLICATION_PASSWORD` | Monster Raid PostgreSQL | Dedicated credential used by the PostgreSQL standbys |
 | `MAP_REDIS_PASSWORD`, `GUILD_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Guild, Monster Raid | Redis passwords |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Service Discovery | Telegram bot and developers' chat for critical-load and health alerts; required unless `ALERTS_ENABLED=false` |
 
@@ -2069,27 +2070,25 @@ docker compose exec service-discovery wget -qO- http://pad-team-11-tamagotchi-go
 
 Each result, with the commands' output, is recorded in #133 before this stack is promoted.
 
-### Lab 5 database replication and failover
+### Database replication and failover
 
-[#193](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/193) provides an
-opt-in [Compose overlay](docker-compose.lab5-ha.yml) for Monster Raid PostgreSQL and
-Map Redis. Each store has a primary and two standbys. PostgreSQL uses streaming replication
+[Docker Compose](docker-compose.yml) provisions a primary and two standbys for Monster Raid
+PostgreSQL and Map Redis. PostgreSQL uses streaming replication
 and an operator-triggered promotion with fencing. Map uses three Redis Sentinels with quorum
 two and a stable `map-redis-writer:6379` endpoint. The endpoint selects a primary with a
-connected replica and disconnects clients from a demoted backend. The overlay uses the
-existing released Map and Raid application images.
+connected replica and disconnects clients from a demoted backend.
 
 #### Start and verify
 
 1. Back up existing `raid-data` and `map-redis-data` volumes before changing their topology.
-   In the same Compose project, the overlay reuses these volumes for the initial primaries.
+   Compose reuses these volumes for the initial primaries in the same project.
    The standbys and Sentinels get new volumes. Keep the existing database and Redis passwords.
-2. Add a separate `LAB5_RAID_REPLICATION_PASSWORD` to the local `.env` using the placeholder in
-   `.env.example`. Use the same project name and Compose file order for every subsequent command.
-3. Start the overlay with the base file:
+2. Add a separate `RAID_REPLICATION_PASSWORD` to the local `.env` using the placeholder in
+   `.env.example`. Use the same Compose project name for every subsequent command.
+3. Start the stack:
 
    ```sh
-   docker compose -f docker-compose.yml -f docker-compose.lab5-ha.yml up -d
+   docker compose up -d
    ```
 
    Wait for both PostgreSQL standbys to report recovery and for Redis Sentinel quorum to form.
@@ -2100,7 +2099,7 @@ The reproducible storage rehearsal provisions its own temporary project and remo
 containers and volumes at the end:
 
 ```sh
-bash scripts/lab5/ha/check-replication.sh
+bash scripts/ha/check-replication.sh
 ```
 
 It checks the existing-volume upgrade, a read and new write after both failovers, TTL expiry and
@@ -2116,10 +2115,10 @@ other standby. Wait for both standbys to replay a test write before deliberately
 Streaming replication is asynchronous, so promotion can lose writes that never reached a standby.
 
 On the test or deployment project, set `COMPOSE_PROJECT_NAME` to the project used to start the stack
-if it differs from the name in Compose. Set `LAB5_HA_ENV_FILE` when using a separate env file.
+if it differs from the name in Compose. Set `HA_ENV_FILE` when using a separate env file.
 
 ```sh
-bash scripts/lab5/ha/postgres-promote.sh \
+bash scripts/ha/postgres-promote.sh \
   monster-raid-db monster-raid-db-1 monster-raid-db-2
 ```
 
@@ -2129,21 +2128,19 @@ differs from the example. Use the original volume as a fenced copy and use a fre
 the rejoined node:
 
 ```dotenv
-LAB5_RAID_ORIGINAL_VOLUME=raid-rejoined-data
-LAB5_RAID_ORIGINAL_DATA_DIR=/var/lib/postgresql/data/pgdata
-LAB5_RAID_REJOIN_SOURCE=monster-raid-db-1
+RAID_POSTGRES_VOLUME=raid-rejoined-data
+RAID_POSTGRES_DATA_DIR=/var/lib/postgresql/data/pgdata
+RAID_POSTGRES_UPSTREAM=monster-raid-db-1
 ```
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.lab5-ha.yml \
-  up -d --no-deps --wait monster-raid-db
+docker compose up -d --no-deps --wait monster-raid-db
 ```
 
 The rejoined node takes a base backup from the promoted writer. Check `pg_is_in_recovery()` returns
-true on it and `pg_stat_replication` shows both standbys on the new writer. Keep the overlay and the
-rejoin settings on this project after the promotion so the ordinary stack does not try to open the
-old primary volume. For another rejoin, select a fresh named volume before changing the old node's
-mapping.
+true on it and `pg_stat_replication` shows both standbys on the new writer. Persist the rejoin settings
+so later deployments use the new volume. For another rejoin, select a fresh named volume before
+changing the old node's mapping.
 
 #### Service owner rollout
 
@@ -2155,13 +2152,13 @@ list shown for Raid. For SQLAlchemy/psycopg use the libpq host list in the query
 `postgresql+psycopg://user:password@/dbname?host=db,db-1,db-2&target_session_attrs=read-write`.
 Verify real service reads and writes through that connection after promotion.
 
-The Redis overlay covers the Map store. Raid and Guild keep their existing Redis addresses.
-Readiness and WebSocket or command recovery for those Redis dependencies are separate service checks
-in #193. Sentinel quorum and the database replicas in this setup share one local Docker host.
+The Redis replication group serves Map. Readiness and WebSocket or command recovery for the separate
+Raid and Guild Redis instances are tracked in #193. Sentinel quorum and the database replicas in this
+setup share one local Docker host.
 
 #### Local verification
 
-The storage rehearsal passed on disposable volumes, including an upgrade from the Lab 4 primary
+The storage rehearsal passed on disposable volumes, including an upgrade from standalone primary
 volumes, writes after both failovers and rejoining both original nodes as standbys. Separate checks
 used the released Map 4.0.1 and Monster Raid 4.0.0 images, real PostgreSQL and Redis, and fixture
 domain dependencies and WebSocket tickets:
@@ -2187,10 +2184,12 @@ loses nothing. `docker compose down -v` deletes the volumes and starts everythin
 | `tamagotchi-data` | Tamagotchi database |
 | `registry-data` | Package Registry database |
 | `battle-data` | Battle database |
-| `map-redis-data` | Map Redis, append-only |
+| `map-redis-data`, `map-redis-1-data`, `map-redis-2-data` | Map Redis data, append-only |
+| `map-sentinel-1-data` through `map-sentinel-3-data` | Map Redis Sentinel election and topology state |
 | `notification-data` | Notification database |
 | `guild-data` | Guild database |
-| `raid-data` | Monster Raid database |
+| `raid-data`, `raid-db-1-data`, `raid-db-2-data` | Monster Raid PostgreSQL data |
+| `raid-rejoined-data` | Fresh data volume for the original Raid database name after rejoining as a standby |
 | `raid-redis-data` | Monster Raid Redis, append-only |
 
 Guild's Redis keeps no volume: it carries chat fan-out between Guild instances and single-use
