@@ -2076,20 +2076,21 @@ Each result, with the commands' output, is recorded in #133 before this stack is
 ### Database replication and failover
 
 [Docker Compose](docker-compose.yml) provisions a primary and two standbys for the Monster Raid,
-Tamagotchi, Notification, Package Registry and Guild PostgreSQL databases and for Map Redis. PostgreSQL uses streaming replication
-and an operator-triggered promotion with fencing. Map uses three Redis Sentinels with quorum
+Tamagotchi, Notification, Package Registry, Guild, User Management and Battle PostgreSQL databases and
+for Map Redis. PostgreSQL uses streaming replication and an operator-triggered promotion with fencing. Map uses three Redis Sentinels with quorum
 two and a stable `map-redis-writer:6379` endpoint. The endpoint selects a primary with a
 connected replica and disconnects clients from a demoted backend.
 
 #### Start and verify
 
 1. Back up existing `raid-data`, `tamagotchi-data`, `notification-data`, `registry-data`,
-   `guild-data` and `map-redis-data` volumes before changing their topology.
+   `guild-data`, `usermgmt-data`, `battle-data` and `map-redis-data` volumes before changing their topology.
    Compose reuses these volumes for the initial primaries in the same project.
    The standbys and Sentinels get new volumes. Keep the existing database and Redis passwords.
 2. Add separate `RAID_REPLICATION_PASSWORD`, `TAMAGOTCHI_REPLICATION_PASSWORD`,
-   `NOTIFICATION_REPLICATION_PASSWORD`, `REGISTRY_REPLICATION_PASSWORD` and `GUILD_REPLICATION_PASSWORD` values to the local `.env` using the placeholders in
-   `.env.example`. Use the same Compose project name for every subsequent command.
+   `NOTIFICATION_REPLICATION_PASSWORD`, `REGISTRY_REPLICATION_PASSWORD`, `GUILD_REPLICATION_PASSWORD`,
+   `USERMGMT_REPLICATION_PASSWORD` and `BATTLE_REPLICATION_PASSWORD` values to the local `.env` using the
+   placeholders in `.env.example`. Use the same Compose project name for every subsequent command.
 3. Start the stack:
 
    ```sh
@@ -2223,6 +2224,28 @@ stops (or kills) `guild-redis`. Observed with Guild 5.0.0:
 | Redis back | Guild is ready again within 3–6 s. Existing sockets fan out again, new tickets (`201`) open sockets on both replicas and messages reach the other member. |
 | Ticket reuse | Refused (`401`) before the outage. After a clean stop it is still refused: Redis saves a snapshot inside its container on shutdown. After a crash (`--kill`) a ticket used 12 s earlier was accepted again: Guild's Redis keeps no volume or append-only file, so claims made since the last snapshot are lost and a ticket can be reused for the rest of its 60 s lifetime. |
 
+**User Management and Battle** use the same template: `user-management-db` and `battle-db` are the primaries
+on their existing volumes (`usermgmt-data`, `battle-data`), `-db-1` and `-db-2` the standbys, and each service
+connects with
+`postgres://<user>:<password>@<svc>-db:5432,<svc>-db-1:5432,<svc>-db-2:5432/<db>?sslmode=disable&target_session_attrs=read-write&connect_timeout=2`.
+Promote with `bash scripts/ha/postgres-promote.sh battle-db battle-db-1 battle-db-2` (or the
+`user-management-db` names). The rejoin settings are `USERMGMT_POSTGRES_VOLUME=usermgmt-rejoined-data` and
+`BATTLE_POSTGRES_VOLUME=battle-rejoined-data`, with the matching `*_POSTGRES_DATA_DIR` and `*_POSTGRES_UPSTREAM` as
+for Raid. Since 5.0.0 both services bound the name lookup of one host to 500 ms, because pgx resolves every
+listed host before it connects and a stopped primary's name can take Docker's DNS seconds.
+
+```sh
+bash scripts/ha/check-service-failover.sh user-management battle
+```
+
+Their images carry no shell or Python, so the check sends its requests from a `python:3.13-alpine` container
+in the service's network; Battle's dependencies stay mocked there. Result with 5.0.0: the write before the
+primary loss reached both standbys, `-db-1` became the writer and `-db-2` followed it, the earlier record was
+read and a new one written (`201`) by the same running service, readiness answered `200 200 200` and no error
+was logged. With DNS that answers for the lost primary after 4 s, the first connection took 0.6 s instead of
+4.1 s, and readiness failed for about 1 s instead of 4 s. An existing standalone volume was taken over by the new
+topology with its rows on all three nodes, and the old primary rejoined as a standby on a fresh volume.
+
 The Redis replication group serves Map. Readiness and WebSocket or command recovery for the separate
 Raid and Guild Redis instances are tracked in #193. Sentinel quorum and the database replicas in this
 setup share one local Docker host.
@@ -2321,16 +2344,16 @@ loses nothing. `docker compose down -v` deletes the volumes and starts everythin
 
 | Volume | Store |
 | ------ | ----- |
-| `usermgmt-data` | User Management database |
+| `usermgmt-data`, `usermgmt-db-1-data`, `usermgmt-db-2-data` | User Management PostgreSQL data |
 | `tamagotchi-data`, `tamagotchi-db-1-data`, `tamagotchi-db-2-data` | Tamagotchi PostgreSQL data |
 | `registry-data`, `registry-db-1-data`, `registry-db-2-data` | Package Registry PostgreSQL data |
-| `battle-data` | Battle database |
+| `battle-data`, `battle-db-1-data`, `battle-db-2-data` | Battle PostgreSQL data |
 | `map-redis-data`, `map-redis-1-data`, `map-redis-2-data` | Map Redis data, append-only |
 | `map-sentinel-1-data` through `map-sentinel-3-data` | Map Redis Sentinel election and topology state |
 | `notification-data`, `notification-db-1-data`, `notification-db-2-data` | Notification PostgreSQL data |
 | `guild-data`, `guild-db-1-data`, `guild-db-2-data` | Guild PostgreSQL data |
 | `raid-data`, `raid-db-1-data`, `raid-db-2-data` | Monster Raid PostgreSQL data |
-| `raid-rejoined-data`, `tamagotchi-rejoined-data`, `notification-rejoined-data`, `registry-rejoined-data`, `guild-rejoined-data` | Fresh data volumes for the original primary names after rejoining as standbys |
+| `raid-rejoined-data`, `tamagotchi-rejoined-data`, `notification-rejoined-data`, `registry-rejoined-data`, `guild-rejoined-data`, `usermgmt-rejoined-data`, `battle-rejoined-data` | Fresh data volumes for the original primary names after rejoining as standbys |
 | `raid-redis-data` | Monster Raid Redis, append-only |
 | `warehouse-data` | Data Warehouse PostgreSQL (#194) |
 
