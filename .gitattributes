@@ -1,0 +1,5 @@
+# Shell scripts and configuration mounted into Linux containers must keep LF line endings,
+# also on Windows checkouts with core.autocrlf=true: sh reads 'set -eu\r' as an illegal option.
+*.sh text eol=lf
+scripts/ha/* text eol=lf
+monitoring/** text eol=lf
