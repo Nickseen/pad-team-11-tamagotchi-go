@@ -2173,6 +2173,75 @@ domain dependencies and WebSocket tickets:
   current snapshot and the next attack's `raid.damage` frame. Retrying that attack did not add a
   second damage record.
 
+### Data Warehouse and ETL
+
+[#194](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/194) adds an analytical
+PostgreSQL, `warehouse-db`, and an `etl` job that loads the terminal results of battles and raids
+into it. The Warehouse is fed only from the services' own CSV exports: no domain service reads or
+writes it, and the ETL never reads a service database itself.
+
+| Part | Where | What it does |
+| ---- | ----- | ------------ |
+| Extract | [`scripts/etl/extract.sh`](scripts/etl/extract.sh), on the host | Runs each service's own export command and writes `etl/input/battle.csv` and `raid.csv` (gitignored). A file is written under a temporary name and renamed only when its command succeeded. |
+| Transform and load | `etl` job in [Compose](docker-compose.yml): [`etl/load.sh`](etl/load.sh), [`etl/load-battle.sql`](etl/load-battle.sql), [`etl/load-raid.sql`](etl/load-raid.sql) | Applies the pending [Warehouse migrations](warehouse/migrations/), checks each export against the CSV contract and upserts it by its source key. |
+| Schema | [`warehouse/migrations/001_terminal_results.sql`](warehouse/migrations/001_terminal_results.sql) | `warehouse.battle_results`, `warehouse.raid_results`, `warehouse.etl_runs`, and the views `terminal_results` and `daily_results`. |
+
+**Run.** With the stack up and `WAREHOUSE_DB_PASSWORD` in `.env`:
+
+```sh
+RAID_CHECKOUT=../tamagotchi-monster-raid bash scripts/etl/extract.sh   # see the sources below
+docker compose run --rm etl
+```
+
+`warehouse-db` starts with the stack; `etl` is a job (profile `etl`), so `up` does not start it and
+`run` exits when the load is done. It runs in the `postgres:17-alpine` image already used by the
+databases, so it has no image of its own. Settings: `ETL_INPUT_DIR` (host folder with the exports,
+default `etl/input`), `ETL_REQUIRE_ALL=1` (fail when an export is missing instead of skipping it) and
+`ETL_PAUSE_BEFORE_COMMIT=<seconds>` (holds each load open before its commit, for the interruption
+check). The exit status is non-zero when any export was rejected.
+
+**Sources** (CSV contract in #194: UTF-8, comma-delimited, exact header, every field required,
+lowercase UUIDs, RFC 3339 UTC timestamps with milliseconds):
+
+| Source | Header | Export command | Warehouse key |
+| ------ | ------ | -------------- | ------------- |
+| Monster Raid | `raidId,status,endedAt` | `scripts/export-raid-results.sql` from a Monster Raid checkout at the reviewed revision (`RAID_CHECKOUT`), run against `monster-raid-db` (`RAID_DB_SERVICE` after a promotion); [handoff](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/194#issuecomment-7140915705) | `raid:<raidId>` |
+| Battle | `battleId,outcome,finishedAt` | Pending the Battle handoff on #194; until then `BATTLE_CSV=<file>` passes an existing export, e.g. [`etl/fixtures/battle.csv`](etl/fixtures/battle.csv) | `battle:<battleId>` |
+
+**Transform.** The header must match exactly. Every row is checked before anything is written: a
+missing field, a value outside the contract (`knockout`, `forfeit`, `timeout`; `defeated`, `expired`,
+`cancelled`), an ID that is not a lowercase UUID, a timestamp that is not UTC with milliseconds, or an ID
+that appears twice rejects the whole export, and the job reports the first offending data rows.
+Timestamps are stored as `timestamptz` and the UTC calendar day is derived from them.
+
+**Repeatable load.** Each source loads in one transaction, serialized by an advisory lock. A record is
+inserted under its source key the first time, updated when its outcome or time changed, and left as it
+is otherwise; a record missing from a later export stays in the Warehouse. Each load also writes one
+`warehouse.etl_runs` row with the rows read, inserted, updated and unchanged. A repeated run therefore
+adds no facts, and a new record appears after the next run.
+
+**Interrupted load.** The facts and the `etl_runs` row commit together. A load stopped at any point (the
+job killed, the database restarted) leaves the Warehouse as it was, and running the job again brings it
+to the expected state. A failed export never replaces the previous file, since extract.sh renames a file
+only when its command succeeded.
+
+**Example queries** (`docker compose exec warehouse-db psql -U warehouse -d warehouse`):
+
+```sql
+SELECT day, source, result, results FROM warehouse.daily_results ORDER BY day, source, result;
+SELECT result, count(*) FROM warehouse.raid_results GROUP BY result;  -- e.g. defeated vs expired raids
+SELECT outcome, count(*) FROM warehouse.battle_results
+ WHERE finished_at >= now() - interval '7 days' GROUP BY outcome;
+SELECT run_id, source, rows_read, rows_inserted, rows_updated, rows_unchanged FROM warehouse.etl_runs ORDER BY run_id;
+```
+
+**Check.** `bash scripts/etl/check-etl.sh` runs the Warehouse and the job in a disposable Compose
+project with generated exports and removes them at the end. Result: the #194 samples loaded one row each;
+the same exports again inserted and updated nothing; a new record per source was inserted and a changed
+battle outcome updated; a load killed before its commit left the Warehouse unchanged and the repeated run
+loaded the new raid; an invalid ID, a duplicate ID, a wrong header and a non-UTC timestamp were each
+rejected without changing anything; header-only exports read zero rows.
+
 ### Data and volumes
 
 Every durable store keeps its data in a named volume, so `docker compose down` followed by `up`
@@ -2191,6 +2260,7 @@ loses nothing. `docker compose down -v` deletes the volumes and starts everythin
 | `raid-data`, `raid-db-1-data`, `raid-db-2-data` | Monster Raid PostgreSQL data |
 | `raid-rejoined-data` | Fresh data volume for the original Raid database name after rejoining as a standby |
 | `raid-redis-data` | Monster Raid Redis, append-only |
+| `warehouse-data` | Data Warehouse PostgreSQL (#194) |
 
 Guild's Redis keeps no volume: it carries chat fan-out between Guild instances and single-use
 WebSocket ticket claims, both transient, while chat history lives in Guild's database.
