@@ -157,7 +157,7 @@ CREATE TABLE transaction_branches (
     outcome        TEXT        NOT NULL CHECK (outcome IN ('committed', 'rolled_back')),
     operation      TEXT,  -- null only for the rollback of a transaction the coordinator does not know
     business_key   UUID,  -- likewise
-    effect         JSONB       NOT NULL DEFAULT '{}',  -- what was really applied, e.g. the clamped debit
+    effect         JSONB       NOT NULL DEFAULT '{}',  -- what was really applied, see the Saga contract
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (transaction_id, attempt)
 );
@@ -180,7 +180,8 @@ CREATE TABLE transaction_branches (
    PREPARE TRANSACTION 'tg:<transactionId>:<attempt>';
    ```
 
-   The row says `committed` because nobody can see it unless the branch commits.
+   The row says `committed` because nobody can see it unless the branch commits. `effect` holds what the Saga
+   needs to undo it; [its contract](lab5-saga-contract.md#effect-and-compensation-per-participant) lists the fields.
 3. Answer `commit` only after `PREPARE TRANSACTION` returned.
 
 | Found on the way | Action |
