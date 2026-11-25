@@ -135,7 +135,7 @@ x-package-registry-env: &package-registry-env
   DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@/registry?host=package-registry-db,package-registry-db-1,package-registry-db-2&target_session_attrs=read-write&connect_timeout=2
 
 x-package-registry: &package-registry
-  image: gabimiric/tamagotchi-package-registry:4.0.1
+  image: gabimiric/tamagotchi-package-registry:5.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
@@ -230,7 +230,7 @@ x-guild-env: &guild-env
   REDIS_URL: redis://:${GUILD_REDIS_PASSWORD}@guild-redis:6379/0
 
 x-guild: &guild
-  image: gabimiric/tamagotchi-guild:4.0.0
+  image: gabimiric/tamagotchi-guild:5.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
