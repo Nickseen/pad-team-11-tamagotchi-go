@@ -131,10 +131,11 @@ x-tamagotchi: &tamagotchi
 x-package-registry-env: &package-registry-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 64
-  DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@package-registry-db:5432/registry
+  # The primary and both standbys; libpq connects to whichever accepts writes (#193).
+  DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@/registry?host=package-registry-db,package-registry-db-1,package-registry-db-2&target_session_attrs=read-write&connect_timeout=2
 
 x-package-registry: &package-registry
-  image: gabimiric/tamagotchi-package-registry:4.0.1
+  image: gabimiric/tamagotchi-package-registry:5.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
@@ -142,6 +143,12 @@ x-package-registry: &package-registry
       condition: service_healthy
     package-registry-db:
       condition: service_healthy
+    package-registry-db-1:
+      condition: service_healthy
+      required: false
+    package-registry-db-2:
+      condition: service_healthy
+      required: false
   healthcheck:
     <<: *python-healthcheck
     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"]
@@ -213,7 +220,8 @@ x-guild-env: &guild-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 64
   MAX_WEBSOCKET_CONNECTIONS: 100
-  DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
+  # The primary and both standbys; libpq connects to whichever accepts writes (#193).
+  DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@/guild?host=guild-db,guild-db-1,guild-db-2&target_session_attrs=read-write&connect_timeout=2
   USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-real}
   # Invitee lookups call UserManagementInternal/ListUsers over gRPC through the Broker (Lab 4 Grade 8).
   USER_MANAGEMENT_TRANSPORT: grpc
@@ -222,7 +230,7 @@ x-guild-env: &guild-env
   REDIS_URL: redis://:${GUILD_REDIS_PASSWORD}@guild-redis:6379/0
 
 x-guild: &guild
-  image: gabimiric/tamagotchi-guild:4.0.0
+  image: gabimiric/tamagotchi-guild:5.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
@@ -230,6 +238,12 @@ x-guild: &guild
       condition: service_healthy
     guild-db:
       condition: service_healthy
+    guild-db-1:
+      condition: service_healthy
+      required: false
+    guild-db-2:
+      condition: service_healthy
+      required: false
     guild-redis:
       condition: service_healthy
   healthcheck:
@@ -308,6 +322,38 @@ x-notification-standby: &notification-standby
     PG_REPLICA_SOURCE: notification-db
   depends_on:
     notification-replication-init:
+      condition: service_completed_successfully
+
+x-registry-db-env: &registry-db-env
+  POSTGRES_DB: registry
+  POSTGRES_USER: registry
+  POSTGRES_PASSWORD: ${REGISTRY_DB_PASSWORD:?set REGISTRY_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${REGISTRY_REPLICATION_PASSWORD:?set REGISTRY_REPLICATION_PASSWORD in .env}
+
+x-registry-standby: &registry-standby
+  <<: *postgres-node
+  environment:
+    <<: *registry-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: package-registry-db
+  depends_on:
+    package-registry-replication-init:
+      condition: service_completed_successfully
+
+x-guild-db-env: &guild-db-env
+  POSTGRES_DB: guild
+  POSTGRES_USER: guild
+  POSTGRES_PASSWORD: ${GUILD_DB_PASSWORD:?set GUILD_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${GUILD_REPLICATION_PASSWORD:?set GUILD_REPLICATION_PASSWORD in .env}
+
+x-guild-standby: &guild-standby
+  <<: *postgres-node
+  environment:
+    <<: *guild-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: guild-db
+  depends_on:
+    guild-replication-init:
       condition: service_completed_successfully
 
 x-raid-standby: &raid-standby
@@ -506,16 +552,43 @@ services:
 
   # --- Package Registry -----------------------------------------------------------------------------
   package-registry-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: package-registry-db
     environment:
-      POSTGRES_DB: registry
-      POSTGRES_USER: registry
-      POSTGRES_PASSWORD: ${REGISTRY_DB_PASSWORD:?set REGISTRY_DB_PASSWORD in .env}
+      <<: *registry-db-env
+      PGDATA: ${REGISTRY_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${REGISTRY_POSTGRES_UPSTREAM:-}
     volumes:
-      - registry-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
+      - ./scripts/ha:/ha:ro
+      - ${REGISTRY_POSTGRES_VOLUME:-registry-data}:/var/lib/postgresql/data
+
+  package-registry-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *registry-db-env
+      PGHOST: package-registry-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      package-registry-db:
+        condition: service_healthy
+
+  package-registry-db-1:
+    <<: *registry-standby
+    hostname: package-registry-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - registry-db-1-data:/var/lib/postgresql/data
+
+  package-registry-db-2:
+    <<: *registry-standby
+    hostname: package-registry-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - registry-db-2-data:/var/lib/postgresql/data
 
   # One block runs every Package Registry replica (deploy.replicas, the default 2 or
   # PACKAGE_REGISTRY_REPLICAS). Each replica fills its own container name into {container}
@@ -697,16 +770,43 @@ services:
 
   # --- Guild ----------------------------------------------------------------------------------------
   guild-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: guild-db
     environment:
-      POSTGRES_DB: guild
-      POSTGRES_USER: guild
-      POSTGRES_PASSWORD: ${GUILD_DB_PASSWORD:?set GUILD_DB_PASSWORD in .env}
+      <<: *guild-db-env
+      PGDATA: ${GUILD_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${GUILD_POSTGRES_UPSTREAM:-}
     volumes:
-      - guild-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U guild -d guild"]
+      - ./scripts/ha:/ha:ro
+      - ${GUILD_POSTGRES_VOLUME:-guild-data}:/var/lib/postgresql/data
+
+  guild-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *guild-db-env
+      PGHOST: guild-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      guild-db:
+        condition: service_healthy
+
+  guild-db-1:
+    <<: *guild-standby
+    hostname: guild-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - guild-db-1-data:/var/lib/postgresql/data
+
+  guild-db-2:
+    <<: *guild-standby
+    hostname: guild-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - guild-db-2-data:/var/lib/postgresql/data
 
   guild-redis:
     <<: *redis
@@ -944,9 +1044,15 @@ volumes:
   notification-db-2-data:
   raid-db-1-data:
   raid-db-2-data:
+  registry-db-1-data:
+  registry-db-2-data:
+  guild-db-1-data:
+  guild-db-2-data:
   tamagotchi-rejoined-data:
   notification-rejoined-data:
   raid-rejoined-data:
+  registry-rejoined-data:
+  guild-rejoined-data:
   raid-redis-data:
   broker-data: # the Broker's durable topic queues and dead letters
   warehouse-data: # the Data Warehouse (#194)

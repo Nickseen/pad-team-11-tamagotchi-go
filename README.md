@@ -1888,11 +1888,11 @@ Every component below selects 4.x; updating references does not complete the sha
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43432132987)) | — (internal 8090) | In-memory registry | `2294a0a` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `4.0.2` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/43313002797)) | — | PostgreSQL | `e0fabc2` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/runs/45486692839)) | — | PostgreSQL primary + 2 standbys | `eda7e3e` |
-| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/runs/43309493412)) | — | PostgreSQL | `8fb32bd` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/runs/45638217264)) | — | PostgreSQL primary + 2 standbys | `3caf86e` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `4.1.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/43403207651)) | — | PostgreSQL | `64e7ef1` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/43310895212)) | 18085, 28085, 38085 (WebSocket) | Redis | `3ca778c` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/runs/45486229438)) | — | PostgreSQL primary + 2 standbys | `2e69d4a` |
-| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-guild/actions/runs/43302752393)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL and Redis | `c643213` |
+| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-guild/actions/runs/45638258625)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL primary + 2 standbys, and Redis | `0f6e68b` |
 | Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/43295115421)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `ab479f6` |
 
 Every selected service image accepts the contract's `DISCOVERY_URL`, `INSTANCE_BASE_URL` and, for
@@ -2076,19 +2076,19 @@ Each result, with the commands' output, is recorded in #133 before this stack is
 ### Database replication and failover
 
 [Docker Compose](docker-compose.yml) provisions a primary and two standbys for the Monster Raid,
-Tamagotchi and Notification PostgreSQL databases and for Map Redis. PostgreSQL uses streaming replication
+Tamagotchi, Notification, Package Registry and Guild PostgreSQL databases and for Map Redis. PostgreSQL uses streaming replication
 and an operator-triggered promotion with fencing. Map uses three Redis Sentinels with quorum
 two and a stable `map-redis-writer:6379` endpoint. The endpoint selects a primary with a
 connected replica and disconnects clients from a demoted backend.
 
 #### Start and verify
 
-1. Back up existing `raid-data`, `tamagotchi-data`, `notification-data` and `map-redis-data` volumes
-   before changing their topology.
+1. Back up existing `raid-data`, `tamagotchi-data`, `notification-data`, `registry-data`,
+   `guild-data` and `map-redis-data` volumes before changing their topology.
    Compose reuses these volumes for the initial primaries in the same project.
    The standbys and Sentinels get new volumes. Keep the existing database and Redis passwords.
-2. Add separate `RAID_REPLICATION_PASSWORD`, `TAMAGOTCHI_REPLICATION_PASSWORD` and
-   `NOTIFICATION_REPLICATION_PASSWORD` values to the local `.env` using the placeholders in
+2. Add separate `RAID_REPLICATION_PASSWORD`, `TAMAGOTCHI_REPLICATION_PASSWORD`,
+   `NOTIFICATION_REPLICATION_PASSWORD`, `REGISTRY_REPLICATION_PASSWORD` and `GUILD_REPLICATION_PASSWORD` values to the local `.env` using the placeholders in
    `.env.example`. Use the same Compose project name for every subsequent command.
 3. Start the stack:
 
@@ -2179,6 +2179,49 @@ the primary loss reached both standbys, after promotion `-db-1` was the writer a
 earlier record was read and a new one written (`201`), the new write reached `-db-2`, and no service
 error was logged. With the 4.0.0 Tamagotchi image the first read after promotion failed before the pool
 recovered, which is why 5.0.0 adds the connection check.
+
+**Package Registry and Guild** use the same template: `package-registry-db` and `guild-db` are the
+primaries on their existing volumes (`registry-data`, `guild-data`), `-db-1` and `-db-2` the standbys, and
+each service connects with
+`postgresql+psycopg://<user>:<password>@/<db>?host=<svc>-db,<svc>-db-1,<svc>-db-2&target_session_attrs=read-write&connect_timeout=2`.
+Promote with `bash scripts/ha/postgres-promote.sh guild-db guild-db-1 guild-db-2` (or the
+`package-registry-db` names). The rejoin settings are `GUILD_POSTGRES_VOLUME=guild-rejoined-data` and
+`REGISTRY_POSTGRES_VOLUME=registry-rejoined-data`, with the matching `*_POSTGRES_DATA_DIR` and
+`*_POSTGRES_UPSTREAM` as for Raid. Both services check a pooled connection before using it, and since 5.0.0
+they also skip a database host whose name no longer resolves: after a promotion the fenced primary is
+stopped, and Docker's DNS takes seconds (about 4 s on Docker Desktop) to say its name does not exist, which
+libpq waits for before trying the next host. Without that, every new connection, and so every readiness
+check, missed its deadline, and both replicas stayed unready after a successful failover. The services
+look the listed names up in parallel for 300 ms and pass only the ones that resolve; once the old primary
+rejoins, it is found again.
+
+```sh
+bash scripts/ha/check-service-failover.sh package-registry guild
+```
+
+On Windows Git Bash, set `MSYS2_ARG_CONV_EXCL=/api` so API paths are not rewritten as file paths. The
+check also probes readiness three times after the promotion and counts the errors logged after it.
+Result with Package Registry and Guild 5.0.0: the write before the primary loss reached both standbys,
+`-db-1` became the writer and `-db-2` followed it, the earlier record was read and a new one written (`201`),
+readiness answered `200 200 200`, and no error was logged after the promotion. The errors logged while no
+primary existed come from the event outbox's background poll, which retries. With the 4.0.x images the
+first request after promotion could miss its deadline (`503 TASK_TIMEOUT`) and readiness stayed `503`.
+
+**Guild's Redis** carries chat fan-out between the Guild replicas and single-use WebSocket ticket claims.
+With the stack running:
+
+```sh
+python scripts/ha/check-guild-redis.py          # a clean stop; --kill for a crash (needs `pip install websockets`)
+```
+
+It joins two users to a guild through the Gateway, opens their chat sockets on different replicas and
+stops (or kills) `guild-redis`. Observed with Guild 5.0.0:
+
+| Phase | Behaviour |
+| ----- | --------- |
+| Redis down | Guild reports not ready (its readiness includes the chat broker), so the Broker has no Guild instance: new tickets, chat history and every Guild REST route answer `503 SERVICE_UNAVAILABLE`. Open sockets stay connected; a message sent then is stored and appears in history, but is not fanned out to a member on the other replica. |
+| Redis back | Guild is ready again within 3–6 s. Existing sockets fan out again, new tickets (`201`) open sockets on both replicas and messages reach the other member. |
+| Ticket reuse | Refused (`401`) before the outage. After a clean stop it is still refused: Redis saves a snapshot inside its container on shutdown. After a crash (`--kill`) a ticket used 12 s earlier was accepted again: Guild's Redis keeps no volume or append-only file, so claims made since the last snapshot are lost and a ticket can be reused for the rest of its 60 s lifetime. |
 
 The Redis replication group serves Map. Readiness and WebSocket or command recovery for the separate
 Raid and Guild Redis instances are tracked in #193. Sentinel quorum and the database replicas in this
@@ -2280,14 +2323,14 @@ loses nothing. `docker compose down -v` deletes the volumes and starts everythin
 | ------ | ----- |
 | `usermgmt-data` | User Management database |
 | `tamagotchi-data`, `tamagotchi-db-1-data`, `tamagotchi-db-2-data` | Tamagotchi PostgreSQL data |
-| `registry-data` | Package Registry database |
+| `registry-data`, `registry-db-1-data`, `registry-db-2-data` | Package Registry PostgreSQL data |
 | `battle-data` | Battle database |
 | `map-redis-data`, `map-redis-1-data`, `map-redis-2-data` | Map Redis data, append-only |
 | `map-sentinel-1-data` through `map-sentinel-3-data` | Map Redis Sentinel election and topology state |
 | `notification-data`, `notification-db-1-data`, `notification-db-2-data` | Notification PostgreSQL data |
-| `guild-data` | Guild database |
+| `guild-data`, `guild-db-1-data`, `guild-db-2-data` | Guild PostgreSQL data |
 | `raid-data`, `raid-db-1-data`, `raid-db-2-data` | Monster Raid PostgreSQL data |
-| `raid-rejoined-data`, `tamagotchi-rejoined-data`, `notification-rejoined-data` | Fresh data volumes for the original primary names after rejoining as standbys |
+| `raid-rejoined-data`, `tamagotchi-rejoined-data`, `notification-rejoined-data`, `registry-rejoined-data`, `guild-rejoined-data` | Fresh data volumes for the original primary names after rejoining as standbys |
 | `raid-redis-data` | Monster Raid Redis, append-only |
 | `warehouse-data` | Data Warehouse PostgreSQL (#194) |
 
