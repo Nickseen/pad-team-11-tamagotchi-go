@@ -777,6 +777,9 @@ Three ownership rules follow directly from
 Consistency across services is therefore **eventual**, bounded by broker latency. Consistency
 *within* a service is transactional: a consumer applies the effect and records the `eventId` in the
 same PostgreSQL transaction, so an at-least-once redelivery is absorbed rather than duplicated.
+Lab 5 makes two operations atomic across services, the rewards of a decided battle and of a defeated
+raid: the [distributed transaction contract](docs/lab5-transaction-contract.md) (#196) defines how the Broker
+coordinates them and what each participant implements.
 
 **Referential integrity** cannot be enforced with foreign keys across services. Instead, a service
 validates a foreign identifier synchronously at write time (Guild asks User Management whether a
@@ -2114,7 +2117,9 @@ During normal operation Raid's existing connection string lists all three nodes 
 read-write session. A failed primary is stopped with Compose and its data volume is fenced before
 promoting a standby. The promotion helper refuses a candidate that has replayed less WAL than the
 other standby. Wait for both standbys to replay a test write before deliberately stopping the primary.
-Streaming replication is asynchronous, so promotion can lose writes that never reached a standby.
+Streaming replication is asynchronous, so promotion can lose writes that never reached a standby. The
+branches of a [distributed transaction](docs/lab5-transaction-contract.md#database-replication-and-promotion)
+are the exception: each is confirmed only after one standby has it, and while no standby runs it waits.
 
 On the test or deployment project, set `COMPOSE_PROJECT_NAME` to the project used to start the stack
 if it differs from the name in Compose. Set `HA_ENV_FILE` when using a separate env file.
