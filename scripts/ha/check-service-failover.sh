@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Service-level PostgreSQL failover check for Tamagotchi, Notification, Package Registry and Guild (#193):
-#   bash scripts/ha/check-service-failover.sh [tamagotchi|notification|package-registry|guild ...]
+# Service-level PostgreSQL failover check for Tamagotchi, Notification, Package Registry, Guild,
+# User Management and Battle (#193):
+#   bash scripts/ha/check-service-failover.sh [tamagotchi|notification|package-registry|guild|user-management|battle ...]
 # For each service it starts the primary and both standbys in a disposable Compose project, runs the
 # service image pinned in docker-compose.yml with the Compose connection string, writes through the
 # service, kills the primary, promotes a standby with postgres-promote.sh, and then reads the earlier
 # write and makes a new one through the same running service. Everything it creates is removed at exit.
-# TAMAGOTCHI_IMAGE / NOTIFICATION_IMAGE / PACKAGE_REGISTRY_IMAGE / GUILD_IMAGE test another image than
-# the pinned one, e.g. a local build.
+# TAMAGOTCHI_IMAGE / NOTIFICATION_IMAGE / PACKAGE_REGISTRY_IMAGE / GUILD_IMAGE / USER_MANAGEMENT_IMAGE /
+# BATTLE_IMAGE test another image than the pinned one, e.g. a local build.
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -16,13 +17,16 @@ export HA_ENV_FILE="$work/env"
 secret=disposable-failover-secret
 for name in TAMAGOTCHI_DB_PASSWORD NOTIFICATION_DB_PASSWORD TAMAGOTCHI_REPLICATION_PASSWORD \
     NOTIFICATION_REPLICATION_PASSWORD REGISTRY_DB_PASSWORD REGISTRY_REPLICATION_PASSWORD \
-    GUILD_DB_PASSWORD GUILD_REPLICATION_PASSWORD; do
+    GUILD_DB_PASSWORD GUILD_REPLICATION_PASSWORD USERMGMT_DB_PASSWORD USERMGMT_REPLICATION_PASSWORD \
+    BATTLE_DB_PASSWORD BATTLE_REPLICATION_PASSWORD; do
     export "$name=$secret"
 done
 unset TAMAGOTCHI_POSTGRES_VOLUME TAMAGOTCHI_POSTGRES_DATA_DIR TAMAGOTCHI_POSTGRES_UPSTREAM
 unset NOTIFICATION_POSTGRES_VOLUME NOTIFICATION_POSTGRES_DATA_DIR NOTIFICATION_POSTGRES_UPSTREAM
 unset REGISTRY_POSTGRES_VOLUME REGISTRY_POSTGRES_DATA_DIR REGISTRY_POSTGRES_UPSTREAM
 unset GUILD_POSTGRES_VOLUME GUILD_POSTGRES_DATA_DIR GUILD_POSTGRES_UPSTREAM
+unset USERMGMT_POSTGRES_VOLUME USERMGMT_POSTGRES_DATA_DIR USERMGMT_POSTGRES_UPSTREAM
+unset BATTLE_POSTGRES_VOLUME BATTLE_POSTGRES_DATA_DIR BATTLE_POSTGRES_UPSTREAM
 # The rest of .env.example only has to parse; this check never starts those services.
 sed 's/=CHANGE_ME$/=disposable-unused-secret/' "$root/.env.example" > "$HA_ENV_FILE"
 
@@ -33,7 +37,9 @@ compose() {
 
 cleanup() {
     docker rm -f "$COMPOSE_PROJECT_NAME-tamagotchi" "$COMPOSE_PROJECT_NAME-notification" \
-        "$COMPOSE_PROJECT_NAME-package-registry" "$COMPOSE_PROJECT_NAME-guild" >/dev/null 2>&1 || :
+        "$COMPOSE_PROJECT_NAME-package-registry" "$COMPOSE_PROJECT_NAME-guild" \
+        "$COMPOSE_PROJECT_NAME-user-management" "$COMPOSE_PROJECT_NAME-user-management-client" \
+        "$COMPOSE_PROJECT_NAME-battle" "$COMPOSE_PROJECT_NAME-battle-client" >/dev/null 2>&1 || :
     compose down -v --remove-orphans >/dev/null 2>&1 || :
     rm -rf "$work"
 }
@@ -51,6 +57,7 @@ service_setting() {
 }
 
 user=11111111-1111-4111-8111-111111111111
+package=22222222-2222-4222-8222-222222222222
 
 check() {
     local svc=$1 port table image
@@ -62,7 +69,9 @@ check() {
         notification) port=8086 table=devices image=${NOTIFICATION_IMAGE:-} ;;
         package-registry) port=8083 table=packages image=${PACKAGE_REGISTRY_IMAGE:-} ;;
         guild) port=8087 table=guilds image=${GUILD_IMAGE:-} ;;
-        *) echo "unknown service $svc (tamagotchi, notification, package-registry or guild)" >&2; return 1 ;;
+        user-management) port=8081 table=friend_requests image=${USER_MANAGEMENT_IMAGE:-} ;;
+        battle) port=8084 table=battles image=${BATTLE_IMAGE:-} ;; # its dependencies stay mocked
+        *) echo "unknown service $svc (tamagotchi, notification, package-registry, guild, user-management or battle)" >&2; return 1 ;;
     esac
     echo "== $svc"
     compose up -d --wait "$svc-db" "$svc-db-1" "$svc-db-2" >/dev/null 2>&1
@@ -76,17 +85,25 @@ check() {
         -e SERVICE_TOKEN="$secret" -e TASK_TIMEOUT_MS=3000 -e MAX_CONCURRENT_TASKS=10 \
         "$image" >/dev/null
     echo "image: $image"
-    call() { # METHOD PATH [BODY]: "<status> <body>" from inside the service's container
-        docker exec "$app" python -c 'import json, sys, urllib.request
+    # The Go images are distroless, so their requests come from a Python container in the same network.
+    local client=$app
+    case "$svc" in
+        user-management | battle)
+            client="$app-client"
+            docker run -d --name "$client" --network "container:$app" python:3.13-alpine sleep 3600 >/dev/null ;;
+    esac
+    call() { # METHOD PATH [BODY]: "<status> <body>" from inside the service's network
+        docker exec "$client" python -c 'import json, sys, urllib.request
 method, path, body = sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None
 request = urllib.request.Request("http://127.0.0.1:" + sys.argv[4] + path, method=method,
     data=body.encode() if body else None, headers={"X-Gateway-Token": sys.argv[5],
-    "X-Authenticated-User-Id": sys.argv[6], "Content-Type": "application/json"})
+    "X-Authenticated-User-Id": sys.argv[6], "X-Authenticated-Package-Id": sys.argv[7],
+    "Content-Type": "application/json"})
 try:
     with urllib.request.urlopen(request, timeout=5) as answer: print(answer.status, answer.read().decode())
-except urllib.error.HTTPError as error: print(error.code, error.read().decode())' "$1" "$2" "${3:-}" "$port" "$secret" "$user"
+except urllib.error.HTTPError as error: print(error.code, error.read().decode())' "$1" "$2" "${3:-}" "$port" "$secret" "$user" "$package"
     }
-    for _ in $(seq 1 40); do docker exec "$app" python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$port/health')" 2>/dev/null && break; sleep 1; done
+    for _ in $(seq 1 40); do docker exec "$client" python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$port/health')" 2>/dev/null && break; sleep 1; done
 
     local collection body
     case "$svc" in
@@ -102,6 +119,18 @@ except urllib.error.HTTPError as error: print(error.code, error.read().decode())
         guild) # tag: 2-5 characters, unique (BEX before, AFX after)
             collection=/api/v1/guilds
             body() { printf '{"name":"%s","tag":"%sX","description":"failover check"}' "$1" "$(printf '%s' "$1" | cut -c1-2 | tr '[:lower:]' '[:upper:]')"; } ;;
+        user-management) # a friend request by a registered user to a new one each time
+            register() { call POST /api/v1/auth/register "{\"username\":\"$1\",\"email\":\"$1@example.com\",\"password\":\"failover-check-1\",\"packageId\":\"$package\"}" |
+                python3 -c 'import json, sys; print(json.loads(sys.stdin.read().partition(" ")[2])["userId"])'; }
+            local sender
+            sender=$(register failover_check)
+            local user=$sender
+            collection="/api/v1/users/me/friend-requests?direction=outgoing"
+            body() { printf '{"targetUserId":"%s"}' "$(register "${1//-/_}")"; } ;;
+        battle) # a challenge to another opponent each time
+            collection=/api/v1/battles
+            body() { printf '{"opponentId":"%s","primaryTamagotchiId":"33333333-3333-4333-8333-333333333333"}' \
+                "$(printf '%s' "$1" | cut -c1 | tr 'ab' '45')0000000-0000-4000-8000-000000000000"; } ;;
     esac
     count() { call GET "$collection" | python3 -c 'import json, sys; status, _, body = sys.stdin.read().partition(" "); print(len(json.loads(body)["items"]) if status == "200" else "status " + status)'; }
 
@@ -129,8 +158,8 @@ except urllib.error.HTTPError as error: print(error.code, error.read().decode())
     echo "readiness after failover (GET /api/v1/status x3):$probes"
     sleep 1
     echo "new writer $svc-db-1: $(query "$svc-db-1" "SELECT count(*) FROM $table") rows; following standby $svc-db-2: $(query "$svc-db-2" "SELECT count(*) FROM $table") rows"
-    # Package Registry and Guild publish events through the Broker, which this check does not start:
-    # their event.publish_failed lines are expected here and are not database errors.
+    # Services that publish events through the Broker, which this check does not start, log
+    # event.publish_failed here; those lines are expected and are not database errors.
     echo "service error lines: $(docker logs "$app" 2>&1 | grep -E '"level": ?"(ERROR|error)"' |
         grep -c -v -E '"event": ?"event.publish_failed"' || :)"
     # Background work (e.g. an outbox poll) may log errors while no primary exists; after it, none should.
@@ -138,6 +167,6 @@ except urllib.error.HTTPError as error: print(error.code, error.read().decode())
         grep -E '"level": ?"(ERROR|error)"' | grep -c -v -E '"event": ?"event.publish_failed"' || :)"
 }
 
-for svc in "${@:-tamagotchi notification package-registry guild}"; do
+for svc in "${@:-tamagotchi notification package-registry guild user-management battle}"; do
     for one in $svc; do check "$one"; done
 done
