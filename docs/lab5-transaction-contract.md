@@ -1,7 +1,7 @@
 # Lab 5: distributed transaction contract (two-phase commit)
 
-Status: **proposed** for CPR #196. The participants' owners (@vladas9, @CyberMoonie, @Nickseen) and the
-scenario owner (@gabimiric) review it before the dependent implementations merge. #197 replaces the
+Status: merged with CPR #206 for #196. The participants' owners (@vladas9, @CyberMoonie, @Nickseen) and the
+scenario owner (@gabimiric) raise problems on #196 before their implementation merges. #197 replaces the
 two phases with Saga steps and keeps everything marked *kept by Saga* below.
 
 Two business operations change several databases at once. Until Lab 4 each consumer applied its part of
@@ -126,7 +126,9 @@ The three POSTs carry the same body, so every phase can be repeated on its own:
 ```
 
 `final` and `reason` are sent with `rollback` only. `final: true` ends the transaction; `false` means
-another attempt follows. Headers: `X-Service-Token`, `X-Correlation-Id` (the start request's) and
+another attempt follows. A rollback from the recovery scan may belong to a transaction the coordinator does
+not know: then `operation`, `operationVersion`, `businessKey` and `payload` are `null` and `reason` is
+`UNKNOWN_TRANSACTION`. Headers: `X-Service-Token`, `X-Correlation-Id` (the start request's) and
 `X-Broker-Attempt` (the number of this send).
 
 | Phase | `200` answer | Meaning |
@@ -140,7 +142,9 @@ another attempt follows. Headers: `X-Service-Token`, `X-Correlation-Id` (the sta
 **Anything else is no answer, never a vote**: the coordinator sends the phase again. So an unreachable
 replica, an old release without the route (`404`), a full task limit (`429`) or a wrong token (`401`)
 delays a settlement and never loses it. A branch that waits longer than its lock timeout answers
-`429 TRANSACTION_BUSY` with `Retry-After: 1`, which the circuit breakers do not count.
+`429 TRANSACTION_BUSY` with `Retry-After: 1`. Phases bypass the circuit breakers and are not reported to
+Service Discovery: they are idempotent and repeated without end, so counting them would remove every replica
+of a service whose database is failing over. Each send goes to another replica than the one that just failed.
 
 ## What a participant does in PostgreSQL
 
@@ -151,8 +155,8 @@ CREATE TABLE transaction_branches (
     transaction_id UUID        NOT NULL,
     attempt        INTEGER     NOT NULL,
     outcome        TEXT        NOT NULL CHECK (outcome IN ('committed', 'rolled_back')),
-    operation      TEXT        NOT NULL,
-    business_key   UUID        NOT NULL,
+    operation      TEXT,  -- null only for the rollback of a transaction the coordinator does not know
+    business_key   UUID,  -- likewise
     effect         JSONB       NOT NULL DEFAULT '{}',  -- what was really applied, e.g. the clamped debit
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (transaction_id, attempt)
@@ -258,29 +262,32 @@ The reward rules stay those of Lab 4; only their application becomes atomic.
 
 1. **Voting.** All participants are asked at once and may be asked again until `TX_PREPARE_TIMEOUT_MS`.
 2. **Decision.** All voted yes → commit. Any reject → rollback, final. Votes missing at the timeout →
-   rollback of this attempt, not final, then a new attempt after a backoff (1 s doubling to 30 s).
+   rollback of this attempt, not final (`VOTE_MISSING: <services>`), then a new attempt after a backoff (1 s
+   doubling to 30 s).
 3. **Durable point.** The commit decision is journaled and synced **before** the first commit is sent. A
    transaction without a journaled commit decision is aborted (presumed abort).
 4. **Commit order.** The initiator commits last, when all others have confirmed. Its outbox event is
    therefore published only after every reward is in place.
 5. **No giving up.** Commit and rollback are repeated until every participant confirmed, with a backoff
    of 1 s doubling to 30 s, also across Broker restarts. No phase counts as delivered without its `200`.
-6. **Restart.** `committing` and `rolling_back` continue; `preparing` rolls its attempt back and starts the
-   next one.
-7. **Recovery scan.** At start and every `TX_RECOVERY_INTERVAL_MS` the coordinator reads each
-   participant's `/prepared` list. A branch whose attempt was decided to commit gets `commit`, also after
-   the transaction finished; one whose attempt is still voting is left alone; any other gets `rollback`. This resolves branches that reappear on a promoted database.
+6. **Restart.** `committing` and `rolling_back` continue; `preparing` rolls its attempt back
+   (`COORDINATOR_RESTARTED`) and starts the next one.
+7. **Recovery scan.** Every `TX_RECOVERY_INTERVAL_MS` the coordinator reads each participant's `/prepared`
+   list. A branch whose attempt was decided to commit gets `commit`, also after the transaction finished; one
+   that is still voting, or whose decision its participant has not confirmed yet, is left to the
+   transaction itself; any other gets `rollback`. This resolves branches that reappear on a promoted database.
 
 | Broker setting | Default | |
 | --- | --- | --- |
 | `TX_PREPARE_TIMEOUT_MS` | 10000 | Voting window of one attempt |
+| `TX_RETRY_BACKOFF_MS` | 1000 | First delay before a phase or an attempt is repeated; doubles up to 30 s |
 | `TX_MAX_ACTIVE` | 32 | Transactions in progress at once; the rest wait in the journal |
 | `TX_RECOVERY_INTERVAL_MS` | 30000 | |
 | `TX_RETENTION_HOURS` | 168 | How long finished transactions stay readable |
 | `TX_PAUSE_POINT`, `TX_PAUSE_MS` | `none`, 0 | Rehearsals only: `before-decision` or `after-decision` holds the coordinator there, to kill it at a known moment |
 
 Metrics: `broker_transactions_total{operation,outcome}`, `broker_transactions_active{status}`,
-`broker_transaction_duration_seconds{operation}`. Logs: `transaction.started`, `.voted`, `.decided`,
+`broker_transaction_duration_seconds{operation}`, `broker_transaction_phases_total{service,phase,outcome}`. Logs: `transaction.started`, `.voted`, `.decided`,
 `.completed`, `.retrying`, `.recovered`, with `transactionId`, `businessKey` and `attempt`.
 
 ## Database replication and promotion
