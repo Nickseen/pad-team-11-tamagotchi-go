@@ -1,0 +1,2 @@
+# Mounted into a Linux container (the etl job): keep LF on every checkout.
+* text eol=lf
