@@ -2,7 +2,8 @@
 # Repeatable ETL check (#194) on a disposable Compose project: only the Warehouse and the etl job run,
 # with generated exports that follow the #194 CSV contract. It checks the first load, a repeated run, a
 # new and a changed record, an interrupted load and its repetition, rejected input (bad value, duplicate
-# ID, wrong header), a header-only export, and runs the README's example queries. Removed at exit.
+# ID, wrong header, a date or time that does not exist), a header-only export, and runs the README's
+# example queries. Removed at exit.
 #   bash scripts/etl/check-etl.sh
 set -euo pipefail
 
@@ -64,6 +65,10 @@ etl
 printf '%s\n' "raidId,result,endedAt" "$r1,defeated,2026-11-24T15:30:00.000Z" > "$ETL_INPUT_DIR/raid.csv"
 etl
 battle "$b2,timeout,2026-11-25 00:10:00"
+etl
+battle "$b2,timeout,2026-02-30T00:10:00.000Z"
+etl
+raid "$r2,expired,2026-11-25T24:00:00.000Z"
 etl
 echo "   $(facts)"
 

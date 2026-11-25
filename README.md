@@ -2210,8 +2210,9 @@ lowercase UUIDs, RFC 3339 UTC timestamps with milliseconds):
 
 **Transform.** The header must match exactly. Every row is checked before anything is written: a
 missing field, a value outside the contract (`knockout`, `forfeit`, `timeout`; `defeated`, `expired`,
-`cancelled`), an ID that is not a lowercase UUID, a timestamp that is not UTC with milliseconds, or an ID
-that appears twice rejects the whole export, and the job reports the first offending data rows.
+`cancelled`), an ID that is not a lowercase UUID, a timestamp that is not UTC with milliseconds or names a
+date or time that does not exist (`2026-02-30`, `24:00`), or an ID that appears twice rejects the whole
+export, and the job reports the first offending data rows.
 Timestamps are stored as `timestamptz` and the UTC calendar day is derived from them.
 
 **Repeatable load.** Each source loads in one transaction, serialized by an advisory lock. A record is
@@ -2239,8 +2240,8 @@ SELECT run_id, source, rows_read, rows_inserted, rows_updated, rows_unchanged FR
 project with generated exports and removes them at the end. Result: the #194 samples loaded one row each;
 the same exports again inserted and updated nothing; a new record per source was inserted and a changed
 battle outcome updated; a load killed before its commit left the Warehouse unchanged and the repeated run
-loaded the new raid; an invalid ID, a duplicate ID, a wrong header and a non-UTC timestamp were each
-rejected without changing anything; header-only exports read zero rows.
+loaded the new raid; an invalid ID, a duplicate ID, a wrong header, a non-UTC timestamp, 30 February and
+24:00 were each rejected without changing anything; header-only exports read zero rows.
 
 ### Data and volumes
 
