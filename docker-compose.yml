@@ -87,7 +87,8 @@ x-user-management-env: &user-management-env
   # bcrypt costs ~200 ms of CPU per login: admit no more than the 10-connection database pool, so excess
   # logins get 429 instead of queueing past TASK_TIMEOUT_MS (contract: overload, timeouts and the last replica).
   MAX_CONCURRENT_TASKS: 10
-  DATABASE_URL: postgres://usermgmt:${USERMGMT_DB_PASSWORD}@user-management-db:5432/usermgmt?sslmode=disable
+  # The primary and both standbys; pgx connects to whichever accepts writes (#193).
+  DATABASE_URL: postgres://usermgmt:${USERMGMT_DB_PASSWORD}@user-management-db:5432,user-management-db-1:5432,user-management-db-2:5432/usermgmt?sslmode=disable&target_session_attrs=read-write&connect_timeout=2
   JWT_ISSUER: user-management
   JWT_AUDIENCE: tamagotchi-go
   JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-signing-key.pem # one key for every replica
@@ -100,6 +101,12 @@ x-user-management: &user-management
       condition: service_healthy
     user-management-db:
       condition: service_healthy
+    user-management-db-1:
+      condition: service_healthy
+      required: false
+    user-management-db-2:
+      condition: service_healthy
+      required: false
   secrets:
     - source: jwt-signing-key
       target: jwt-signing-key.pem
@@ -156,7 +163,8 @@ x-package-registry: &package-registry
 x-battle-env: &battle-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 50
-  DATABASE_URL: postgres://battle:${BATTLE_DB_PASSWORD}@battle-db:5432/battle?sslmode=disable
+  # The primary and both standbys; pgx connects to whichever accepts writes (#193).
+  DATABASE_URL: postgres://battle:${BATTLE_DB_PASSWORD}@battle-db:5432,battle-db-1:5432,battle-db-2:5432/battle?sslmode=disable&target_session_attrs=read-write&connect_timeout=2
   # live calls Tamagotchi and Package Registry through the Broker's HTTP queues and User Management
   # over gRPC through the Broker (BROKER_URL and BROKER_GRPC_ADDR above); Battle 4.x reads no GATEWAY_URL.
   DEPENDENCY_MODE: ${BATTLE_DEPENDENCY_MODE:-live}
@@ -169,6 +177,12 @@ x-battle: &battle
       condition: service_healthy
     battle-db:
       condition: service_healthy
+    battle-db-1:
+      condition: service_healthy
+      required: false
+    battle-db-2:
+      condition: service_healthy
+      required: false
 
 x-map-env: &map-env
   <<: *gateway-context
@@ -356,6 +370,38 @@ x-guild-standby: &guild-standby
     guild-replication-init:
       condition: service_completed_successfully
 
+x-user-management-db-env: &user-management-db-env
+  POSTGRES_DB: usermgmt
+  POSTGRES_USER: usermgmt
+  POSTGRES_PASSWORD: ${USERMGMT_DB_PASSWORD:?set USERMGMT_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${USERMGMT_REPLICATION_PASSWORD:?set USERMGMT_REPLICATION_PASSWORD in .env}
+
+x-user-management-standby: &user-management-standby
+  <<: *postgres-node
+  environment:
+    <<: *user-management-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: user-management-db
+  depends_on:
+    user-management-replication-init:
+      condition: service_completed_successfully
+
+x-battle-db-env: &battle-db-env
+  POSTGRES_DB: battle
+  POSTGRES_USER: battle
+  POSTGRES_PASSWORD: ${BATTLE_DB_PASSWORD:?set BATTLE_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${BATTLE_REPLICATION_PASSWORD:?set BATTLE_REPLICATION_PASSWORD in .env}
+
+x-battle-standby: &battle-standby
+  <<: *postgres-node
+  environment:
+    <<: *battle-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: battle-db
+  depends_on:
+    battle-replication-init:
+      condition: service_completed_successfully
+
 x-raid-standby: &raid-standby
   <<: *postgres-node
   environment:
@@ -471,16 +517,43 @@ services:
 
   # --- User Management ------------------------------------------------------------------------------
   user-management-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: user-management-db
     environment:
-      POSTGRES_DB: usermgmt
-      POSTGRES_USER: usermgmt
-      POSTGRES_PASSWORD: ${USERMGMT_DB_PASSWORD:?set USERMGMT_DB_PASSWORD in .env}
+      <<: *user-management-db-env
+      PGDATA: ${USERMGMT_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${USERMGMT_POSTGRES_UPSTREAM:-}
     volumes:
-      - usermgmt-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U usermgmt -d usermgmt"]
+      - ./scripts/ha:/ha:ro
+      - ${USERMGMT_POSTGRES_VOLUME:-usermgmt-data}:/var/lib/postgresql/data
+
+  user-management-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *user-management-db-env
+      PGHOST: user-management-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      user-management-db:
+        condition: service_healthy
+
+  user-management-db-1:
+    <<: *user-management-standby
+    hostname: user-management-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - usermgmt-db-1-data:/var/lib/postgresql/data
+
+  user-management-db-2:
+    <<: *user-management-standby
+    hostname: user-management-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - usermgmt-db-2-data:/var/lib/postgresql/data
 
   # Every replica signs access tokens with the same mounted key, so a token from one validates
   # against the key set any other publishes.
@@ -605,16 +678,43 @@ services:
 
   # --- Battle ---------------------------------------------------------------------------------------
   battle-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: battle-db
     environment:
-      POSTGRES_DB: battle
-      POSTGRES_USER: battle
-      POSTGRES_PASSWORD: ${BATTLE_DB_PASSWORD:?set BATTLE_DB_PASSWORD in .env}
+      <<: *battle-db-env
+      PGDATA: ${BATTLE_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${BATTLE_POSTGRES_UPSTREAM:-}
     volumes:
-      - battle-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U battle -d battle"]
+      - ./scripts/ha:/ha:ro
+      - ${BATTLE_POSTGRES_VOLUME:-battle-data}:/var/lib/postgresql/data
+
+  battle-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *battle-db-env
+      PGHOST: battle-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      battle-db:
+        condition: service_healthy
+
+  battle-db-1:
+    <<: *battle-standby
+    hostname: battle-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - battle-db-1-data:/var/lib/postgresql/data
+
+  battle-db-2:
+    <<: *battle-standby
+    hostname: battle-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - battle-db-2-data:/var/lib/postgresql/data
 
   # One block runs every Battle replica (deploy.replicas, the default 2 or BATTLE_REPLICAS), as
   # for User Management above: pad-team-11-tamagotchi-go-battle-<n>, up to five.
@@ -1048,11 +1148,17 @@ volumes:
   registry-db-2-data:
   guild-db-1-data:
   guild-db-2-data:
+  usermgmt-db-1-data:
+  usermgmt-db-2-data:
+  battle-db-1-data:
+  battle-db-2-data:
   tamagotchi-rejoined-data:
   notification-rejoined-data:
   raid-rejoined-data:
   registry-rejoined-data:
   guild-rejoined-data:
+  usermgmt-rejoined-data:
+  battle-rejoined-data:
   raid-redis-data:
   broker-data: # the Broker's durable topic queues and dead letters
   warehouse-data: # the Data Warehouse (#194)
