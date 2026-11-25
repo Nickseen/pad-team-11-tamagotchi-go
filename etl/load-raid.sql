@@ -15,6 +15,18 @@ CREATE TEMP TABLE stage (
 ) ON COMMIT DROP;
 \copy stage (raid_id, status, ended_at) FROM pstdin WITH (FORMAT csv, HEADER true)
 
+-- A real UTC instant: the contract's format, and a date and time that exist (no 2026-02-30, no 24:00).
+CREATE FUNCTION pg_temp.is_utc_millis(value text) RETURNS boolean LANGUAGE plpgsql AS $f$
+BEGIN
+    IF value IS NULL OR value !~ '^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}Z$' THEN
+        RETURN false;
+    END IF;
+    PERFORM value::timestamptz;
+    RETURN true;
+EXCEPTION WHEN datetime_field_overflow OR invalid_datetime_format THEN
+    RETURN false;
+END $f$;
+
 -- Every field is required and must follow the #194 CSV contract; the first offending rows are reported.
 DO $$
 DECLARE problems text;
@@ -26,8 +38,8 @@ BEGIN
                 THEN format('raidId %L is not a lowercase UUID', raid_id)
             WHEN status IS NULL OR status NOT IN ('defeated', 'expired', 'cancelled')
                 THEN format('status %L is not defeated, expired or cancelled', status)
-            WHEN ended_at IS NULL OR ended_at !~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$'
-                THEN format('endedAt %L is not an RFC 3339 UTC timestamp with milliseconds', ended_at)
+            WHEN NOT pg_temp.is_utc_millis(ended_at)
+                THEN format('endedAt %L is not a valid RFC 3339 UTC timestamp with milliseconds', ended_at)
             WHEN count(*) OVER (PARTITION BY raid_id) > 1
                 THEN format('raidId %s appears more than once', raid_id)
         END AS reason
