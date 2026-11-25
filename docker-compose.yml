@@ -724,6 +724,43 @@ services:
     ports:
       - "38088:8088" # this replica's direct WebSocket origin
 
+  # --- Data Warehouse and ETL (Lab 5 Grade 4, #194) ------------------------------------------------
+  # An analytical PostgreSQL fed only from the services' own CSV exports (scripts/etl/extract.sh), never
+  # by a domain service. The etl job applies warehouse/migrations and loads the exports, then exits:
+  #   docker compose run --rm etl
+  warehouse-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD:?set WAREHOUSE_DB_PASSWORD in .env}
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+    healthcheck:
+      <<: *postgres-healthcheck
+      test: ["CMD-SHELL", "pg_isready -U warehouse -d warehouse"]
+
+  etl:
+    image: postgres:17-alpine # psql only; the job needs no image of its own
+    profiles: [etl] # a job: not started by `up`, run on demand
+    restart: "no"
+    entrypoint: ["/bin/sh", "/etl/load.sh"]
+    environment:
+      PGHOST: warehouse-db
+      PGUSER: warehouse
+      PGDATABASE: warehouse
+      PGOPTIONS: -c client_min_messages=warning
+      PGPASSWORD: ${WAREHOUSE_DB_PASSWORD:?set WAREHOUSE_DB_PASSWORD in .env}
+      ETL_REQUIRE_ALL: ${ETL_REQUIRE_ALL:-0}
+      ETL_PAUSE_BEFORE_COMMIT: ${ETL_PAUSE_BEFORE_COMMIT:-0}
+    volumes:
+      - ./etl:/etl:ro
+      - ./warehouse/migrations:/migrations:ro
+      - ${ETL_INPUT_DIR:-./etl/input}:/input:ro
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
+
   # --- Monitoring (Lab 4 Grade 10, #154) -------------------------------------------------------------
   # Prometheus scrapes every /metrics; Alloy ships every container's JSON logs to Loki; Grafana shows
   # both. Only Grafana (and Prometheus, for ad-hoc queries) are published, on loopback.
@@ -806,6 +843,7 @@ volumes:
   raid-rejoined-data:
   raid-redis-data:
   broker-data: # the Broker's durable topic queues and dead letters
+  warehouse-data: # the Data Warehouse (#194)
   prometheus-data:
   loki-data:
   grafana-data:
