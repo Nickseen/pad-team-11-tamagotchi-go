@@ -40,7 +40,13 @@ if [ -n "${PG_REPLICA_SOURCE:-}" ]; then
     fi
 fi
 
+# Two-phase commit (docs/lab5-transaction-contract.md): prepared transactions are replicated, so a standby
+# needs at least the primary's limit. Ordinary commits stay asynchronous (synchronous_commit=local); a
+# transaction that sets synchronous_commit=on returns only after one standby has flushed it.
 exec docker-entrypoint.sh postgres \
     -c hba_file=/ha/postgres-hba.conf \
+    -c max_prepared_transactions=64 \
+    -c synchronous_commit=local \
+    -c synchronous_standby_names='ANY 1 (*)' \
     -c wal_keep_size=128MB \
     -c wal_level=replica
