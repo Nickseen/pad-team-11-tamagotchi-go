@@ -1002,6 +1002,23 @@ The ring is fixed: `flame → nature → earth → electric → water → shadow
 `1.5` when the attacker is strong against the defender, `0.75` when weak, and `1.0` otherwise.
 Battle and Monster Raid read this instead of hard-coding the table, so the ring has one owner.
 
+##### Distributed transactions (Lab 5, Tamagotchi 5.1.0)
+
+The Message Broker calls these as the coordinator of `battle.settlement` and `raid.payout`; the
+[transaction contract](docs/lab5-transaction-contract.md) defines the bodies and the votes.
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/internal/transactions/{transactionId}/prepare` | service | `transactionId`, `attempt`, `operation`, `operationVersion`, `businessKey`, `payload` (that of `battle.finished` or `raid.monster_defeated`) | `200` → `{ "vote": "commit" \| "already_applied" \| "reject", "code"?, "message"? }`; `409 TRANSACTION_ABORTED`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/commit` | service | as `prepare` | `200` → `{ "status": "committed" }`; `409 COMMIT_REJECTED` |
+| `POST /api/v1/internal/transactions/{transactionId}/rollback` | service | as `prepare`, plus `final` boolean and `reason` string; `operation`, `businessKey` and `payload` may be `null` | `200` → `{ "status": "rolled_back" }`; `409 TRANSACTION_ALREADY_COMMITTED` |
+| `GET /api/v1/internal/transactions/prepared` | service | — | `200` → `{ "items": [{ "transactionId": UUID, "attempt": integer, "preparedAt": Timestamp }] }` |
+
+Tamagotchi rejects a battle settlement with `TAMAGOTCHI_NOT_FOUND` when the staked creature is gone
+and `TAMAGOTCHI_NOT_OWNED` when the loser no longer owns it; XP for a creature that is gone is
+skipped. The branch records the transfer and every XP grant it applied, for a later compensation.
+A transaction and the matching event share one business key, so a battle or raid is settled once.
+
 #### 3. Package Registry Service — `http://package-registry:8083`
 
 **`Package`**
@@ -1911,7 +1928,7 @@ Every component below selects 4.x; updating references does not complete the sha
 | Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/45787275546)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals of queues, dead letters and transactions in the `broker-data` volume | `05817c5` |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43432132987)) | — (internal 8090) | In-memory registry | `2294a0a` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `5.1.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/45790834060)) | — | PostgreSQL primary + 2 standbys | `0b6bb16` |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/runs/45486692839)) | — | PostgreSQL primary + 2 standbys | `eda7e3e` |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `5.1.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/runs/45866310859)) | — | PostgreSQL primary + 2 standbys | `e54879f` |
 | Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/runs/45638217264)) | — | PostgreSQL primary + 2 standbys | `3caf86e` |
 | Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/45684120073)) | — | PostgreSQL primary + 2 standbys | `f9012fd` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/43310895212)) | 18085, 28085, 38085 (WebSocket) | Redis | `3ca778c` |
