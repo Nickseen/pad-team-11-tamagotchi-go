@@ -157,7 +157,7 @@ CREATE TABLE transaction_branches (
     outcome        TEXT        NOT NULL CHECK (outcome IN ('committed', 'rolled_back')),
     operation      TEXT,  -- null only for the rollback of a transaction the coordinator does not know
     business_key   UUID,  -- likewise
-    effect         JSONB       NOT NULL DEFAULT '{}',  -- what was really applied, e.g. the clamped debit
+    effect         JSONB       NOT NULL DEFAULT '{}',  -- what was really applied, see the Saga contract
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (transaction_id, attempt)
 );
@@ -180,7 +180,8 @@ CREATE TABLE transaction_branches (
    PREPARE TRANSACTION 'tg:<transactionId>:<attempt>';
    ```
 
-   The row says `committed` because nobody can see it unless the branch commits.
+   The row says `committed` because nobody can see it unless the branch commits. `effect` holds what the Saga
+   needs to undo it; [its contract](lab5-saga-contract.md#effect-and-compensation-per-participant) lists the fields.
 3. Answer `commit` only after `PREPARE TRANSACTION` returned.
 
 | Found on the way | Action |
@@ -247,9 +248,11 @@ The reward rules stay those of Lab 4; only their application becomes atomic.
 | --- | --- | --- |
 | User Management | `battle.settlement`: `currency.winnerDelta` and `currency.loserDelta`; `raid.payout`: each `globalCurrency`. A debit stops at 0, as today, and `effect` records the applied amount | `USER_NOT_FOUND`: no account with that ID. A deleted account still has one |
 | Tamagotchi | `battle.settlement`: transfers `transferredTamagotchiId` to the winner, creates the winner's secondary reference, grants both XP shares; `raid.payout`: each `xp` | `TAMAGOTCHI_NOT_FOUND`: the transferred creature is gone; `TAMAGOTCHI_NOT_OWNED`: the loser no longer owns it, e.g. after losing it in another battle. **New**: the transfer expects the loser as the owner. Until now the consumer skipped an unknown creature and transferred from any owner. XP for a creature that is gone is still skipped |
-| Battle | `settlementStatus` `pending` → `settled`; stores `battle.finished` in its outbox | `BATTLE_NOT_DECIDED`: unknown or undecided battle |
-| Monster Raid | The same for the raid's payout; stores `raid.monster_defeated` in its outbox | `RAID_NOT_DEFEATED`: unknown raid or one that was not defeated |
+| Battle | `settlementStatus` `pending` → `settled`; stores `battle.finished` in its outbox | `BATTLE_NOT_DECIDED`: unknown or undecided battle; `SETTLEMENT_MISMATCH`: a `transactionId` other than the one it stored with the start request, or a payload other than the stored result |
+| Monster Raid | The same for the raid's payout; stores `raid.monster_defeated` in its outbox | `RAID_NOT_DEFEATED`: unknown raid or one that was not defeated; `SETTLEMENT_MISMATCH` as for Battle |
 
+- The initiator stores the `transactionId` of its start request with the battle or raid. A final rollback marks the
+  settlement `failed` only for that ID, so a wrong request for a real battle or raid cannot spoil its settlement.
 - The match or the raid itself is decided by its owner before the transaction and stays decided. A rejected
   settlement means that **nobody** receives a reward and no creature changes hands.
 - `Battle` gains `settlementStatus`: `null` until decided, then `pending`, `settled` or `failed`. Monster
