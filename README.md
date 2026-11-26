@@ -1924,7 +1924,7 @@ Every component below selects 4.x; updating references does not complete the sha
 
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
-| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/43326608468)) | 8080 | — | `aa7b0b9` |
+| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/45868754336)) | 8080 | Shared cache in `cache-1..3` (Redis, memory only) | `6af5740` |
 | Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/45787275546)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals of queues, dead letters and transactions in the `broker-data` volume | `05817c5` |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43432132987)) | — (internal 8090) | In-memory registry | `2294a0a` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `5.1.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/45790834060)) | — | PostgreSQL primary + 2 standbys | `0b6bb16` |
@@ -2378,6 +2378,34 @@ battle outcome updated; a load killed before its commit left the Warehouse uncha
 loaded the new raid; an invalid ID, a duplicate ID, a wrong header, a non-UTC timestamp, 30 February and
 24:00 were each rejected without changing anything; header-only exports read zero rows.
 
+### Gateway cache
+
+Lab 5 Grades 6–7 (#195). The Gateway caches frequently read GET answers and User Management's key set in three
+Redis nodes, `cache-1` to `cache-3`, and chooses a key's node by consistent hashing. The nodes keep data in
+memory only (no snapshots, no AOF), evict least recently used keys at 64 MB, and require `CACHE_PASSWORD` from
+`.env`; they have no host port. The Gateway's [README, "Shared cache"](services/gateway/README.md#shared-cache)
+documents the cached routes, keys, TTL, invalidation, access rules and failure behaviour.
+
+Request path: client → Gateway (token validated, request classified) → the key's cache node, chosen on the hash
+ring → `X-Cache: HIT` answered from the cache, or `MISS`: Broker → service, answer stored on that node. A write
+through the Gateway to a cached family (Package Registry packages, monsters, raid definitions) gives every node
+a new generation for it. With a node down its keys answer `X-Cache: BYPASS` from the service, and the other
+nodes keep serving theirs.
+
+Reproduce:
+
+```sh
+npx newman run postman/gateway-cache.postman_collection.json \
+  -e postman/tamagotchi-go.postman_environment.json      # miss/hit, users, token, invalidation, query order
+docker compose stop cache-2                              # its keys: X-Cache: BYPASS, the others still HIT
+docker compose start cache-2
+(cd services/gateway && npm ci && npm run ring-report)   # key distribution and keys moved on add/remove
+```
+
+The ring report for 100000 keys over three nodes: 36.4% / 31.0% / 32.6% of the keys per node; adding a fourth
+node moves 26.4% of them, all to the new node (`hash % N`: 75.0%); removing one moves only its 31.0% (`hash %
+N`: 66.4%).
+
 ### Data and volumes
 
 Every durable store keeps its data in a named volume, so `docker compose down` followed by `up`
@@ -2449,6 +2477,7 @@ secrets.
 | Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
 | Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history; `guild.*` events reaching the Broker and `user.deleted` removing a member |
 | Monster Raid | `monster-raid.postman_collection.json` | `raid.feed` ticket negotiation with the participant check; admin requests skipped without `adminToken` |
+| Gateway cache | `gateway-cache.postman_collection.json` | Lab 5 #195: the shared cache through the Gateway: `X-Cache` miss then hit, another user and no token never served a cached answer, a write invalidating, query order, the public combat types shared, an uncached route |
 | Gateway | `gateway-logs.postman_collection.json` | Lab 4 #155: `GET /api/v1/gateway/logs` downloads the system logs as NDJSON (last 15 minutes); set `adminToken` (and optionally `userToken` for the `403` case) |
 | Message Broker | `message-broker.postman_collection.json` | Called directly at `{{brokerUrl}}`: status and metrics; request queues to Battle and Tamagotchi; publishing `user.deleted`; the topic list; a dead letter created, listed and replayed; `400`, `401` and `404` answers |
 
@@ -2476,7 +2505,7 @@ Install Newman or run it through `npx`. Pass the shared environment and supply t
 at runtime so it does not need to be written to the JSON file:
 
 ```sh
-for service in user-management tamagotchi package-registry battle map notification guild monster-raid message-broker; do
+for service in user-management tamagotchi package-registry battle map notification guild monster-raid message-broker gateway-cache; do
   npx newman run "postman/$service.postman_collection.json" \
     -e postman/tamagotchi-go.postman_environment.json \
     --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"

@@ -293,6 +293,16 @@ x-monster-raid: &monster-raid
     monster-raid-redis:
       condition: service_healthy
 
+# The Gateway's shared cache (Lab 5, #195): Redis nodes the Gateway shards keys over by consistent hashing.
+# In memory only (no RDB snapshots, no AOF): every entry is a copy the services can rebuild, so a restarted node
+# starts empty. When a node is full it evicts the least recently used keys.
+x-cache-node: &cache-node
+  <<: *redis
+  command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb",
+    "--maxmemory-policy", "allkeys-lru", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD in .env}"]
+  environment:
+    REDISCLI_AUTH: ${CACHE_PASSWORD}
+
 x-postgres-node: &postgres-node
   <<: *postgres
   entrypoint: ["/bin/sh", "/ha/postgres-start.sh"]
@@ -494,13 +504,23 @@ services:
 
   # --- API Gateway ----------------------------------------------------------------------------------
   gateway:
-    image: nickseen/tamagotchi-gateway:4.0.1 # Broker queues, gRPC ticket checks and system logs
+    image: nickseen/tamagotchi-gateway:5.0.0 # Broker queues, gRPC ticket checks, system logs and the shared cache
     restart: unless-stopped
     depends_on:
       service-discovery:
         condition: service_healthy
       message-broker:
         condition: service_healthy
+      # The cache is optional for the Gateway: a node that is down is bypassed, so it does not wait for them.
+      cache-1:
+        condition: service_started
+        required: false
+      cache-2:
+        condition: service_started
+        required: false
+      cache-3:
+        condition: service_started
+        required: false
     environment:
       # Lab 4: Gateway forwards client traffic to the Broker's request queues (#153).
       BROKER_URL: http://message-broker:8091
@@ -513,8 +533,18 @@ services:
       # Above the services' 3000 ms, so their 503 TASK_TIMEOUT arrives before the Gateway's 504.
       REQUEST_TIMEOUT_MS: 5000
       MAX_IN_FLIGHT_REQUESTS: 100
+      # Lab 5: GET answers and User Management's key set in the shared cache, sharded over these nodes (#195).
+      CACHE_NODES: cache-1:6379,cache-2:6379,cache-3:6379
+      CACHE_PASSWORD: ${CACHE_PASSWORD:?set CACHE_PASSWORD in .env}
     ports:
       - "8080:8080"
+
+  cache-1:
+    <<: *cache-node
+  cache-2:
+    <<: *cache-node
+  cache-3:
+    <<: *cache-node
 
   # --- User Management ------------------------------------------------------------------------------
   user-management-db:
