@@ -187,6 +187,11 @@ the earlier services use, and owned by Vlad (`@vladas9`). Its protocol is define
 - **Distributed transactions** (Lab 5, since 5.0.0): the Broker coordinates the two-phase commit that
   settles a decided battle or pays a defeated raid in every participating service or in none, as the
   [transaction contract](docs/lab5-transaction-contract.md) defines.
+- **Transaction API** (service token): `POST /api/v1/transactions` with `transactionId`, `operation`,
+  `operationVersion`, `businessKey`, `correlationId` and `payload` → `202` stored, `200` already known,
+  `400 VALIDATION_FAILED`, `409 TRANSACTION_CONFLICT`; `GET /api/v1/transactions/{id}` →
+  `{ transactionId, operation, businessKey, status, attempt, decision, reason, participants[] }` or
+  `404 TRANSACTION_NOT_FOUND`; `GET /api/v1/transactions?operation=&businessKey=&status=&offset=&limit=`.
 - **Inspection** on `127.0.0.1:8091` with the service token: `GET /api/v1/topics`,
   `GET /api/v1/dead-letters`, `POST /api/v1/dead-letters/{id}/replay` and
   `GET /api/v1/transactions[/{id}]`; `GET /metrics` for Prometheus.
@@ -898,6 +903,22 @@ and safe to cache for 30 seconds.
 `delta` is signed. A debit that would drive `globalCurrency` below zero is rejected with
 `409 INSUFFICIENT_FUNDS` and the balance is unchanged. The synchronous adjust route exists for
 flows that must fail fast — a shop purchase — while battle and raid rewards arrive as events.
+
+##### Distributed transactions (Lab 5, User Management 5.1.0)
+
+The Message Broker calls these as the coordinator of `battle.settlement` and `raid.payout`; the
+[transaction contract](docs/lab5-transaction-contract.md) defines the bodies and the votes.
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/internal/transactions/{transactionId}/prepare` | service | `transactionId`, `attempt`, `operation`, `operationVersion`, `businessKey`, `payload` (that of `battle.finished` or `raid.monster_defeated`) | `200` → `{ "vote": "commit" \| "already_applied" \| "reject", "code"? }`; `409 TRANSACTION_ABORTED`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/commit` | service | as `prepare` | `200` → `{ "status": "committed" }`; `409 COMMIT_REJECTED` |
+| `POST /api/v1/internal/transactions/{transactionId}/rollback` | service | as `prepare`, plus `final` boolean and `reason` string; `operation`, `businessKey` and `payload` may be `null` | `200` → `{ "status": "rolled_back" }`; `409 TRANSACTION_ALREADY_COMMITTED` |
+| `GET /api/v1/internal/transactions/prepared` | service | — | `200` → `{ "items": [{ "transactionId": UUID, "attempt": integer, "preparedAt": Timestamp }] }` |
+
+User Management rejects with `USER_NOT_FOUND`. A debit in a transaction stops at zero, as for events,
+and the applied amount is recorded for a later compensation. A transaction and the matching event
+share one ledger key, so a battle or raid is paid once.
 
 #### 2. Tamagotchi Service — `http://tamagotchi:8082`
 
