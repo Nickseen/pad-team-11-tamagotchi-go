@@ -1563,6 +1563,7 @@ sends a message.
 | `monsterName` | string | Denormalized for display only |
 | `maxHp` / `currentHp` | integer | `currentHp` never drops below 0 |
 | `status` | string | `active`, `defeated`, `expired` or `cancelled` |
+| `settlementStatus` | string \| null | `pending`, `settled` or `failed` for a defeated raid |
 | `participantCount` | integer | |
 | `startedAt` / `expiresAt` / `endedAt` | `Timestamp` \| null | `expiresAt` = `startedAt` + `durationSeconds` |
 
@@ -1622,10 +1623,22 @@ participation again at WebSocket upgrade time.
 ```
 
 The HP decrement is a single atomic Redis `DECRBY` clamped at zero, because an entire guild hits one
-counter concurrently. The result is appended to `damage_log` in PostgreSQL for durability, and the
-transition to `defeated` is applied exactly once with a conditional update — the first attack that
-drives HP to zero wins the transition and publishes the terminal event; every later attack receives
-`409 RAID_NOT_ACTIVE`. Rate limit: 10 attacks per second per participant.
+counter concurrently. PostgreSQL records the damage. The first attack that drives HP to zero
+records the defeat and a durable `raid.payout` request in the same PostgreSQL transaction.
+Subsequent new attacks receive `409 RAID_NOT_ACTIVE`. Repeating a recorded command returns its
+stored result. Rate limit: 10 attacks per second per participant.
+
+##### Two-phase payout
+
+Broker coordinates reward currency in User Management and XP in Tamagotchi. Raid's branch changes
+`settlementStatus` from `pending` to `settled` and saves `raid.monster_defeated` in the outbox.
+Broker commits that branch last, after confirming both other participants. A final rollback sets
+`settlementStatus` to `failed` while the raid stays defeated.
+
+The [2PC participant contract](docs/lab5-transaction-contract.md#participant-api) defines the
+authenticated `prepare`, `commit`, `rollback` and `prepared` routes. The branch ledger lives in
+`raid.transaction_branches`. Run the shared Raid scenarios with
+`python scripts/tx/check-2pc.py --scenario 3,4`.
 
 ##### WebSocket — `GET /api/v1/raids/{raidId}/feed`
 
@@ -1951,7 +1964,7 @@ Every component below selects 4.x; updating references does not complete the sha
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/43310895212)) | 18085, 28085, 38085 (WebSocket) | Redis | `3ca778c` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/runs/45486229438)) | — | PostgreSQL primary + 2 standbys | `2e69d4a` |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-guild/actions/runs/45638258625)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL primary + 2 standbys, and Redis | `0f6e68b` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/43295115421)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `ab479f6` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/45875656105)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `a69760e` |
 
 Every selected service image accepts the contract's `DISCOVERY_URL`, `INSTANCE_BASE_URL` and, for
 Map, Guild and Raid, `INSTANCE_WS_PUBLIC_URL`. Package Registry,

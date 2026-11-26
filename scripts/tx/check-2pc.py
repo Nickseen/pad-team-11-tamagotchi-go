@@ -63,11 +63,14 @@ class Run:
 
     # ------------------------------------------------------------------------------- observations
     def branches(self, participant: str, transaction_id: str) -> list[dict]:
+        table = "raid.transaction_branches" if participant == "monster-raid" else "transaction_branches"
         out = self.c.query(participant,
                            "SELECT coalesce(json_agg(json_build_object('attempt', attempt, 'outcome', outcome, "
-                           "'effect', effect) ORDER BY attempt), '[]') FROM transaction_branches "
+                           f"'effect', effect) ORDER BY attempt), '[]') FROM {table} "
                            f"WHERE transaction_id = '{transaction_id}'")
-        return json.loads(out) if out else []
+        if out is None:
+            raise StepFailed(f"could not read {table} for {participant}")
+        return json.loads(out)
 
     def in_doubt(self) -> dict[str, list[str]]:
         found = {}
@@ -225,7 +228,9 @@ class Run:
         res.check("nothing changes afterwards", "same snapshot",
                   "same snapshot" if Snapshot(self.b, [owner, member]).same(after) else "changed", None)
         for participant in PARTICIPANTS["raid.payout"]:
-            res.note(f"{participant} transaction_branches: {json.dumps(self.branches(participant, tx['transactionId']))}")
+            branches = self.branches(participant, tx["transactionId"])
+            res.note(f"{participant} transaction_branches: {json.dumps(branches)}")
+            res.check(f"{participant} branch", ["committed"], [branch["outcome"] for branch in branches])
         self.no_branch_in_doubt(res)
 
     def s4(self, res: Result) -> None:
