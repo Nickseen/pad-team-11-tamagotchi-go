@@ -1,18 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 2100" width="1560" height="2100" font-family="Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 2400" width="1560" height="2400" font-family="Segoe UI, Arial, sans-serif">
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4A4A58"/></marker>
 <marker id="arrowWs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1F6FB2"/></marker>
 <filter id="shadow" x="-10%" y="-10%" width="125%" height="125%"><feDropShadow dx="2.5" dy="2.5" stdDeviation="2.5" flood-color="#1A1A28" flood-opacity="0.16"/></filter>
 </defs>
-<rect width="1560" height="2100" fill="#FFFFFF"/>
-<text x="80" y="44" font-size="24" fill="#1E1E28" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Tamagotchi Go — Lab 4 Architecture</text>
-<text x="80" y="68" font-size="13" fill="#70707E" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">The API Gateway and the Message Broker in front of eight domain services, each run as replicas registered with Service Discovery. Each domain box lists the state that service exclusively owns.</text>
+<rect width="1560" height="2400" fill="#FFFFFF"/>
+<text x="80" y="44" font-size="24" fill="#1E1E28" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Tamagotchi Go — Lab 5 Architecture</text>
+<text x="80" y="68" font-size="13" fill="#70707E" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">The API Gateway with its sharded cache and the Message Broker in front of eight domain services. Each runs as replicas registered with Service Discovery and owns the replicated store shown in its box.</text>
 <path d="M 780 156 L 780 232" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
 <path d="M 560 124 L 24 124 L 24 1120 L 80 1120" fill="none" stroke="#1F6FB2" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#arrowWs)"/>
 <path d="M 24 1120 L 24 1440 L 80 1440" fill="none" stroke="#1F6FB2" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#arrowWs)"/>
 <path d="M 1000 124 L 1536 124 L 1536 1120 L 1480 1120" fill="none" stroke="#1F6FB2" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#arrowWs)"/>
 <path d="M 780 440 L 780 500" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<path d="M 1325 440 L 1325 500" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 1100 440 L 1100 470 L 1325 470 L 1325 500" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
 <path d="M 1130 600 L 1170 600" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
 <path d="M 290 700 L 290 760" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
 <path d="M 780 700 L 780 760" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
@@ -35,30 +35,31 @@
 <rect x="560" y="92" width="440" height="64" rx="6" fill="#FFFFFF" stroke="#4A4A58" stroke-width="1.5" filter="url(#shadow)"/>
 <text x="780" y="119" font-size="15" fill="#1E1E28" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700" text-anchor="middle">Client apps</text>
 <text x="780" y="139" font-size="11.8" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="middle">third-party Tamagotchi packages</text>
-<rect x="80" y="232" width="1400" height="208" rx="6" fill="#E3E8F2" stroke="#5A6C8F" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="80" y="232" width="1040" height="208" rx="6" fill="#E3E8F2" stroke="#5A6C8F" stroke-width="1.5" filter="url(#shadow)"/>
 <rect x="80" y="232" width="5" height="208" rx="2.5" fill="#5A6C8F"/>
 <text x="102" y="264" font-size="16.5" fill="#2E3D5C" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">API Gateway</text>
 <text x="216" y="264" font-size="12.5" fill="#4A5670" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">stateless · the single public HTTP entry point · owns no domain data</text>
 <text x="102" y="296" font-size="12.5" fill="#2E3D5C" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">REST routing</text>
-<text x="102" y="318" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• /&lt;slug&gt;/api/v1/… → the Broker's request queue of</text>
-<text x="102" y="334" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   that service, with X-Service-Token and X-Gateway-Token</text>
-<text x="102" y="350" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• any X-Service-Token or /api/v1/internal from a</text>
+<text x="102" y="318" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• /&lt;slug&gt;/api/v1/… → that service's Broker</text>
+<text x="102" y="334" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   queue, with X-Service-Token and X-Gateway-Token</text>
+<text x="102" y="350" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• X-Service-Token or /api/v1/internal from a</text>
 <text x="102" y="366" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   client → 403 INTERNAL_ROUTE_FORBIDDEN</text>
-<text x="572" y="296" font-size="12.5" fill="#2E3D5C" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Authentication and authorization</text>
-<text x="572" y="318" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• validates the Bearer access token against User</text>
-<text x="572" y="334" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   Management's keys, read through the Broker</text>
-<text x="572" y="350" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• removes Authorization: never forwarded downstream</text>
-<text x="572" y="366" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• adds X-Gateway-Token and X-Authenticated-*</text>
-<text x="1042" y="296" font-size="12.5" fill="#2E3D5C" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">WebSocket tickets, logs and limits</text>
-<text x="1042" y="318" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• POST /api/v1/gateway/websocket-tickets → a 60 s</text>
-<text x="1042" y="334" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   ticket and a ready replica's URL, from SD</text>
-<text x="1042" y="350" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• GET /api/v1/gateway/logs: system logs for admins</text>
-<text x="1042" y="366" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• carries no socket traffic · 429 and 504 limits</text>
-<text x="102" y="410" font-size="11.2" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">Balancing, retries and circuit breakers moved to the Message Broker; Map, Guild and Monster Raid read the Gateway's public key set to verify tickets.</text>
+<text x="452" y="296" font-size="12.5" fill="#2E3D5C" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Authentication and authorization</text>
+<text x="452" y="318" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• validates the Bearer token against User</text>
+<text x="452" y="334" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   Management's keys: shared cache, else Broker</text>
+<text x="452" y="350" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• removes Authorization: never forwarded</text>
+<text x="452" y="366" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• adds X-Gateway-Token and X-Authenticated-*</text>
+<text x="792" y="296" font-size="12.5" fill="#2E3D5C" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">WebSocket tickets, logs and limits</text>
+<text x="792" y="318" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• POST …/websocket-tickets → a 60 s ticket</text>
+<text x="792" y="334" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   and a ready replica's URL, from SD</text>
+<text x="792" y="350" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• GET /api/v1/gateway/logs: logs for admins</text>
+<text x="792" y="366" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• no socket traffic · 429 and 504 limits</text>
+<text x="102" y="396" font-size="11.2" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">GETs the cache may hold are answered from it: X-Cache: HIT, MISS or BYPASS. Balancing, retries and circuit breakers are in the Message Broker;</text>
+<text x="102" y="414" font-size="11.2" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">Map, Guild and Monster Raid read the Gateway's public key set to verify tickets.</text>
 <rect x="80" y="500" width="1050" height="200" rx="6" fill="#D9EFEA" stroke="#4E9A8C" stroke-width="1.5" filter="url(#shadow)"/>
 <rect x="80" y="500" width="5" height="200" rx="2.5" fill="#4E9A8C"/>
 <text x="102" y="532" font-size="16.5" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Message Broker</text>
-<text x="240" y="532" font-size="12.5" fill="#4A5670" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Rust · a thread per request · owns no domain data</text>
+<text x="240" y="532" font-size="12.5" fill="#4A5670" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Rust · a thread per request · owns no domain data · coordinates distributed transactions</text>
 <text x="102" y="564" font-size="12.5" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Request queues · HTTP :8091</text>
 <text x="102" y="586" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• ANY /api/v1/queues/&lt;service&gt;/api/v1/…</text>
 <text x="102" y="602" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• least-loaded ready replica, then round robin</text>
@@ -74,7 +75,7 @@
 <text x="792" y="602" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• one queue per subscriber: &lt;service&gt;.events</text>
 <text x="792" y="618" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• 5 attempts with backoff; 4xx → dead letter</text>
 <text x="792" y="634" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• topics, dead letters, replay: 127.0.0.1:8091</text>
-<text x="102" y="670" font-size="11.2" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">Counted failures are reported to Service Discovery. Journals in the broker-data volume keep queued events and dead letters across restarts.</text>
+<text x="102" y="670" font-size="11.2" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">Counted failures are reported to Service Discovery. Journals in the broker-data volume keep queued events, dead letters and transactions across restarts.</text>
 <rect x="1170" y="500" width="310" height="200" rx="6" fill="#ECE6D6" stroke="#9C8A5A" stroke-width="1.5" filter="url(#shadow)"/>
 <rect x="1170" y="500" width="5" height="200" rx="2.5" fill="#9C8A5A"/>
 <text x="1192" y="532" font-size="16.5" fill="#5E4F26" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Service Discovery</text>
@@ -220,19 +221,125 @@
 <text x="64" y="1869" font-size="10.5" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">Prometheus · Loki · Grafana</text>
 <text x="240" y="1847" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Prometheus scrapes GET /metrics of the Broker, the Gateway, Service Discovery and every replica; Grafana Alloy ships every container's JSON log lines to Loki.</text>
 <text x="240" y="1868" font-size="11.8" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Grafana shows the Broker, domain-service and log dashboards; the Gateway's GET /api/v1/gateway/logs downloads the same logs.</text>
-<rect x="40" y="1920" width="1480" height="150" rx="6" fill="#F1F1F4" stroke="#B4B4C0" stroke-width="1.5" stroke-dasharray="5 4"/>
-<text x="64" y="1950" font-size="16.5" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Legend</text>
-<path d="M 66 1976 L 126 1976" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<text x="142" y="1980" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">REST request, caller waits: client → Gateway → Broker request queue → a ready replica</text>
-<path d="M 66 2000 L 126 2000" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<text x="142" y="2004" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">service call, caller waits: service → Broker (gRPC, or the HTTP queue) → a ready replica</text>
-<path d="M 66 2024 L 126 2024" fill="none" stroke="#1F6FB2" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#arrowWs)"/>
-<text x="142" y="2028" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">direct WebSocket: the client connects with a Gateway ticket; neither Gateway nor Broker is in the path</text>
-<path d="M 66 2048 L 126 2048" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-dasharray="7 5" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<text x="142" y="2052" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">asynchronous event through a Broker topic, delivered at least once</text>
-<text x="860" y="1976" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Arrows point from the caller to the receiver. No service calls another directly: client</text>
-<text x="860" y="1992" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">requests enter the Gateway and every request reaches a replica through the Broker.</text>
-<text x="860" y="2008" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">The Gateway validates the access token and removes Authorization; services trust only</text>
-<text x="860" y="2024" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">the X-Gateway-Token and X-Authenticated-* context it adds, or the service token.</text>
-<text x="860" y="2040" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Replicas are not drawn: each service runs two or three behind the Broker.</text>
+<rect x="1170" y="232" width="310" height="208" rx="6" fill="#F8E1DD" stroke="#C0645A" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="1170" y="232" width="5" height="208" rx="2.5" fill="#C0645A"/>
+<text x="1192" y="264" font-size="16.5" fill="#7D2E26" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Gateway cache</text>
+<text x="1192" y="284" font-size="10.5" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Redis · memory only · LRU · owns no data of record</text>
+<path d="M 1205 298.48 L 1205 317.52 A 13.0 4.48 0 0 0 1231 317.52 L 1231 298.48" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="1218.0" cy="298.48" rx="13.0" ry="4.48" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/>
+<text x="1218" y="336" font-size="10" fill="#7D2E26" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="middle">cache-1</text>
+<path d="M 1295 298.48 L 1295 317.52 A 13.0 4.48 0 0 0 1321 317.52 L 1321 298.48" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="1308.0" cy="298.48" rx="13.0" ry="4.48" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/>
+<text x="1308" y="336" font-size="10" fill="#7D2E26" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="middle">cache-2</text>
+<path d="M 1385 298.48 L 1385 317.52 A 13.0 4.48 0 0 0 1411 317.52 L 1411 298.48" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="1398.0" cy="298.48" rx="13.0" ry="4.48" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/>
+<text x="1398" y="336" font-size="10" fill="#7D2E26" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="middle">cache-3</text>
+<text x="1192" y="358" font-size="11.2" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• consistent-hash ring: 160 points per node,</text>
+<text x="1192" y="374" font-size="11.2" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">   SHA-1; a key goes to the next point clockwise</text>
+<text x="1192" y="390" font-size="11.2" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• Registry GETs per user, combat types shared</text>
+<text x="1192" y="406" font-size="11.2" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• User Management's key set (JWKS), shared</text>
+<text x="1192" y="422" font-size="11.2" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">• a node down: only its keys answer BYPASS</text>
+<path d="M 1120 300 L 1170 300" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 442 776.88 L 442 789.12 A 6.0 2.88 0 0 0 454 789.12 L 454 776.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="448.0" cy="776.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 457 776.88 L 457 789.12 A 6.0 2.88 0 0 0 469 789.12 L 469 776.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="463.0" cy="776.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 472 776.88 L 472 789.12 A 6.0 2.88 0 0 0 484 789.12 L 484 776.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="478.0" cy="776.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<text x="484" y="806" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">PostgreSQL: primary + 2 standbys</text>
+<path d="M 932 776.88 L 932 789.12 A 6.0 2.88 0 0 0 944 789.12 L 944 776.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="938.0" cy="776.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 947 776.88 L 947 789.12 A 6.0 2.88 0 0 0 959 789.12 L 959 776.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="953.0" cy="776.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 962 776.88 L 962 789.12 A 6.0 2.88 0 0 0 974 789.12 L 974 776.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="968.0" cy="776.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<text x="974" y="806" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">PostgreSQL: primary + 2 standbys</text>
+<path d="M 1422 776.88 L 1422 789.12 A 6.0 2.88 0 0 0 1434 789.12 L 1434 776.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="1428.0" cy="776.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 1437 776.88 L 1437 789.12 A 6.0 2.88 0 0 0 1449 789.12 L 1449 776.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="1443.0" cy="776.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 1452 776.88 L 1452 789.12 A 6.0 2.88 0 0 0 1464 789.12 L 1464 776.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="1458.0" cy="776.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<text x="1464" y="806" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">PostgreSQL: primary + 2 standbys</text>
+<path d="M 442 1096.88 L 442 1109.12 A 6.0 2.88 0 0 0 454 1109.12 L 454 1096.88" fill="#B5473D" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="448.0" cy="1096.88" rx="6.0" ry="2.88" fill="#B5473D" stroke="#B5473D" stroke-width="1.2"/>
+<path d="M 457 1096.88 L 457 1109.12 A 6.0 2.88 0 0 0 469 1109.12 L 469 1096.88" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="463.0" cy="1096.88" rx="6.0" ry="2.88" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/>
+<path d="M 472 1096.88 L 472 1109.12 A 6.0 2.88 0 0 0 484 1109.12 L 484 1096.88" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="478.0" cy="1096.88" rx="6.0" ry="2.88" fill="#F1C9C3" stroke="#B5473D" stroke-width="1.2"/>
+<text x="484" y="1126" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">Redis: primary + 2 replicas, 3 Sentinels</text>
+<path d="M 932 1096.88 L 932 1109.12 A 6.0 2.88 0 0 0 944 1109.12 L 944 1096.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="938.0" cy="1096.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 947 1096.88 L 947 1109.12 A 6.0 2.88 0 0 0 959 1109.12 L 959 1096.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="953.0" cy="1096.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 962 1096.88 L 962 1109.12 A 6.0 2.88 0 0 0 974 1109.12 L 974 1096.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="968.0" cy="1096.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<text x="974" y="1126" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">PostgreSQL: primary + 2 standbys</text>
+<path d="M 1407 1096.88 L 1407 1109.12 A 6.0 2.88 0 0 0 1419 1109.12 L 1419 1096.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="1413.0" cy="1096.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 1422 1096.88 L 1422 1109.12 A 6.0 2.88 0 0 0 1434 1109.12 L 1434 1096.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="1428.0" cy="1096.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 1437 1096.88 L 1437 1109.12 A 6.0 2.88 0 0 0 1449 1109.12 L 1449 1096.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="1443.0" cy="1096.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 1452 1096.88 L 1452 1109.12 A 6.0 2.88 0 0 0 1464 1109.12 L 1464 1096.88" fill="#B5473D" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="1458.0" cy="1096.88" rx="6.0" ry="2.88" fill="#B5473D" stroke="#B5473D" stroke-width="1.2"/>
+<text x="1464" y="1126" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">PostgreSQL ×3 · Redis pub/sub</text>
+<path d="M 427 1416.88 L 427 1429.12 A 6.0 2.88 0 0 0 439 1429.12 L 439 1416.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="433.0" cy="1416.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 442 1416.88 L 442 1429.12 A 6.0 2.88 0 0 0 454 1429.12 L 454 1416.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="448.0" cy="1416.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 457 1416.88 L 457 1429.12 A 6.0 2.88 0 0 0 469 1429.12 L 469 1416.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="463.0" cy="1416.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 472 1416.88 L 472 1429.12 A 6.0 2.88 0 0 0 484 1429.12 L 484 1416.88" fill="#B5473D" stroke="#B5473D" stroke-width="1.2"/><ellipse cx="478.0" cy="1416.88" rx="6.0" ry="2.88" fill="#B5473D" stroke="#B5473D" stroke-width="1.2"/>
+<text x="484" y="1446" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">PostgreSQL ×3 · Redis counters</text>
+<path d="M 932 1416.88 L 932 1429.12 A 6.0 2.88 0 0 0 944 1429.12 L 944 1416.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="938.0" cy="1416.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 947 1416.88 L 947 1429.12 A 6.0 2.88 0 0 0 959 1429.12 L 959 1416.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="953.0" cy="1416.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<path d="M 962 1416.88 L 962 1429.12 A 6.0 2.88 0 0 0 974 1429.12 L 974 1416.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="968.0" cy="1416.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/>
+<text x="974" y="1446" font-size="9.8" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" text-anchor="end" font-style="italic">PostgreSQL: primary + 2 standbys</text>
+<rect x="40" y="1920" width="1480" height="130" rx="6" fill="#E4F1EC" stroke="#4E9A8C" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="64" y="1948" font-size="14" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">DISTRIBUTED</text>
+<text x="64" y="1966" font-size="14" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">TRANSACTIONS</text>
+<text x="64" y="1986" font-size="10.5" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">coordinated by the</text>
+<text x="64" y="2000" font-size="10.5" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">Message Broker above</text>
+<text x="240" y="1946" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Battle and Monster Raid store a start request in their outbox with the decided result; the Broker then runs battle.settlement or raid.payout through the participants' internal routes.</text>
+<rect x="240" y="1958" width="228" height="63" rx="5" fill="#FFFFFF" stroke="#4E9A8C" stroke-width="1.2"/>
+<text x="250" y="1977" font-size="11.8" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">1 · verify</text>
+<text x="250" y="1994" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Battle / Monster Raid</text>
+<text x="250" y="2009" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">the request is its own, pending</text>
+<path d="M 468 1982 L 490 1982" fill="none" stroke="#4A4A58" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="490" y="1958" width="228" height="63" rx="5" fill="#FFFFFF" stroke="#4E9A8C" stroke-width="1.2"/>
+<text x="500" y="1977" font-size="11.8" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">2 · currency</text>
+<text x="500" y="1994" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">User Management</text>
+<text x="500" y="2009" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">credits and debits</text>
+<path d="M 718 1982 L 740 1982" fill="none" stroke="#4A4A58" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="740" y="1958" width="228" height="63" rx="5" fill="#FFFFFF" stroke="#4E9A8C" stroke-width="1.2"/>
+<text x="750" y="1977" font-size="11.8" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">3 · creatures  (pivot)</text>
+<text x="750" y="1994" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Tamagotchi</text>
+<text x="750" y="2009" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">owner transfer and XP</text>
+<path d="M 968 1982 L 990 1982" fill="none" stroke="#4A4A58" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="990" y="1958" width="228" height="63" rx="5" fill="#FFFFFF" stroke="#4E9A8C" stroke-width="1.2"/>
+<text x="1000" y="1977" font-size="11.8" fill="#235E53" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">4 · complete</text>
+<text x="1000" y="1994" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Battle / Monster Raid</text>
+<text x="1000" y="2009" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">settled; result event in outbox</text>
+<text x="1240" y="1972" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Saga (final): each step commits</text>
+<text x="1240" y="1987" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">at once; a refusal compensates the</text>
+<text x="1240" y="2002" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">executed steps in reverse order.</text>
+<text x="1240" y="2020" font-size="10.8" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">2PC checkpoint: prepare everywhere,</text>
+<text x="1240" y="2035" font-size="10.8" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">then commit or roll back.</text>
+<rect x="40" y="2080" width="1480" height="130" rx="6" fill="#ECE8F6" stroke="#8C7BBF" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="64" y="2108" font-size="14" fill="#4B3C80" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">DATA WAREHOUSE</text>
+<text x="64" y="2126" font-size="14" fill="#4B3C80" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">AND ETL</text>
+<text x="64" y="2146" font-size="10.5" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">analytics, outside the</text>
+<text x="64" y="2160" font-size="10.5" fill="#5A5A68" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-style="italic">request path</text>
+<text x="240" y="2106" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">No service reads or writes the Warehouse, and the ETL never reads a service database: it loads only the services' own CSV exports of terminal results.</text>
+<rect x="240" y="2118" width="228" height="63" rx="5" fill="#FFFFFF" stroke="#8C7BBF" stroke-width="1.2"/>
+<text x="250" y="2137" font-size="11.8" fill="#4B3C80" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Exports (extract)</text>
+<text x="250" y="2154" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Battle: server export-results</text>
+<text x="250" y="2169" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Raid: export-raid-results.sql</text>
+<path d="M 468 2142 L 490 2142" fill="none" stroke="#4A4A58" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="490" y="2118" width="210" height="63" rx="5" fill="#FFFFFF" stroke="#8C7BBF" stroke-width="1.2"/>
+<text x="500" y="2137" font-size="11.8" fill="#4B3C80" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">scripts/etl/extract.sh</text>
+<text x="500" y="2154" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">on the host: runs each export,</text>
+<text x="500" y="2169" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">writes etl/input/*.csv</text>
+<path d="M 700 2142 L 722 2142" fill="none" stroke="#4A4A58" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="722" y="2118" width="228" height="63" rx="5" fill="#FFFFFF" stroke="#8C7BBF" stroke-width="1.2"/>
+<text x="732" y="2137" font-size="11.8" fill="#4B3C80" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">etl job (transform, load)</text>
+<text x="732" y="2154" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">load.sh: checks the CSV contract,</text>
+<text x="732" y="2169" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">upserts by source key, one tx</text>
+<path d="M 950 2142 L 972 2142" fill="none" stroke="#4A4A58" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 976 2129.04 L 976 2158.96 A 17.0 7.04 0 0 0 1010 2158.96 L 1010 2129.04" fill="#D9D1F0" stroke="#4B3C80" stroke-width="1.2"/><ellipse cx="993.0" cy="2129.04" rx="17.0" ry="7.04" fill="#D9D1F0" stroke="#4B3C80" stroke-width="1.2"/>
+<text x="1022" y="2136" font-size="11.8" fill="#4B3C80" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">warehouse-db</text>
+<text x="1022" y="2152" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">PostgreSQL: battle_results, raid_results,</text>
+<text x="1022" y="2167" font-size="10.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">etl_runs; views terminal_results, daily_results</text>
+<rect x="40" y="2220" width="1480" height="170" rx="6" fill="#F1F1F4" stroke="#B4B4C0" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="64" y="2250" font-size="16.5" fill="#4A4A58" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-weight="700">Legend</text>
+<path d="M 66 2276 L 126 2276" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="142" y="2280" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">REST request, caller waits: client → Gateway → Broker request queue → a ready replica</text>
+<path d="M 66 2300 L 126 2300" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="142" y="2304" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">service call, caller waits: service → Broker (gRPC, or the HTTP queue) → a ready replica</text>
+<path d="M 66 2324 L 126 2324" fill="none" stroke="#1F6FB2" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#arrowWs)"/>
+<text x="142" y="2328" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">direct WebSocket: the client connects with a Gateway ticket; neither Gateway nor Broker is in the path</text>
+<path d="M 66 2348 L 126 2348" fill="none" stroke="#4A4A58" stroke-width="1.8" stroke-dasharray="7 5" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<text x="142" y="2352" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">asynchronous event through a Broker topic, delivered at least once</text>
+<text x="860" y="2276" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Arrows point from the caller to the receiver. No service calls another directly: client</text>
+<text x="860" y="2292" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">requests enter the Gateway and every request reaches a replica through the Broker.</text>
+<text x="860" y="2308" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">The Gateway validates the access token and removes Authorization; services trust only</text>
+<text x="860" y="2324" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">the X-Gateway-Token and X-Authenticated-* context it adds, or the service token.</text>
+<text x="860" y="2340" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">Replicas are not drawn: each service runs two or three behind the Broker.</text>
+<path d="M 70 2364.88 L 70 2377.12 A 6.0 2.88 0 0 0 82 2377.12 L 82 2364.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="76.0" cy="2364.88" rx="6.0" ry="2.88" fill="#3F5F86" stroke="#3F5F86" stroke-width="1.2"/><path d="M 85 2364.88 L 85 2377.12 A 6.0 2.88 0 0 0 97 2377.12 L 97 2364.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="91.0" cy="2364.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><path d="M 100 2364.88 L 100 2377.12 A 6.0 2.88 0 0 0 112 2377.12 L 112 2364.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><ellipse cx="106.0" cy="2364.88" rx="6.0" ry="2.88" fill="#C9D7EA" stroke="#3F5F86" stroke-width="1.2"/><text x="142" y="2376" font-size="11.8" fill="#2C2C34" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">a service's own store: the primary (dark) takes the writes and two standbys follow it, one promoted when the primary is lost; red: Redis, blue: PostgreSQL</text>
 </svg>
