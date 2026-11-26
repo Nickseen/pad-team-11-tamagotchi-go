@@ -479,7 +479,7 @@ services:
   # the coordinator of distributed transactions (docs/lab5-transaction-contract.md), journaled in
   # broker-data. Published release; the matching main source is pinned in services/message-broker.
   message-broker:
-    image: nickseen/tamagotchi-message-broker:5.0.0
+    image: nickseen/tamagotchi-message-broker:5.0.1
     restart: unless-stopped
     depends_on:
       service-discovery:
