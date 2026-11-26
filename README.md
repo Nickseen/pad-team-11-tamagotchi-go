@@ -184,9 +184,12 @@ the earlier services use, and owned by Vlad (`@vladas9`). Its protocol is define
   `<service>.events`, built from the `topics` its replicas register with Service Discovery.
   Delivery is at least once, with retries; an event that cannot be delivered goes to the dead-letter
   channel.
+- **Distributed transactions** (Lab 5, since 5.0.0): the Broker coordinates the two-phase commit that
+  settles a decided battle or pays a defeated raid in every participating service or in none, as the
+  [transaction contract](docs/lab5-transaction-contract.md) defines.
 - **Inspection** on `127.0.0.1:8091` with the service token: `GET /api/v1/topics`,
-  `GET /api/v1/dead-letters` and `POST /api/v1/dead-letters/{id}/replay`; `GET /metrics` for
-  Prometheus.
+  `GET /api/v1/dead-letters`, `POST /api/v1/dead-letters/{id}/replay` and
+  `GET /api/v1/transactions[/{id}]`; `GET /metrics` for Prometheus.
 
 ---
 
@@ -1884,7 +1887,7 @@ Every component below selects 4.x; updating references does not complete the sha
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/43326608468)) | 8080 | — | `aa7b0b9` |
-| Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/43297792016)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals in the `broker-data` volume | `cd194d5` |
+| Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/45787275546)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals of queues, dead letters and transactions in the `broker-data` volume | `05817c5` |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43432132987)) | — (internal 8090) | In-memory registry | `2294a0a` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/45684151107)) | — | PostgreSQL primary + 2 standbys | `2b8666c` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/runs/45486692839)) | — | PostgreSQL primary + 2 standbys | `eda7e3e` |
