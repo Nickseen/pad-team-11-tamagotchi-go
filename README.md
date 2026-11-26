@@ -2371,7 +2371,7 @@ lowercase UUIDs, RFC 3339 UTC timestamps with milliseconds):
 | Source | Header | Export command | Warehouse key |
 | ------ | ------ | -------------- | ------------- |
 | Monster Raid | `raidId,status,endedAt` | `scripts/export-raid-results.sql` from a Monster Raid checkout at the reviewed revision (`RAID_CHECKOUT`), run against `monster-raid-db` (`RAID_DB_SERVICE` after a promotion); [handoff](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/194#issuecomment-7140915705) | `raid:<raidId>` |
-| Battle | `battleId,outcome,finishedAt` | Pending the Battle handoff on #194; until then `BATTLE_CSV=<file>` passes an existing export, e.g. [`etl/fixtures/battle.csv`](etl/fixtures/battle.csv) | `battle:<battleId>` |
+| Battle | `battleId,outcome,finishedAt` | `/app/server export-results` in the running `battle` container (image 5.0.0 and later); it reads the container's own `DATABASE_URL`, so it also works after a promotion; [handoff](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/194#issuecomment-7176005871). `BATTLE_CSV=<file>` passes an existing export instead, e.g. [`etl/fixtures/battle.csv`](etl/fixtures/battle.csv) | `battle:<battleId>` |
 
 **Transform.** The header must match exactly. Every row is checked before anything is written: a
 missing field, a value outside the contract (`knockout`, `forfeit`, `timeout`; `defeated`, `expired`,
