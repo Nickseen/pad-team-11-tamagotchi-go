@@ -116,6 +116,32 @@
             ],
             "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/status"
           }
+        },
+        {
+          "name": "Read prepared Raid payout branches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/internal/transactions/prepared",
+            "description": "Lists unresolved 2PC branches without changing them. The list is empty after settlement."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Prepared branches are listed', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -160,6 +186,7 @@
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));",
                   "const json = pm.response.json();",
                   "pm.test('Active raid is created', () => pm.expect(json.status).to.eql('active'));",
+                  "pm.test('Active raid has no settlement', () => pm.expect(json.settlementStatus).to.eql(null));",
                   "pm.collectionVariables.set('raidId', json.raidId);"
                 ]
               }
@@ -187,7 +214,12 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Correct raid is returned', () => pm.expect(pm.response.json().raidId).to.eql(pm.collectionVariables.get('raidId')));"
+                  "const raid = pm.response.json();",
+                  "pm.test('Correct raid is returned', () => pm.expect(raid.raidId).to.eql(pm.collectionVariables.get('raidId')));",
+                  "pm.test('Settlement state follows the raid result', () => {",
+                  "  if (raid.status === 'defeated') pm.expect(['pending', 'settled', 'failed']).to.include(raid.settlementStatus);",
+                  "  else pm.expect(raid.settlementStatus).to.eql(null);",
+                  "});"
                 ]
               }
             }

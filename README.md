@@ -1563,6 +1563,7 @@ sends a message.
 | `monsterName` | string | Denormalized for display only |
 | `maxHp` / `currentHp` | integer | `currentHp` never drops below 0 |
 | `status` | string | `active`, `defeated`, `expired` or `cancelled` |
+| `settlementStatus` | string \| null | `pending`, `settled` or `failed` for a defeated raid |
 | `participantCount` | integer | |
 | `startedAt` / `expiresAt` / `endedAt` | `Timestamp` \| null | `expiresAt` = `startedAt` + `durationSeconds` |
 
@@ -1622,10 +1623,22 @@ participation again at WebSocket upgrade time.
 ```
 
 The HP decrement is a single atomic Redis `DECRBY` clamped at zero, because an entire guild hits one
-counter concurrently. The result is appended to `damage_log` in PostgreSQL for durability, and the
-transition to `defeated` is applied exactly once with a conditional update — the first attack that
-drives HP to zero wins the transition and publishes the terminal event; every later attack receives
-`409 RAID_NOT_ACTIVE`. Rate limit: 10 attacks per second per participant.
+counter concurrently. PostgreSQL records the damage. The first attack that drives HP to zero
+records the defeat and a durable `raid.payout` request in the same PostgreSQL transaction.
+Subsequent new attacks receive `409 RAID_NOT_ACTIVE`. Repeating a recorded command returns its
+stored result. Rate limit: 10 attacks per second per participant.
+
+##### Two-phase payout
+
+Broker coordinates reward currency in User Management and XP in Tamagotchi. Raid's branch changes
+`settlementStatus` from `pending` to `settled` and saves `raid.monster_defeated` in the outbox.
+Broker commits that branch last, after confirming both other participants. A final rollback sets
+`settlementStatus` to `failed` while the raid stays defeated.
+
+The [2PC participant contract](docs/lab5-transaction-contract.md#participant-api) defines the
+authenticated `prepare`, `commit`, `rollback` and `prepared` routes. The branch ledger lives in
+`raid.transaction_branches`. Run the shared Raid scenarios with
+`python scripts/tx/check-2pc.py --scenario 3,4`.
 
 ##### WebSocket — `GET /api/v1/raids/{raidId}/feed`
 
