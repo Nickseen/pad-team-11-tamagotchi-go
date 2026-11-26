@@ -360,8 +360,9 @@ class Run:
         res.check("first settlement", "committed", tx.get("status"))
         time.sleep(SETTLE)
         settled = Snapshot(self.b, [a, b])
-        payload = self.battle_payload(battle_id, a, b, settled.balance[a.user_id] - before.balance[a.user_id],
-                                      settled.balance[b.user_id] - before.balance[b.user_id])
+        payload = tx.get("payload") or self.battle_payload(  # the Broker's view carries the stored payload
+            battle_id, a, b, settled.balance[a.user_id] - before.balance[a.user_id],
+            settled.balance[b.user_id] - before.balance[b.user_id])
         start = {"transactionId": tx["transactionId"], "operation": "battle.settlement", "operationVersion": 1,
                  "businessKey": battle_id, "correlationId": new_id(), "payload": payload}
         r = self.b.own("POST", "/api/v1/transactions", start)
@@ -408,6 +409,9 @@ class Run:
             self.c.restore_broker(self.b)
         res.note(f"battle {battle_id}, transaction {transaction_id}")
         res.check("transaction status", "committed", tx.get("status"))
+        states = {p.get("service"): p.get("state") for p in tx.get("participants", [])}
+        res.check("participant states", {"user-management": "already_applied", "tamagotchi": "already_applied",
+                                         "battle": "committed"}, states)
         time.sleep(SETTLE)
         after = Snapshot(self.b, [a, b])
         res.check("winner's balance", f"{before.balance[a.user_id] + 250} (event's +250 once)", after.balance[a.user_id],

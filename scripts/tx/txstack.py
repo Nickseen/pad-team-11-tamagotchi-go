@@ -25,9 +25,9 @@ BROKER = os.environ.get("BROKER_URL", "http://127.0.0.1:8091")
 
 # Participant databases: Compose services of the writer and its standbys, user, database.
 DATABASES = {
-    "user-management": (["user-management-db"], "usermgmt", "usermgmt"),
+    "user-management": (["user-management-db", "user-management-db-1", "user-management-db-2"], "usermgmt", "usermgmt"),
     "tamagotchi": (["tamagotchi-db", "tamagotchi-db-1", "tamagotchi-db-2"], "tamagotchi", "tamagotchi"),
-    "battle": (["battle-db"], "battle", "battle"),
+    "battle": (["battle-db", "battle-db-1", "battle-db-2"], "battle", "battle"),
     "monster-raid": (["monster-raid-db", "monster-raid-db-1", "monster-raid-db-2"], "raid", "raid"),
 }
 PARTICIPANTS = {
