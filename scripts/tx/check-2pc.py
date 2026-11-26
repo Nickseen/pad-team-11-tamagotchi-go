@@ -51,6 +51,7 @@ SCENARIOS = {
     11: ("A battle.finished queued by a 4.x producer, then a settlement of the same battle",
          "applied once; the vote is already_applied"),
 }
+RAID_SCENARIOS = {3, 4}  # the others settle battles
 SETTLE = 5  # seconds to wait before checking that nothing changes any more
 
 
@@ -430,12 +431,13 @@ class Run:
         self.no_branch_in_doubt(res)
 
     # ------------------------------------------------------------------------------- preflight
-    def preflight(self) -> bool:
+    def preflight(self, participants: list[str]) -> bool:
+        """Checks the Broker and the given participants only, so battle scenarios can run before Raid serves 2PC."""
         rows = [("message-broker", "GET /api/v1/transactions", self.b.own("GET", "/api/v1/transactions?limit=1").status)]
-        for service in ("user-management", "tamagotchi", "battle", "monster-raid"):
+        for service in participants:
             rows.append((service, "GET /api/v1/internal/transactions/prepared",
                          self.b.service("GET", service, "/api/v1/internal/transactions/prepared").status))
-        for participant in DATABASES:
+        for participant in participants:
             setting = self.c.query(participant, "SHOW max_prepared_transactions")
             rows.append((f"{participant} database", "max_prepared_transactions", setting))
         ok = True
@@ -485,15 +487,17 @@ def main() -> int:
     if args.setup_only:
         run.setup_only()
         return 0
-    print("== preflight")
-    ready = run.preflight()
+    numbers = list(SCENARIOS) if args.scenario == "all" else [int(n) for n in args.scenario.split(",")]
+    operations = {"raid.payout" if n in RAID_SCENARIOS else "battle.settlement" for n in numbers}
+    needed = sorted({p for op in operations for p in PARTICIPANTS[op]}, key=list(DATABASES).index)
+    print(f"== preflight for scenarios {','.join(map(str, numbers))}")
+    ready = run.preflight(needed)
     if args.preflight:
         return 0 if ready else 1
     if not ready and not args.force:
-        print("2PC is not served by every component yet; nothing was run (--force to run anyway).")
+        print("2PC is not served by every component these scenarios use; nothing was run (--force to run anyway).")
         return 1
 
-    numbers = list(SCENARIOS) if args.scenario == "all" else [int(n) for n in args.scenario.split(",")]
     results = []
     for n in numbers:
         title, expected = SCENARIOS[n]
