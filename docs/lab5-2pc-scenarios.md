@@ -33,15 +33,16 @@ databases (on the current writer), and records each participant's `transaction_b
 | 5 | Broker killed at `before-decision` | Broker with `TX_PAUSE_POINT=before-decision`; killed once all three participants list the branch in `/prepared`; restarted with its own settings | `committed` at attempt 2; attempt 1 `rolled_back` in User Management; the effects of scenario 1 once |
 | 6 | Broker killed at `after-decision` | The same at `after-decision`, once the status is `committing` | `committed` at attempt 1; the effects once; no branch in doubt |
 | 7 | A participant killed after its vote | Paused at `before-decision` for 20 s; one Tamagotchi replica killed once every branch is prepared, started again afterwards | `committed`; the effects once |
-| 8 | A participant down longer than the voting window | All Tamagotchi replicas stopped before the forfeit, started 15 s after the transaction is `waiting` | `waiting` with `VOTE_MISSING: tamagotchi`; no prepared branch in User Management or Battle meanwhile; `committed` at attempt ≥ 2; the effects once |
-| 9 | Promotion with a branch in doubt | Paused at `after-decision`; the branch is checked on `tamagotchi-db-1`; `tamagotchi-db` killed and `tamagotchi-db-1` promoted with `postgres-promote.sh` | The branch is in doubt on the promoted node, then `committed` there; Tamagotchi `/prepared` empty; the effects once |
+| 8 | A participant down longer than the voting window | Use a 20 s retry delay, stop all Tamagotchi replicas before the forfeit, and check both databases while the same attempt is `waiting`. Start the replicas after 15 s | `waiting` with `VOTE_MISSING: tamagotchi`; no prepared branch in User Management or Battle meanwhile; `committed` at attempt ≥ 2; the effects once |
+| 9 | Promotion with a branch in doubt | Pause at `after-decision`, verify both Tamagotchi standbys replayed the WAL through the prepare, kill `tamagotchi-db`, and promote the most caught-up standby with `postgres-promote.sh` | The branch is in doubt on the promoted node, then `committed` there; Tamagotchi `/prepared` empty; the effects once |
 | 10 | Start request and commit sent again | After a committed forfeit: the start request again with the same `transactionId`, again with a new one, and `commit` again to each participant | `200` and the same `transactionId` both times; each commit `200 committed`; one transaction for the battle; nothing applied twice; one `battle.finished` |
 | 11 | Queued 4.x event, then the settlement | `TX_RETRY_BACKOFF_MS=20000`; User Management and Tamagotchi stopped; forfeit; once `waiting`, a `battle.finished` published as Battle 4.x does (+250/−100); both started | `committed`; balances moved by the event's amounts exactly once; owner and secondary reference once; no committed branch in User Management or Tamagotchi (`already_applied` prepares nothing); two `battle.finished` (the queued one and Battle's), the second a duplicate |
 
-Scenarios 5–9 and 11 recreate the Broker with rehearsal settings through a temporary Compose override
-and restore its own settings afterwards, also when a scenario fails. Scenario 9 is only run with
-`--allow-promotion`: afterwards `tamagotchi-db` is fenced and `tamagotchi-db-1` is the writer, so the
-stack needs the rejoin procedure of the README before the next run of scenario 9.
+Scenarios 5–9 and 11 recreate the Broker with rehearsal settings through a temporary Compose
+override and restore its settings even after a failure. Publication counters are scoped to a single
+Broker process and reset when it restarts. In scenario 9, the WAL replay check precedes the promotion
+and `pg_prepared_xacts` on the new writer confirms the branch. `--allow-promotion` enables this
+scenario. The old primary stays fenced until the README's rejoin procedure is run.
 
 ## Baseline before 2PC
 
