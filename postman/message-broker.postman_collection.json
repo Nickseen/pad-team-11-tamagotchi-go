@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Message Broker",
-    "description": "The Message Broker's own HTTP API (Lab 4), called directly at {{brokerUrl}}: Compose publishes it on 127.0.0.1:8091 for inspection, outside the Gateway. Status and metrics need no credentials; every other route needs X-Service-Token. Covers the request queues (Gateway-to-service to Battle, service-to-service to Tamagotchi), topic publication, the topic list, and a dead letter created, listed and replayed. Uses the shared environment's brokerUrl and serviceToken. Run it against the Lab 4 stack in the saved order.",
+    "description": "The Message Broker's own HTTP API (Lab 4), called directly at {{brokerUrl}}: Compose publishes it on 127.0.0.1:8091 for inspection, outside the Gateway. Status and metrics need no credentials; every other route needs X-Service-Token. Covers the request queues (Gateway-to-service to Battle, service-to-service to Tamagotchi), topic publication, the topic list, a dead letter created, listed and replayed, and the read-only routes of the transaction coordinator (Lab 5). Uses the shared environment's brokerUrl and serviceToken. Run it against the Lab 4 stack in the saved order.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -675,6 +675,178 @@
             "method": "GET",
             "header": [],
             "url": "{{brokerUrl}}/api/v1/dead-letters"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHORIZED\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"UNAUTHORIZED\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "Lab 5: the coordinator of distributed transactions (docs/lab5-transaction-contract.md). Battle and Monster Raid start them from their outboxes; these requests only read and validate, so they start nothing.",
+      "item": [
+        {
+          "name": "List transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/transactions?limit=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with a page\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"items, total, offset and limit\", () => {",
+                  "  pm.expect(page.items).to.be.an(\"array\");",
+                  "  pm.expect(page.total).to.be.a(\"number\");",
+                  "  pm.expect(page.limit).to.eql(5);",
+                  "});",
+                  "pm.test(\"no transaction shows its payload\", () => page.items.forEach(t => pm.expect(t).to.not.have.property(\"payload\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Committed battle settlements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/transactions?operation=battle.settlement&status=committed"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"only committed battle settlements\", () => pm.response.json().items.forEach(t => {",
+                  "  pm.expect(t.operation).to.eql(\"battle.settlement\");",
+                  "  pm.expect(t.status).to.eql(\"committed\");",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An unknown transaction",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/transactions/00000000-0000-4000-8000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 TRANSACTION_NOT_FOUND\", () => {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"TRANSACTION_NOT_FOUND\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start an unknown operation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{$guid}}\",\n  \"operation\": \"battle.rematch\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{$guid}}\",\n  \"correlationId\": \"{{$guid}}\",\n  \"payload\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 VALIDATION_FAILED\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_FAILED\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"CPR error envelope\", () => {",
+                  "  pm.expect(body.error.code).to.be.a(\"string\");",
+                  "  pm.expect(body.correlationId).to.be.a(\"string\");",
+                  "  pm.expect(body.timestamp).to.match(/Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transactions without the service token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{brokerUrl}}/api/v1/transactions"
           },
           "event": [
             {

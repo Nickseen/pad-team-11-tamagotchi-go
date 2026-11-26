@@ -94,7 +94,7 @@ x-user-management-env: &user-management-env
   JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-signing-key.pem # one key for every replica
 
 x-user-management: &user-management
-  image: amzavladislav/tamagotchi-user-management:5.0.0
+  image: amzavladislav/tamagotchi-user-management:5.1.0
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -465,10 +465,11 @@ services:
 
   # --- Message Broker (Lab 4) -----------------------------------------------------------------------
   # Request queues and topics for every service-to-service call and event, gRPC forwarding,
-  # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md).
-  # Published release; the matching main source is pinned in services/message-broker.
+  # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md); since 5.0.0 also
+  # the coordinator of distributed transactions (docs/lab5-transaction-contract.md), journaled in
+  # broker-data. Published release; the matching main source is pinned in services/message-broker.
   message-broker:
-    image: nickseen/tamagotchi-message-broker:4.0.0
+    image: nickseen/tamagotchi-message-broker:5.0.0
     restart: unless-stopped
     depends_on:
       service-discovery:
