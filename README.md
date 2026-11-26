@@ -231,6 +231,15 @@ Every replica registers with Service Discovery, with the topics it consumes and,
 its `grpcAddress`; the Broker routes by that registry and reports failing replicas back to it.
 Prometheus scrapes every component's `/metrics`, Loki collects every log line and Grafana shows both.
 
+**Lab 5 additions.** The Gateway answers cacheable GETs and reads User Management's key set from three
+Redis nodes, sharded by consistent hashing ([Gateway cache](#gateway-cache)). Every service's store has a
+primary and two standbys: PostgreSQL with streaming replication and a fenced promotion, Map's Redis with
+Sentinel ([Database replication and failover](#database-replication-and-failover)). The Broker
+coordinates `battle.settlement` and `raid.payout` across Battle or Monster Raid, User Management and
+Tamagotchi ([transaction contract](docs/lab5-transaction-contract.md),
+[Saga contract](docs/lab5-saga-contract.md)). The ETL job loads the services' own exports into the Data
+Warehouse ([Data Warehouse and ETL](#data-warehouse-and-etl)).
+
 Two properties are worth pointing out, because they are the reason the boundaries are drawn this
 way:
 
