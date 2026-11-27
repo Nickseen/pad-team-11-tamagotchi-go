@@ -258,7 +258,7 @@ class Run:
 
     def _killed_coordinator(self, res: Result, point: str, attempt: int) -> None:
         a, b, battle_id = self.duel()
-        before, events = Snapshot(self.b, [a, b]), self.events("battle.finished")
+        before = Snapshot(self.b, [a, b])
         self.c.broker_settings(self.b, TX_PAUSE_POINT=point, TX_PAUSE_MS="120000")
         try:
             transaction_id = self.forfeit_and_find(battle_id, a, b)["transactionId"]
@@ -276,7 +276,9 @@ class Run:
             self.c.restore_broker(self.b)
         tx = self.b.wait_transaction(transaction_id)
         res.note(f"battle {battle_id}, transaction {transaction_id}")
-        self.settled_battle(res, battle_id, a, b, before, tx, events, attempt=attempt)
+        # The restarted Broker starts its publication counter at zero. The
+        # killed process was paused before it could commit Battle's outbox.
+        self.settled_battle(res, battle_id, a, b, before, tx, events_before=0, attempt=attempt)
         if attempt == 2:
             res.check("attempt 1 in User Management", "rolled_back",
                       next((r["outcome"] for r in self.branches("user-management", transaction_id) if r["attempt"] == 1),
@@ -290,73 +292,105 @@ class Run:
 
     def s7(self, res: Result) -> None:
         a, b, battle_id = self.duel()
-        before, events = Snapshot(self.b, [a, b]), self.events("battle.finished")
+        before = Snapshot(self.b, [a, b])
         replicas = self.c.containers("tamagotchi")
         if len(replicas) < 2:
             raise StepFailed("scenario 7 needs two Tamagotchi replicas")
         self.c.broker_settings(self.b, TX_PAUSE_POINT="before-decision", TX_PAUSE_MS="20000")
         try:
+            events = self.events("battle.finished")
             transaction_id = self.forfeit_and_find(battle_id, a, b)["transactionId"]
             self.wait_prepared(transaction_id, PARTICIPANTS["battle.settlement"])
             subprocess.run(["docker", "kill", replicas[0]], capture_output=True)
             res.note(f"Tamagotchi replica {replicas[0][:12]} killed after its vote")
             tx = self.b.wait_transaction(transaction_id, timeout=180)
+            res.note(f"battle {battle_id}, transaction {transaction_id}")
+            self.settled_battle(res, battle_id, a, b, before, tx, events)
         finally:
             subprocess.run(["docker", "start", replicas[0]], capture_output=True)
             self.c.restore_broker(self.b)
-        res.note(f"battle {battle_id}, transaction {transaction_id}")
-        self.settled_battle(res, battle_id, a, b, before, tx, events)
 
     def s8(self, res: Result) -> None:
         a, b, battle_id = self.duel()
-        before, events = Snapshot(self.b, [a, b]), self.events("battle.finished")
-        self.c.run("stop", "tamagotchi")
+        before = Snapshot(self.b, [a, b])
+        # The default retry delay is shorter than the observations of both databases.
+        self.c.broker_settings(self.b, TX_RETRY_BACKOFF_MS="20000")
         try:
-            transaction_id = self.forfeit_and_find(battle_id, a, b)["transactionId"]
-            held = self.wait_status(transaction_id, {"waiting"}, timeout=60)
-            res.check("status while Tamagotchi is down", "waiting", held.get("status"))
-            res.check("reason", "VOTE_MISSING: tamagotchi", held.get("reason"),
-                      "VOTE_MISSING" in str(held.get("reason")) and "tamagotchi" in str(held.get("reason")))
-            locks = {p: self.c.query(p, "SELECT count(*) FROM pg_prepared_xacts") for p in ("user-management", "battle")}
-            res.check("prepared branches held by the others", {"user-management": "0", "battle": "0"}, locks)
-            res.note(f"Tamagotchi down for {SETTLE * 3}s more than the voting window")
-            time.sleep(SETTLE * 3)
+            events = self.events("battle.finished")
+            self.c.run("stop", "tamagotchi")
+            try:
+                transaction_id = self.forfeit_and_find(battle_id, a, b)["transactionId"]
+                held = self.wait_status(transaction_id, {"waiting"}, timeout=60)
+                res.check("status while Tamagotchi is down", "waiting", held.get("status"))
+                res.check("reason", "VOTE_MISSING: tamagotchi", held.get("reason"))
+                locks = {p: self.c.query(p, "SELECT count(*) FROM pg_prepared_xacts")
+                         for p in ("user-management", "battle")}
+                res.check("prepared branches held by the others", {"user-management": "0", "battle": "0"}, locks)
+                still_waiting = self.b.transaction(transaction_id)
+                res.check("same attempt was waiting throughout database checks", ("waiting", held.get("attempt")),
+                          (still_waiting.get("status"), still_waiting.get("attempt")))
+                res.note(f"Tamagotchi stays down for another {SETTLE * 3}s")
+                time.sleep(SETTLE * 3)
+            finally:
+                self.c.run("start", "tamagotchi")
+            tx = self.b.wait_transaction(transaction_id, timeout=240)
+            res.note(f"battle {battle_id}, transaction {transaction_id}, committed at attempt {tx.get('attempt')}")
+            self.settled_battle(res, battle_id, a, b, before, tx, events, attempt=None)
+            res.check("attempt", ">= 2", tx.get("attempt"), (tx.get("attempt") or 0) >= 2)
         finally:
-            self.c.run("start", "tamagotchi")
-        tx = self.b.wait_transaction(transaction_id, timeout=240)
-        res.note(f"battle {battle_id}, transaction {transaction_id}, committed at attempt {tx.get('attempt')}")
-        self.settled_battle(res, battle_id, a, b, before, tx, events, attempt=None)
-        res.check("attempt", ">= 2", tx.get("attempt"), (tx.get("attempt") or 0) >= 2)
+            self.c.restore_broker(self.b)
 
     def s9(self, res: Result) -> None:
         nodes = DATABASES["tamagotchi"][0]
         if self.c.writer("tamagotchi") != nodes[0]:
             raise StepFailed(f"{nodes[0]} is not the Tamagotchi writer; rejoin the topology first")
         a, b, battle_id = self.duel()
-        before, events = Snapshot(self.b, [a, b]), self.events("battle.finished")
+        before = Snapshot(self.b, [a, b])
         self.c.broker_settings(self.b, TX_PAUSE_POINT="after-decision", TX_PAUSE_MS="90000")
         try:
+            events = self.events("battle.finished")
             transaction_id = self.forfeit_and_find(battle_id, a, b)["transactionId"]
             self.wait_status(transaction_id, {"committing"})
             self.wait_prepared(transaction_id, PARTICIPANTS["battle.settlement"])
-            gid = self.c.query("tamagotchi", "SELECT string_agg(gid, ',') FROM pg_prepared_xacts", node=nodes[1]) or ""
-            res.check(f"branch in doubt replicated to {nodes[1]}", "present", "present" if transaction_id in gid else gid,
-                      transaction_id in gid)
+            lsn = self.c.query("tamagotchi", "SELECT pg_current_wal_flush_lsn()", node=nodes[0])
+            if not lsn:
+                raise StepFailed("could not read the primary WAL position after prepare")
+            # Hot standbys replay the prepare record without listing it in
+            # pg_prepared_xacts. Verify replay now and inspect the branch after promotion.
+            deadline = time.monotonic() + 20
+            for node in nodes[1:]:
+                sql = f"SELECT pg_last_wal_replay_lsn() WHERE pg_last_wal_replay_lsn() >= '{lsn}'::pg_lsn"
+                while not (replayed := self.c.query("tamagotchi", sql, node=node)):
+                    if time.monotonic() >= deadline:
+                        raise StepFailed(f"{node} did not replay prepared WAL through {lsn}")
+                    time.sleep(0.25)
+                res.check(f"{node} replayed the primary WAL position after prepare", f"at least {lsn}", replayed, True)
             self.c.run("kill", nodes[0])
-            p = subprocess.run(["bash", str(ROOT / "scripts/ha/postgres-promote.sh"), *nodes],
+
+            def replay_position(node: str) -> int:
+                position = self.c.query("tamagotchi", "SELECT pg_last_wal_replay_lsn() - '0/0'::pg_lsn", node=node)
+                if position is None:
+                    raise StepFailed(f"could not read {node}'s replay position")
+                return int(position)
+
+            candidate, remaining = sorted(nodes[1:], key=replay_position, reverse=True)
+            p = subprocess.run(["bash", str(ROOT / "scripts/ha/postgres-promote.sh"), nodes[0], candidate, remaining],
                                capture_output=True, text=True)
-            res.note(f"{nodes[0]} killed, promote: {(p.stdout + p.stderr).strip().splitlines()[-1:]}")
-            res.check("new Tamagotchi writer", nodes[1], self.c.writer("tamagotchi"))
-            gid = self.c.query("tamagotchi", "SELECT string_agg(gid, ',') FROM pg_prepared_xacts", node=nodes[1]) or ""
+            if p.returncode:
+                details = (p.stdout + p.stderr).strip().splitlines()[-1:]
+                raise StepFailed(f"standby promotion failed: {details}")
+            res.note(f"{nodes[0]} was stopped. {p.stdout.strip().splitlines()[-1]}")
+            res.check("new Tamagotchi writer", candidate, self.c.writer("tamagotchi"))
+            gid = self.c.query("tamagotchi", "SELECT string_agg(gid, ',') FROM pg_prepared_xacts", node=candidate) or ""
             res.check("branch in doubt on the promoted node", "present", "present" if transaction_id in gid else gid,
                       transaction_id in gid)
             tx = self.b.wait_transaction(transaction_id, timeout=240)
+            res.note(f"battle {battle_id}, transaction {transaction_id}")
+            self.settled_battle(res, battle_id, a, b, before, tx, events)
+            res.check("Tamagotchi /prepared", [], self.b.prepared("tamagotchi"))
+            res.note(f"Topology changed: {nodes[0]} is fenced; rejoin it as in the README before the next run.")
         finally:
             self.c.restore_broker(self.b)
-        res.note(f"battle {battle_id}, transaction {transaction_id}")
-        self.settled_battle(res, battle_id, a, b, before, tx, events)
-        res.check("Tamagotchi /prepared", [], self.b.prepared("tamagotchi"))
-        res.note("Topology changed: tamagotchi-db is fenced; rejoin it as in the README before the next run.")
 
     def s10(self, res: Result) -> None:
         a, b, battle_id = self.duel()
@@ -393,9 +427,21 @@ class Run:
 
     def s11(self, res: Result) -> None:
         a, b, battle_id = self.duel()
-        before, events = Snapshot(self.b, [a, b]), self.events("battle.finished")
+        before = Snapshot(self.b, [a, b])
         self.c.broker_settings(self.b, TX_RETRY_BACKOFF_MS="20000")
         try:
+            events = self.events("battle.finished")
+            consumers = {"user-management", "tamagotchi"}
+            deadline = time.monotonic() + 30
+            while True:
+                topics = self.b.own("GET", "/api/v1/topics").get("topics", [])
+                subscribed = {s["service"] for t in topics if t["pattern"] in ("battle.finished", "battle.*", "*")
+                              for s in t["subscribers"]}
+                if consumers <= subscribed:
+                    break
+                if time.monotonic() >= deadline:
+                    raise StepFailed(f"Broker is missing battle.finished subscriptions: {sorted(consumers - subscribed)}")
+                time.sleep(0.5)
             self.c.run("stop", "user-management", "tamagotchi")
             try:
                 transaction_id = self.forfeit_and_find(battle_id, a, b)["transactionId"]
@@ -406,10 +452,15 @@ class Run:
                     "producer": "battle-service", "correlationId": new_id(), "idempotencyKey": battle_id,
                     "payload": payload})
                 res.check("legacy battle.finished queued", 202, r.status)
+                subscribers = set(r.get("subscribers") or [])
+                res.check("legacy event queued for both participants", sorted(consumers), sorted(consumers & subscribers))
                 res.note("published as Battle 4.x would, while User Management and Tamagotchi were down")
             finally:
                 self.c.run("start", "user-management", "tamagotchi")
             tx = self.b.wait_transaction(transaction_id, timeout=240)
+            time.sleep(SETTLE)
+            res.check("battle.finished published (by hand, then by Battle)", 2,
+                      int(self.events("battle.finished") - events))
         finally:
             self.c.restore_broker(self.b)
         res.note(f"battle {battle_id}, transaction {transaction_id}")
@@ -417,7 +468,6 @@ class Run:
         states = {p.get("service"): p.get("state") for p in tx.get("participants", [])}
         res.check("participant states", {"user-management": "already_applied", "tamagotchi": "already_applied",
                                          "battle": "committed"}, states)
-        time.sleep(SETTLE)
         after = Snapshot(self.b, [a, b])
         res.check("winner's balance", f"{before.balance[a.user_id] + 250} (event's +250 once)", after.balance[a.user_id],
                   after.balance[a.user_id] == before.balance[a.user_id] + 250)
@@ -427,13 +477,16 @@ class Run:
         res.check("transferred creature's owner", a.user_id, after.creature[b.primary]["ownerId"])
         res.check("winner's new secondary references", [b.primary],
                   sorted(set(after.secondaries[a.user_id]) - set(before.secondaries[a.user_id])))
+        for p, xp in ((a, 30), (b, 10)):
+            old, new = before.creature[p.primary], after.creature[p.primary]
+            res.check(f"{p.username}'s legacy XP applied once", (old["level"], old["xp"] + xp),
+                      (new["level"], new["xp"]))
         for participant in ("user-management", "tamagotchi"):
             rows = self.branches(participant, transaction_id)
             res.check(f"{participant} branch (already_applied prepares nothing)", "no committed branch",
                       json.dumps(rows) if any(r["outcome"] == "committed" for r in rows) else "no committed branch",
                       not any(r["outcome"] == "committed" for r in rows))
         res.check("settlementStatus", "settled", self.f.get_battle(battle_id, a.user_id).get("settlementStatus"))
-        res.check("battle.finished published (by hand, then by Battle)", 2, int(self.events("battle.finished") - events))
         time.sleep(SETTLE)
         res.check("nothing changes afterwards", "same snapshot",
                   "same snapshot" if Snapshot(self.b, [a, b]).same(after) else "changed", None)
