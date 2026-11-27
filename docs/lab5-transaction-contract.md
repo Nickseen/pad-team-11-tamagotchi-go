@@ -271,8 +271,11 @@ The reward rules stay those of Lab 4; only their application becomes atomic.
    transaction without a journaled commit decision is aborted (presumed abort).
 4. **Commit order.** The initiator commits last, when all others have confirmed. Its outbox event is
    therefore published only after every reward is in place.
-5. **No giving up.** Commit and rollback are repeated until every participant confirmed, with a backoff
-   of 1 s doubling to 30 s, also across Broker restarts. No phase counts as delivered without its `200`.
+5. **No giving up.** Commit and a final rollback are repeated until every participant confirmed, with a
+   backoff of 1 s doubling to 30 s, also across Broker restarts. No phase counts as delivered without its
+   `200`. The rollback of an attempt that is not the last waits at most `TX_PREPARE_TIMEOUT_MS` for each
+   participant: one that is still unreachable, usually the one whose vote was missing, is left to the
+   recovery scan (rule 7), so the transaction reaches `waiting` while that participant is down.
 6. **Restart.** `committing` and `rolling_back` continue; `preparing` rolls its attempt back
    (`COORDINATOR_RESTARTED`) and starts the next one.
 7. **Recovery scan.** Every `TX_RECOVERY_INTERVAL_MS` the coordinator reads each participant's `/prepared`

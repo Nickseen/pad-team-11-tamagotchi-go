@@ -94,7 +94,7 @@ x-user-management-env: &user-management-env
   JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-signing-key.pem # one key for every replica
 
 x-user-management: &user-management
-  image: amzavladislav/tamagotchi-user-management:5.1.1
+  image: amzavladislav/tamagotchi-user-management:5.2.0
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -170,7 +170,7 @@ x-battle-env: &battle-env
   DEPENDENCY_MODE: ${BATTLE_DEPENDENCY_MODE:-live}
 
 x-battle: &battle
-  image: amzavladislav/tamagotchi-battle:5.1.0
+  image: amzavladislav/tamagotchi-battle:5.2.0
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
