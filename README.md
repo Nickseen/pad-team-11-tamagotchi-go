@@ -2555,17 +2555,17 @@ secrets.
 
 | Service | Collection | Covers beyond its own routes |
 | ------- | ---------- | ---------------------------- |
-| User Management | `user-management.postman_collection.json` | `403 INTERNAL_ROUTE_FORBIDDEN` for clients, also through an escaped path; forged identity headers replaced by the token's |
+| User Management | `user-management.postman_collection.json` | `403 INTERNAL_ROUTE_FORBIDDEN` for clients, also through an escaped path; forged identity headers replaced by the token's; the Saga `currency` step through the Broker with synthetic IDs: refused for unknown users, compensated, then `409 TRANSACTION_ABORTED` and resolved as aborted |
 | Tamagotchi | `tamagotchi.postman_collection.json` | Service routes through the Broker's request queue; the Gateway refusing the service token; Gateway errors |
 | Package Registry | `package-registry.postman_collection.json` | Packages created by any user; status through the Broker; `registry.*` events checked against the Broker's publication counts; admin requests skipped without `registryAdminToken` |
-| Battle | `battle.postman_collection.json` | Real data set up in Package Registry and Tamagotchi through the Gateway; the lineup checks Battle makes with Tamagotchi |
+| Battle | `battle.postman_collection.json` | Real data set up in Package Registry and Tamagotchi through the Gateway; the lineup checks Battle makes with Tamagotchi; the Saga `verify` and `complete` steps through the Broker with a synthetic battle: `BATTLE_NOT_DECIDED`, compensated, then `409 TRANSACTION_ABORTED` |
 | Map | `map.postman_collection.json` | Map → User Management relationships; `map.stream` ticket negotiation |
 | Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
 | Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history; `guild.*` events reaching the Broker and `user.deleted` removing a member |
 | Monster Raid | `monster-raid.postman_collection.json` | Saga participant requests and 2PC prepared-branch inspection through Broker, plus `raid.feed` ticket negotiation |
 | Gateway cache | `gateway-cache.postman_collection.json` | Lab 5 #195: the shared cache through the Gateway: `X-Cache` miss then hit, another user and no token never served a cached answer, a write invalidating, query order, the public combat types shared, an uncached route |
 | Gateway | `gateway-logs.postman_collection.json` | Lab 4 #155: `GET /api/v1/gateway/logs` downloads the system logs as NDJSON (last 15 minutes); set `adminToken` (and optionally `userToken` for the `403` case) |
-| Message Broker | `message-broker.postman_collection.json` | Called directly at `{{brokerUrl}}`: status and metrics; request queues to Battle and Tamagotchi; publishing `user.deleted`; the topic list; a dead letter created, listed and replayed; `400`, `401` and `404` answers |
+| Message Broker | `message-broker.postman_collection.json` | Called directly at `{{brokerUrl}}`: status and metrics; request queues to Battle and Tamagotchi; publishing `user.deleted`; the topic list; a dead letter created, listed and replayed; transactions, with finished sagas and their four steps; `400`, `401` and `404` answers |
 
 The environment `tamagotchi-go.postman_environment.json` defines `gatewayUrl`
 (`http://localhost:8080`), `brokerUrl` (`http://localhost:8091`, the Broker's local inspection port), `guildUrl` for Guild's health probe, `packageId` for test-user
