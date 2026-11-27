@@ -3,3 +3,9 @@
 
 # The shared User Management signing key the Compose stack mounts
 secrets/
+
+# Service exports the ETL job loads (scripts/etl/extract.sh); they hold live data
+etl/input/
+
+# Python bytecode from scripts/tx
+__pycache__/

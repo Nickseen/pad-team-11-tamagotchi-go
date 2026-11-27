@@ -1939,6 +1939,225 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Saga participant",
+      "description": "Battle's Saga steps (`verify` and `complete`), in order, with a synthetic battle and transaction ID through the Broker's request queue. No real battle is settled or failed.",
+      "item": [
+        {
+          "name": "Verify an unknown battle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{battleSagaTransactionId}}\",\n  \"step\": \"verify\",\n  \"operation\": \"battle.settlement\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{battleSagaBattleId}}\",\n  \"payload\": {{battleSagaPayload}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/battle/api/v1/internal/transactions/{{battleSagaTransactionId}}/execute",
+            "description": "`verify` changes nothing; a battle that is not decided with this transaction refuses it."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Synthetic IDs: no user or battle has them, so nothing real is paid or settled.",
+                  "const id = () => pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('battleSagaTransactionId', id());",
+                  "const battleId = id(); pm.collectionVariables.set('battleSagaBattleId', battleId);",
+                  "const payload = { battleId, winnerId: id(), loserId: id(), outcome: 'forfeit', turnCount: 1, transferredTamagotchiId: id(),",
+                  "  currency: { winnerDelta: 250, loserDelta: -100 },",
+                  "  xp: { winner: { primaryTamagotchiId: id(), primaryXp: 30, secondaryTamagotchiId: null, secondaryXp: 0 },",
+                  "        loser: { primaryTamagotchiId: id(), primaryXp: 10, secondaryTamagotchiId: null, secondaryXp: 0 } },",
+                  "  finishedAt: new Date().toISOString() };",
+                  "pm.collectionVariables.set('battleSagaPayload', JSON.stringify(payload));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Refused with BATTLE_NOT_DECIDED', () => pm.expect(pm.response.json()).to.include({ result: 'rejected', code: 'BATTLE_NOT_DECIDED' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A step owned by another service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{battleSagaTransactionId}}\",\n  \"step\": \"currency\",\n  \"operation\": \"battle.settlement\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{battleSagaBattleId}}\",\n  \"payload\": {{battleSagaPayload}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/battle/api/v1/internal/transactions/{{battleSagaTransactionId}}/execute",
+            "description": "Battle executes only `verify` and `complete`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Wrong step is refused', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Compensate verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{battleSagaTransactionId}}\",\n  \"step\": \"verify\",\n  \"operation\": \"battle.settlement\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{battleSagaBattleId}}\",\n  \"payload\": {{battleSagaPayload}},\n  \"reason\": \"POSTMAN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/battle/api/v1/internal/transactions/{{battleSagaTransactionId}}/compensate",
+            "description": "Fails the settlement only for the battle's own transaction ID; here it records the ID and changes no battle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Compensated', () => pm.expect(pm.response.json()).to.eql({ status: 'compensated' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complete after the compensation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{battleSagaTransactionId}}\",\n  \"step\": \"complete\",\n  \"operation\": \"battle.settlement\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{battleSagaBattleId}}\",\n  \"payload\": {{battleSagaPayload}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/battle/api/v1/internal/transactions/{{battleSagaTransactionId}}/execute",
+            "description": "Once `verify` is compensated, the battle is never settled by this transaction."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('The saga is aborted', () => pm.expect(pm.response.json().error.code).to.eql('TRANSACTION_ABORTED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve complete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{battleSagaTransactionId}}\",\n  \"step\": \"complete\",\n  \"operation\": \"battle.settlement\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{battleSagaBattleId}}\",\n  \"payload\": {{battleSagaPayload}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/battle/api/v1/internal/transactions/{{battleSagaTransactionId}}/resolve",
+            "description": "`complete` did not run. Its resolve changes nothing, so after the pivot the Broker could send it again."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Reported as aborted', () => pm.expect(pm.response.json()).to.eql({ state: 'aborted' }));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

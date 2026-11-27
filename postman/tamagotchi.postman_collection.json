@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Tamagotchi Service",
-    "description": "Every route of the Tamagotchi service, called through the API Gateway (Lab 2), in the order the Runner should run them. Setup registers and logs in through the Gateway. User requests carry the access token, which the Gateway validates and replaces with its trusted headers; service requests carry only X-Service-Token. Uses the shared environment's gatewayUrl and serviceToken. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN.",
+    "description": "Every route of the Tamagotchi service, called through the API Gateway (Lab 2), in the order the Runner should run them. Setup registers and logs in through the Gateway. User requests carry the access token, which the Gateway validates and replaces with its trusted headers; service requests carry only X-Service-Token. Uses the shared environment's gatewayUrl and serviceToken. Lab 4: requests that carry X-Service-Token act as another service, so they go to the Message Broker's request queue of the service, {{brokerUrl}}/api/v1/queues/<slug>/api/v1/..., which forwards them to a ready replica; the Gateway refuses them with 403 INTERNAL_ROUTE_FORBIDDEN. Lab 5: the Distributed transactions folder reads and validates the participant routes the Broker calls as the coordinator.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -1661,6 +1661,148 @@
                   "pm.test(\"422 UNSUPPORTED_EVENT_VERSION\", () => {",
                   "    pm.response.to.have.status(422);",
                   "    pm.expect(pm.response.json().error.code).to.eql('UNSUPPORTED_EVENT_VERSION');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Distributed transactions",
+      "description": "Lab 5: Tamagotchi's participant routes (docs/lab5-transaction-contract.md, docs/lab5-saga-contract.md). The Broker calls them as the coordinator; these requests only read and validate, so no creature changes.",
+      "item": [
+        {
+          "name": "Branches in doubt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/transactions/prepared"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a list of branches\", () => {",
+                  "  const items = pm.response.json().items;",
+                  "  pm.expect(items).to.be.an(\"array\");",
+                  "  items.forEach(b => { pm.expect(b.transactionId).to.be.a(\"string\"); pm.expect(b.attempt).to.be.a(\"number\"); });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prepare an unknown operation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/transactions/00000000-0000-4000-8000-000000000001/prepare",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"00000000-0000-4000-8000-000000000001\",\n  \"attempt\": 1,\n  \"operation\": \"battle.rematch\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"00000000-0000-4000-8000-000000000002\",\n  \"payload\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 VALIDATION_FAILED\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Execute another participant's step",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/queues/tamagotchi/api/v1/internal/transactions/00000000-0000-4000-8000-000000000001/execute",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"00000000-0000-4000-8000-000000000001\",\n  \"step\": \"currency\",\n  \"operation\": \"battle.settlement\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"00000000-0000-4000-8000-000000000002\",\n  \"payload\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 VALIDATION_FAILED: Tamagotchi runs only the creatures step\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"VALIDATION_FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Branches in doubt read by a client",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/internal/transactions/prepared"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 INTERNAL_ROUTE_FORBIDDEN\", () => {",
+                  "  pm.response.to.have.status(403);",
+                  "  pm.expect(pm.response.json().error.code).to.eql(\"INTERNAL_ROUTE_FORBIDDEN\");",
                   "});"
                 ]
               }

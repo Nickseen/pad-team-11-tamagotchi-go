@@ -1,0 +1,554 @@
+{
+  "info": {
+    "name": "Gateway cache",
+    "description": "CPR #195: the Gateway's shared, sharded Redis cache (Gateway README, \"Shared cache\"). Every request goes through the Gateway. X-Cache tells whether an answer came from the cache (HIT), from the service and was stored (MISS), or from the service because the cache could not answer (BYPASS). Each run registers its own users and package.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('cacheRunId')) {",
+          "    const runId = Date.now().toString(36);",
+          "    pm.collectionVariables.set('cacheRunId', runId);",
+          "    pm.collectionVariables.set('cacheNameA', 'pad_cache_a_' + runId);",
+          "    pm.collectionVariables.set('cacheNameB', 'pad_cache_b_' + runId);",
+          "    pm.collectionVariables.set('cachePassword', 'postman-run-' + runId);",
+          "    pm.collectionVariables.set('cacheRunPackageId', pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup (User Management, Package Registry)",
+      "item": [
+        {
+          "name": "Register user A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('cacheUserA', pm.response.json().userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{cacheNameA}}\",\n  \"email\": \"{{cacheNameA}}@example.com\",\n  \"password\": \"{{cachePassword}}\",\n  \"packageId\": \"{{cacheRunPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register user B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{cacheNameB}}\",\n  \"email\": \"{{cacheNameB}}@example.com\",\n  \"password\": \"{{cachePassword}}\",\n  \"packageId\": \"{{cacheRunPackageId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Log in user A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('cacheTokenA', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{cacheNameA}}\",\n  \"password\": \"{{cachePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Log in user B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('cacheTokenB', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{gatewayUrl}}/user-management/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{cacheNameB}}\",\n  \"password\": \"{{cachePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "User A creates a package",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('cachePackageId', pm.response.json().packageId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"cache-check-{{cacheRunId}}\",\n  \"name\": \"Cache check\",\n  \"description\": \"before the write\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cache",
+      "item": [
+        {
+          "name": "First read: MISS, answered by Package Registry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: MISS', () => pm.expect(xCache).to.equal('MISS'));",
+                  "pm.collectionVariables.set('cacheFirstBody', pm.response.text());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{cachePackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Same read again: HIT, the same answer from the cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: HIT', () => pm.expect(xCache).to.equal('HIT'));",
+                  "pm.test('the cached answer is the first one', () => pm.expect(pm.response.text()).to.equal(pm.collectionVariables.get('cacheFirstBody')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{cachePackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "User B reads the same URL: MISS, never user A's entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: MISS (the key is scoped to the user)', () => pm.expect(xCache).to.equal('MISS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenB}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{cachePackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "No token: 401 before the cache is looked up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('UNAUTHORIZED', () => pm.expect(pm.response.json().error.code).to.equal('UNAUTHORIZED'));",
+                  "pm.test('no X-Cache header: the cache was not involved', () => pm.expect(pm.response.headers.has('X-Cache')).to.be.false);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{cachePackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "User A changes the package: the write invalidates the family",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{cachePackageId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"after the write {{cacheRunId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Read after the write: MISS, with the new data",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: MISS (the generation changed)', () => pm.expect(xCache).to.equal('MISS'));",
+                  "pm.test('the new description', () => pm.expect(pm.response.json().description).to.equal('after the write ' + pm.collectionVariables.get('cacheRunId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{cachePackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Read again: HIT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: HIT', () => pm.expect(xCache).to.equal('HIT'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages/{{cachePackageId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "List with ?status=draft&limit=5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: MISS', () => pm.expect(xCache).to.equal('MISS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages?status=draft&limit=5"
+          },
+          "response": []
+        },
+        {
+          "name": "Same list with the query reordered: HIT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: HIT (sorted query in the key)', () => pm.expect(xCache).to.equal('HIT'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/package-registry/api/v1/packages?limit=5&status=draft"
+          },
+          "response": []
+        },
+        {
+          "name": "Public combat types, no token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: MISS or HIT (shared by every client for 60 s)', () => pm.expect(['MISS', 'HIT']).to.include(xCache));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/combat-types"
+          },
+          "response": []
+        },
+        {
+          "name": "Public combat types as user B: HIT, one entry for all clients",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const xCache = pm.response.headers.get('X-Cache');",
+                  "pm.test('X-Cache: HIT', () => pm.expect(xCache).to.equal('HIT'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenB}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/combat-types"
+          },
+          "response": []
+        },
+        {
+          "name": "A route outside the cache rules has no X-Cache header",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('no X-Cache header', () => pm.expect(pm.response.headers.has('X-Cache')).to.be.false);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cacheTokenA}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/tamagotchi/api/v1/tamagotchis"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "cacheRunId",
+      "value": ""
+    },
+    {
+      "key": "cacheNameA",
+      "value": ""
+    },
+    {
+      "key": "cacheNameB",
+      "value": ""
+    },
+    {
+      "key": "cachePassword",
+      "value": ""
+    },
+    {
+      "key": "cacheRunPackageId",
+      "value": ""
+    },
+    {
+      "key": "cacheUserA",
+      "value": ""
+    },
+    {
+      "key": "cacheTokenA",
+      "value": ""
+    },
+    {
+      "key": "cacheTokenB",
+      "value": ""
+    },
+    {
+      "key": "cachePackageId",
+      "value": ""
+    },
+    {
+      "key": "cacheFirstBody",
+      "value": ""
+    }
+  ]
+}

@@ -1,8 +1,6 @@
-# The whole Tamagotchi Go ecosystem for Lab 3: the API Gateway, Service Discovery, two replicas of
-# each of the eight services and the stores each service owns, run from versioned images. Nothing
-# is built locally. DRAFT for #133: it selects the planned Lab 3 releases; README ("Lab 3 rollout
-# status") lists which are published. Do not merge until every image exists and the shared-stack
-# checks in #133 pass.
+# Tamagotchi Go deployment. Compose runs versioned images for Gateway, Discovery, Broker,
+# the eight domain services, their stores and monitoring.
+# See README for credentials, database replication and failover.
 #
 #   cp .env.example .env                                   # replace every CHANGE_ME
 #   openssl genrsa -out secrets/jwt-signing-key.pem 2048   # one key for every User Management replica
@@ -89,19 +87,26 @@ x-user-management-env: &user-management-env
   # bcrypt costs ~200 ms of CPU per login: admit no more than the 10-connection database pool, so excess
   # logins get 429 instead of queueing past TASK_TIMEOUT_MS (contract: overload, timeouts and the last replica).
   MAX_CONCURRENT_TASKS: 10
-  DATABASE_URL: postgres://usermgmt:${USERMGMT_DB_PASSWORD}@user-management-db:5432/usermgmt?sslmode=disable
+  # The primary and both standbys; pgx connects to whichever accepts writes (#193).
+  DATABASE_URL: postgres://usermgmt:${USERMGMT_DB_PASSWORD}@user-management-db:5432,user-management-db-1:5432,user-management-db-2:5432/usermgmt?sslmode=disable&target_session_attrs=read-write&connect_timeout=2
   JWT_ISSUER: user-management
   JWT_AUDIENCE: tamagotchi-go
   JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-signing-key.pem # one key for every replica
 
 x-user-management: &user-management
-  image: amzavladislav/tamagotchi-user-management:4.0.2
+  image: amzavladislav/tamagotchi-user-management:5.2.0
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
     user-management-db:
       condition: service_healthy
+    user-management-db-1:
+      condition: service_healthy
+      required: false
+    user-management-db-2:
+      condition: service_healthy
+      required: false
   secrets:
     - source: jwt-signing-key
       target: jwt-signing-key.pem
@@ -109,16 +114,23 @@ x-user-management: &user-management
 x-tamagotchi-env: &tamagotchi-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 10
-  DATABASE_URL: postgresql+psycopg://tamagotchi:${TAMAGOTCHI_DB_PASSWORD}@tamagotchi-db:5432/tamagotchi
+  # The primary and both standbys; libpq connects to whichever accepts writes (#193).
+  DATABASE_URL: postgresql+psycopg://tamagotchi:${TAMAGOTCHI_DB_PASSWORD}@/tamagotchi?host=tamagotchi-db,tamagotchi-db-1,tamagotchi-db-2&target_session_attrs=read-write&connect_timeout=2
 
 x-tamagotchi: &tamagotchi
-  image: crislp/tamagotchi-tamagotchi:4.0.0
+  image: crislp/tamagotchi-tamagotchi:5.2.0
   restart: on-failure
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
     tamagotchi-db:
       condition: service_healthy
+    tamagotchi-db-1:
+      condition: service_healthy
+      required: false
+    tamagotchi-db-2:
+      condition: service_healthy
+      required: false
   healthcheck:
     <<: *python-healthcheck
     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
@@ -126,10 +138,11 @@ x-tamagotchi: &tamagotchi
 x-package-registry-env: &package-registry-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 64
-  DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@package-registry-db:5432/registry
+  # The primary and both standbys; libpq connects to whichever accepts writes (#193).
+  DATABASE_URL: postgresql+psycopg://registry:${REGISTRY_DB_PASSWORD}@/registry?host=package-registry-db,package-registry-db-1,package-registry-db-2&target_session_attrs=read-write&connect_timeout=2
 
 x-package-registry: &package-registry
-  image: gabimiric/tamagotchi-package-registry:4.0.1
+  image: gabimiric/tamagotchi-package-registry:5.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
@@ -137,6 +150,12 @@ x-package-registry: &package-registry
       condition: service_healthy
     package-registry-db:
       condition: service_healthy
+    package-registry-db-1:
+      condition: service_healthy
+      required: false
+    package-registry-db-2:
+      condition: service_healthy
+      required: false
   healthcheck:
     <<: *python-healthcheck
     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"]
@@ -144,19 +163,26 @@ x-package-registry: &package-registry
 x-battle-env: &battle-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 50
-  DATABASE_URL: postgres://battle:${BATTLE_DB_PASSWORD}@battle-db:5432/battle?sslmode=disable
+  # The primary and both standbys; pgx connects to whichever accepts writes (#193).
+  DATABASE_URL: postgres://battle:${BATTLE_DB_PASSWORD}@battle-db:5432,battle-db-1:5432,battle-db-2:5432/battle?sslmode=disable&target_session_attrs=read-write&connect_timeout=2
   # live calls Tamagotchi and Package Registry through the Broker's HTTP queues and User Management
   # over gRPC through the Broker (BROKER_URL and BROKER_GRPC_ADDR above); Battle 4.x reads no GATEWAY_URL.
   DEPENDENCY_MODE: ${BATTLE_DEPENDENCY_MODE:-live}
 
 x-battle: &battle
-  image: amzavladislav/tamagotchi-battle:4.1.0
+  image: amzavladislav/tamagotchi-battle:5.2.0
   restart: unless-stopped
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
     battle-db:
       condition: service_healthy
+    battle-db-1:
+      condition: service_healthy
+      required: false
+    battle-db-2:
+      condition: service_healthy
+      required: false
 
 x-map-env: &map-env
   <<: *gateway-context
@@ -165,7 +191,7 @@ x-map-env: &map-env
   PORT: 8085
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
   MAP_STORAGE: redis
-  MAP_REDIS_ADDR: map-redis:6379
+  MAP_REDIS_ADDR: map-redis-writer:6379
   MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
   MAP_REDIS_DB: 0
   MAP_RELATIONSHIP_MODE: ${MAP_RELATIONSHIP_MODE:-grpc}
@@ -176,23 +202,30 @@ x-map: &map
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
-    map-redis:
-      condition: service_healthy
+    map-redis-writer:
+      condition: service_started
 
 x-notification-env: &notification-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 10
-  DATABASE_URL: postgresql+psycopg://notification:${NOTIFICATION_DB_PASSWORD}@notification-db:5432/notification
+  # The primary and both standbys; libpq connects to whichever accepts writes (#193).
+  DATABASE_URL: postgresql+psycopg://notification:${NOTIFICATION_DB_PASSWORD}@/notification?host=notification-db,notification-db-1,notification-db-2&target_session_attrs=read-write&connect_timeout=2
   # Guild member reads use BROKER_GRPC_ADDR; event publication/delivery uses Broker topics.
 
 x-notification: &notification
-  image: crislp/tamagotchi-notification:4.0.0
+  image: crislp/tamagotchi-notification:5.0.0
   restart: on-failure
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
     notification-db:
       condition: service_healthy
+    notification-db-1:
+      condition: service_healthy
+      required: false
+    notification-db-2:
+      condition: service_healthy
+      required: false
   healthcheck:
     <<: *python-healthcheck
     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
@@ -201,7 +234,8 @@ x-guild-env: &guild-env
   <<: *gateway-context
   MAX_CONCURRENT_TASKS: 64
   MAX_WEBSOCKET_CONNECTIONS: 100
-  DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@guild-db:5432/guild
+  # The primary and both standbys; libpq connects to whichever accepts writes (#193).
+  DATABASE_URL: postgresql+psycopg://guild:${GUILD_DB_PASSWORD}@/guild?host=guild-db,guild-db-1,guild-db-2&target_session_attrs=read-write&connect_timeout=2
   USER_MANAGEMENT_MODE: ${GUILD_USER_MANAGEMENT_MODE:-real}
   # Invitee lookups call UserManagementInternal/ListUsers over gRPC through the Broker (Lab 4 Grade 8).
   USER_MANAGEMENT_TRANSPORT: grpc
@@ -210,7 +244,7 @@ x-guild-env: &guild-env
   REDIS_URL: redis://:${GUILD_REDIS_PASSWORD}@guild-redis:6379/0
 
 x-guild: &guild
-  image: gabimiric/tamagotchi-guild:4.0.0
+  image: gabimiric/tamagotchi-guild:5.0.0
   restart: on-failure
   stop_grace_period: 15s # SIGTERM: not ready, deregister, then drain for at most 8 s
   depends_on:
@@ -218,6 +252,12 @@ x-guild: &guild
       condition: service_healthy
     guild-db:
       condition: service_healthy
+    guild-db-1:
+      condition: service_healthy
+      required: false
+    guild-db-2:
+      condition: service_healthy
+      required: false
     guild-redis:
       condition: service_healthy
   healthcheck:
@@ -230,7 +270,7 @@ x-monster-raid-env: &monster-raid-env
   MAX_WEBSOCKET_CONNECTIONS: 100
   RAID_ADDR: ":8088"
   RAID_STORAGE: postgres-redis
-  DATABASE_URL: postgres://raid:${RAID_DB_PASSWORD}@monster-raid-db:5432/raid?sslmode=disable
+  DATABASE_URL: postgres://raid:${RAID_DB_PASSWORD}@monster-raid-db:5432,monster-raid-db-1:5432,monster-raid-db-2:5432/raid?sslmode=disable&target_session_attrs=read-write&connect_timeout=2
   RAID_REDIS_ADDR: monster-raid-redis:6379
   RAID_REDIS_PASSWORD: ${RAID_REDIS_PASSWORD}
   RAID_REDIS_DB: 0
@@ -239,15 +279,174 @@ x-monster-raid-env: &monster-raid-env
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
 
 x-monster-raid: &monster-raid
-  image: nickseen/tamagotchi-monster-raid:4.0.0 # its image declares the /healthz check
+  image: nickseen/tamagotchi-monster-raid:5.1.0 # its image declares the /healthz check
   restart: on-failure
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
       condition: service_healthy
-    monster-raid-db:
+    monster-raid-db-1:
       condition: service_healthy
+      required: false
+    monster-raid-db-2:
+      condition: service_healthy
+      required: false
     monster-raid-redis:
       condition: service_healthy
+
+# The Gateway's shared cache (Lab 5, #195): Redis nodes the Gateway shards keys over by consistent hashing.
+# In memory only (no RDB snapshots, no AOF): every entry is a copy the services can rebuild, so a restarted node
+# starts empty. When a node is full it evicts the least recently used keys.
+x-cache-node: &cache-node
+  <<: *redis
+  command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb",
+    "--maxmemory-policy", "allkeys-lru", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD in .env}"]
+  environment:
+    REDISCLI_AUTH: ${CACHE_PASSWORD}
+
+x-postgres-node: &postgres-node
+  <<: *postgres
+  entrypoint: ["/bin/sh", "/ha/postgres-start.sh"]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+    <<: *postgres-healthcheck
+
+x-raid-db-env: &raid-db-env
+  POSTGRES_DB: raid
+  POSTGRES_USER: raid
+  POSTGRES_PASSWORD: ${RAID_DB_PASSWORD:?set RAID_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${RAID_REPLICATION_PASSWORD:?set RAID_REPLICATION_PASSWORD in .env}
+
+x-tamagotchi-db-env: &tamagotchi-db-env
+  POSTGRES_DB: tamagotchi
+  POSTGRES_USER: tamagotchi
+  POSTGRES_PASSWORD: ${TAMAGOTCHI_DB_PASSWORD:?set TAMAGOTCHI_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${TAMAGOTCHI_REPLICATION_PASSWORD:?set TAMAGOTCHI_REPLICATION_PASSWORD in .env}
+
+x-tamagotchi-standby: &tamagotchi-standby
+  <<: *postgres-node
+  environment:
+    <<: *tamagotchi-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: tamagotchi-db
+  depends_on:
+    tamagotchi-replication-init:
+      condition: service_completed_successfully
+
+x-notification-db-env: &notification-db-env
+  POSTGRES_DB: notification
+  POSTGRES_USER: notification
+  POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set NOTIFICATION_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${NOTIFICATION_REPLICATION_PASSWORD:?set NOTIFICATION_REPLICATION_PASSWORD in .env}
+
+x-notification-standby: &notification-standby
+  <<: *postgres-node
+  environment:
+    <<: *notification-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: notification-db
+  depends_on:
+    notification-replication-init:
+      condition: service_completed_successfully
+
+x-registry-db-env: &registry-db-env
+  POSTGRES_DB: registry
+  POSTGRES_USER: registry
+  POSTGRES_PASSWORD: ${REGISTRY_DB_PASSWORD:?set REGISTRY_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${REGISTRY_REPLICATION_PASSWORD:?set REGISTRY_REPLICATION_PASSWORD in .env}
+
+x-registry-standby: &registry-standby
+  <<: *postgres-node
+  environment:
+    <<: *registry-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: package-registry-db
+  depends_on:
+    package-registry-replication-init:
+      condition: service_completed_successfully
+
+x-guild-db-env: &guild-db-env
+  POSTGRES_DB: guild
+  POSTGRES_USER: guild
+  POSTGRES_PASSWORD: ${GUILD_DB_PASSWORD:?set GUILD_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${GUILD_REPLICATION_PASSWORD:?set GUILD_REPLICATION_PASSWORD in .env}
+
+x-guild-standby: &guild-standby
+  <<: *postgres-node
+  environment:
+    <<: *guild-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: guild-db
+  depends_on:
+    guild-replication-init:
+      condition: service_completed_successfully
+
+x-user-management-db-env: &user-management-db-env
+  POSTGRES_DB: usermgmt
+  POSTGRES_USER: usermgmt
+  POSTGRES_PASSWORD: ${USERMGMT_DB_PASSWORD:?set USERMGMT_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${USERMGMT_REPLICATION_PASSWORD:?set USERMGMT_REPLICATION_PASSWORD in .env}
+
+x-user-management-standby: &user-management-standby
+  <<: *postgres-node
+  environment:
+    <<: *user-management-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: user-management-db
+  depends_on:
+    user-management-replication-init:
+      condition: service_completed_successfully
+
+x-battle-db-env: &battle-db-env
+  POSTGRES_DB: battle
+  POSTGRES_USER: battle
+  POSTGRES_PASSWORD: ${BATTLE_DB_PASSWORD:?set BATTLE_DB_PASSWORD in .env}
+  PG_REPLICATION_PASSWORD: ${BATTLE_REPLICATION_PASSWORD:?set BATTLE_REPLICATION_PASSWORD in .env}
+
+x-battle-standby: &battle-standby
+  <<: *postgres-node
+  environment:
+    <<: *battle-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: battle-db
+  depends_on:
+    battle-replication-init:
+      condition: service_completed_successfully
+
+x-raid-standby: &raid-standby
+  <<: *postgres-node
+  environment:
+    <<: *raid-db-env
+    PGDATA: /var/lib/postgresql/data/pgdata
+    PG_REPLICA_SOURCE: monster-raid-db
+  depends_on:
+    monster-raid-replication-init:
+      condition: service_completed_successfully
+
+x-map-redis-node: &map-redis-node
+  <<: *redis
+  entrypoint: ["/bin/sh", "/ha/redis-start.sh"]
+  environment:
+    MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD:?set MAP_REDIS_PASSWORD in .env}
+    REDISCLI_AUTH: ${MAP_REDIS_PASSWORD}
+
+x-map-replica: &map-replica
+  <<: *map-redis-node
+  command: ["replica"]
+  depends_on:
+    map-redis:
+      condition: service_started
+
+x-map-sentinel: &map-sentinel
+  <<: *map-redis-node
+  command: ["sentinel"]
+  healthcheck:
+    test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+  depends_on:
+    map-redis:
+      condition: service_started
 
 services:
   # --- Service Discovery ----------------------------------------------------------------------------
@@ -276,10 +475,11 @@ services:
 
   # --- Message Broker (Lab 4) -----------------------------------------------------------------------
   # Request queues and topics for every service-to-service call and event, gRPC forwarding,
-  # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md).
-  # Published release; the matching main source is pinned in services/message-broker.
+  # least-load routing, breakers and durable queues (docs/lab4-broker-contract.md); since 5.0.0 also
+  # the coordinator of distributed transactions (docs/lab5-transaction-contract.md), journaled in
+  # broker-data. Published release; the matching main source is pinned in services/message-broker.
   message-broker:
-    image: nickseen/tamagotchi-message-broker:4.0.0
+    image: nickseen/tamagotchi-message-broker:5.1.0
     restart: unless-stopped
     depends_on:
       service-discovery:
@@ -304,13 +504,23 @@ services:
 
   # --- API Gateway ----------------------------------------------------------------------------------
   gateway:
-    image: nickseen/tamagotchi-gateway:4.0.1 # Broker queues, gRPC ticket checks and system logs
+    image: nickseen/tamagotchi-gateway:5.0.0 # Broker queues, gRPC ticket checks, system logs and the shared cache
     restart: unless-stopped
     depends_on:
       service-discovery:
         condition: service_healthy
       message-broker:
         condition: service_healthy
+      # The cache is optional for the Gateway: a node that is down is bypassed, so it does not wait for them.
+      cache-1:
+        condition: service_started
+        required: false
+      cache-2:
+        condition: service_started
+        required: false
+      cache-3:
+        condition: service_started
+        required: false
     environment:
       # Lab 4: Gateway forwards client traffic to the Broker's request queues (#153).
       BROKER_URL: http://message-broker:8091
@@ -323,21 +533,58 @@ services:
       # Above the services' 3000 ms, so their 503 TASK_TIMEOUT arrives before the Gateway's 504.
       REQUEST_TIMEOUT_MS: 5000
       MAX_IN_FLIGHT_REQUESTS: 100
+      # Lab 5: GET answers and User Management's key set in the shared cache, sharded over these nodes (#195).
+      CACHE_NODES: cache-1:6379,cache-2:6379,cache-3:6379
+      CACHE_PASSWORD: ${CACHE_PASSWORD:?set CACHE_PASSWORD in .env}
     ports:
       - "8080:8080"
 
+  cache-1:
+    <<: *cache-node
+  cache-2:
+    <<: *cache-node
+  cache-3:
+    <<: *cache-node
+
   # --- User Management ------------------------------------------------------------------------------
   user-management-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: user-management-db
     environment:
-      POSTGRES_DB: usermgmt
-      POSTGRES_USER: usermgmt
-      POSTGRES_PASSWORD: ${USERMGMT_DB_PASSWORD:?set USERMGMT_DB_PASSWORD in .env}
+      <<: *user-management-db-env
+      PGDATA: ${USERMGMT_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${USERMGMT_POSTGRES_UPSTREAM:-}
     volumes:
-      - usermgmt-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U usermgmt -d usermgmt"]
+      - ./scripts/ha:/ha:ro
+      - ${USERMGMT_POSTGRES_VOLUME:-usermgmt-data}:/var/lib/postgresql/data
+
+  user-management-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *user-management-db-env
+      PGHOST: user-management-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      user-management-db:
+        condition: service_healthy
+
+  user-management-db-1:
+    <<: *user-management-standby
+    hostname: user-management-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - usermgmt-db-1-data:/var/lib/postgresql/data
+
+  user-management-db-2:
+    <<: *user-management-standby
+    hostname: user-management-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - usermgmt-db-2-data:/var/lib/postgresql/data
 
   # Every replica signs access tokens with the same mounted key, so a token from one validates
   # against the key set any other publishes.
@@ -356,16 +603,43 @@ services:
 
   # --- Tamagotchi -----------------------------------------------------------------------------------
   tamagotchi-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: tamagotchi-db
     environment:
-      POSTGRES_DB: tamagotchi
-      POSTGRES_USER: tamagotchi
-      POSTGRES_PASSWORD: ${TAMAGOTCHI_DB_PASSWORD:?set TAMAGOTCHI_DB_PASSWORD in .env}
+      <<: *tamagotchi-db-env
+      PGDATA: ${TAMAGOTCHI_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${TAMAGOTCHI_POSTGRES_UPSTREAM:-}
     volumes:
-      - tamagotchi-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U tamagotchi -d tamagotchi"]
+      - ./scripts/ha:/ha:ro
+      - ${TAMAGOTCHI_POSTGRES_VOLUME:-tamagotchi-data}:/var/lib/postgresql/data
+
+  tamagotchi-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *tamagotchi-db-env
+      PGHOST: tamagotchi-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      tamagotchi-db:
+        condition: service_healthy
+
+  tamagotchi-db-1:
+    <<: *tamagotchi-standby
+    hostname: tamagotchi-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - tamagotchi-db-1-data:/var/lib/postgresql/data
+
+  tamagotchi-db-2:
+    <<: *tamagotchi-standby
+    hostname: tamagotchi-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - tamagotchi-db-2-data:/var/lib/postgresql/data
 
   # One block runs every Tamagotchi replica (deploy.replicas, the default 2 or TAMAGOTCHI_REPLICAS).
   # Each replica fills its own container name into {container}
@@ -382,16 +656,43 @@ services:
 
   # --- Package Registry -----------------------------------------------------------------------------
   package-registry-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: package-registry-db
     environment:
-      POSTGRES_DB: registry
-      POSTGRES_USER: registry
-      POSTGRES_PASSWORD: ${REGISTRY_DB_PASSWORD:?set REGISTRY_DB_PASSWORD in .env}
+      <<: *registry-db-env
+      PGDATA: ${REGISTRY_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${REGISTRY_POSTGRES_UPSTREAM:-}
     volumes:
-      - registry-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
+      - ./scripts/ha:/ha:ro
+      - ${REGISTRY_POSTGRES_VOLUME:-registry-data}:/var/lib/postgresql/data
+
+  package-registry-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *registry-db-env
+      PGHOST: package-registry-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      package-registry-db:
+        condition: service_healthy
+
+  package-registry-db-1:
+    <<: *registry-standby
+    hostname: package-registry-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - registry-db-1-data:/var/lib/postgresql/data
+
+  package-registry-db-2:
+    <<: *registry-standby
+    hostname: package-registry-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - registry-db-2-data:/var/lib/postgresql/data
 
   # One block runs every Package Registry replica (deploy.replicas, the default 2 or
   # PACKAGE_REGISTRY_REPLICAS). Each replica fills its own container name into {container}
@@ -408,16 +709,43 @@ services:
 
   # --- Battle ---------------------------------------------------------------------------------------
   battle-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: battle-db
     environment:
-      POSTGRES_DB: battle
-      POSTGRES_USER: battle
-      POSTGRES_PASSWORD: ${BATTLE_DB_PASSWORD:?set BATTLE_DB_PASSWORD in .env}
+      <<: *battle-db-env
+      PGDATA: ${BATTLE_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${BATTLE_POSTGRES_UPSTREAM:-}
     volumes:
-      - battle-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U battle -d battle"]
+      - ./scripts/ha:/ha:ro
+      - ${BATTLE_POSTGRES_VOLUME:-battle-data}:/var/lib/postgresql/data
+
+  battle-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *battle-db-env
+      PGHOST: battle-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      battle-db:
+        condition: service_healthy
+
+  battle-db-1:
+    <<: *battle-standby
+    hostname: battle-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - battle-db-1-data:/var/lib/postgresql/data
+
+  battle-db-2:
+    <<: *battle-standby
+    hostname: battle-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - battle-db-2-data:/var/lib/postgresql/data
 
   # One block runs every Battle replica (deploy.replicas, the default 2 or BATTLE_REPLICAS), as
   # for User Management above: pad-team-11-tamagotchi-go-battle-<n>, up to five.
@@ -431,12 +759,62 @@ services:
 
   # --- Map ------------------------------------------------------------------------------------------
   map-redis:
-    <<: *redis
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${MAP_REDIS_PASSWORD:?set MAP_REDIS_PASSWORD in .env}"]
-    environment:
-      REDISCLI_AUTH: ${MAP_REDIS_PASSWORD}
+    <<: *map-redis-node
+    hostname: map-redis
+    command: ["primary"]
     volumes:
+      - ./scripts/ha:/ha:ro
       - map-redis-data:/data
+
+  map-redis-1:
+    <<: *map-replica
+    hostname: map-redis-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-redis-1-data:/data
+
+  map-redis-2:
+    <<: *map-replica
+    hostname: map-redis-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-redis-2-data:/data
+
+  map-sentinel-1:
+    <<: *map-sentinel
+    hostname: map-sentinel-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-sentinel-1-data:/data
+
+  map-sentinel-2:
+    <<: *map-sentinel
+    hostname: map-sentinel-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-sentinel-2-data:/data
+
+  map-sentinel-3:
+    <<: *map-sentinel
+    hostname: map-sentinel-3
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - map-sentinel-3-data:/data
+
+  map-redis-writer:
+    image: haproxy:3.2-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/ha/redis-writer.sh"]
+    environment:
+      MAP_REDIS_PASSWORD: ${MAP_REDIS_PASSWORD}
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      - map-redis-1
+      - map-redis-2
+      - map-sentinel-1
+      - map-sentinel-2
+      - map-sentinel-3
 
   map-1:
     <<: *map
@@ -471,16 +849,43 @@ services:
 
   # --- Notification ---------------------------------------------------------------------------------
   notification-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: notification-db
     environment:
-      POSTGRES_DB: notification
-      POSTGRES_USER: notification
-      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set NOTIFICATION_DB_PASSWORD in .env}
+      <<: *notification-db-env
+      PGDATA: ${NOTIFICATION_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${NOTIFICATION_POSTGRES_UPSTREAM:-}
     volumes:
-      - notification-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U notification -d notification"]
+      - ./scripts/ha:/ha:ro
+      - ${NOTIFICATION_POSTGRES_VOLUME:-notification-data}:/var/lib/postgresql/data
+
+  notification-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *notification-db-env
+      PGHOST: notification-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      notification-db:
+        condition: service_healthy
+
+  notification-db-1:
+    <<: *notification-standby
+    hostname: notification-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - notification-db-1-data:/var/lib/postgresql/data
+
+  notification-db-2:
+    <<: *notification-standby
+    hostname: notification-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - notification-db-2-data:/var/lib/postgresql/data
 
   # One block runs every Notification replica (deploy.replicas, the default 2 or
   # NOTIFICATION_REPLICAS). Each replica fills its own container name into {container}
@@ -496,16 +901,43 @@ services:
 
   # --- Guild ----------------------------------------------------------------------------------------
   guild-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: guild-db
     environment:
-      POSTGRES_DB: guild
-      POSTGRES_USER: guild
-      POSTGRES_PASSWORD: ${GUILD_DB_PASSWORD:?set GUILD_DB_PASSWORD in .env}
+      <<: *guild-db-env
+      PGDATA: ${GUILD_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${GUILD_POSTGRES_UPSTREAM:-}
     volumes:
-      - guild-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U guild -d guild"]
+      - ./scripts/ha:/ha:ro
+      - ${GUILD_POSTGRES_VOLUME:-guild-data}:/var/lib/postgresql/data
+
+  guild-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *guild-db-env
+      PGHOST: guild-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      guild-db:
+        condition: service_healthy
+
+  guild-db-1:
+    <<: *guild-standby
+    hostname: guild-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - guild-db-1-data:/var/lib/postgresql/data
+
+  guild-db-2:
+    <<: *guild-standby
+    hostname: guild-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - guild-db-2-data:/var/lib/postgresql/data
 
   guild-redis:
     <<: *redis
@@ -546,16 +978,43 @@ services:
 
   # --- Monster Raid ---------------------------------------------------------------------------------
   monster-raid-db:
-    <<: *postgres
+    <<: *postgres-node
+    hostname: monster-raid-db
     environment:
-      POSTGRES_DB: raid
-      POSTGRES_USER: raid
-      POSTGRES_PASSWORD: ${RAID_DB_PASSWORD:?set RAID_DB_PASSWORD in .env}
+      <<: *raid-db-env
+      PGDATA: ${RAID_POSTGRES_DATA_DIR:-/var/lib/postgresql/data}
+      PG_REPLICA_SOURCE: ${RAID_POSTGRES_UPSTREAM:-}
     volumes:
-      - raid-data:/var/lib/postgresql/data
-    healthcheck:
-      <<: *postgres-healthcheck
-      test: ["CMD-SHELL", "pg_isready -U raid -d raid"]
+      - ./scripts/ha:/ha:ro
+      - ${RAID_POSTGRES_VOLUME:-raid-data}:/var/lib/postgresql/data
+
+  monster-raid-replication-init:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/ha/postgres-init-role.sh"]
+    environment:
+      <<: *raid-db-env
+      PGHOST: monster-raid-db
+      PGCONNECT_TIMEOUT: 3
+    volumes:
+      - ./scripts/ha:/ha:ro
+    depends_on:
+      monster-raid-db:
+        condition: service_healthy
+
+  monster-raid-db-1:
+    <<: *raid-standby
+    hostname: monster-raid-db-1
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - raid-db-1-data:/var/lib/postgresql/data
+
+  monster-raid-db-2:
+    <<: *raid-standby
+    hostname: monster-raid-db-2
+    volumes:
+      - ./scripts/ha:/ha:ro
+      - raid-db-2-data:/var/lib/postgresql/data
 
   monster-raid-redis:
     <<: *redis
@@ -595,6 +1054,43 @@ services:
       INSTANCE_WS_PUBLIC_URL: ws://localhost:38088
     ports:
       - "38088:8088" # this replica's direct WebSocket origin
+
+  # --- Data Warehouse and ETL (Lab 5 Grade 4, #194) ------------------------------------------------
+  # An analytical PostgreSQL fed only from the services' own CSV exports (scripts/etl/extract.sh), never
+  # by a domain service. The etl job applies warehouse/migrations and loads the exports, then exits:
+  #   docker compose run --rm etl
+  warehouse-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD:?set WAREHOUSE_DB_PASSWORD in .env}
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+    healthcheck:
+      <<: *postgres-healthcheck
+      test: ["CMD-SHELL", "pg_isready -U warehouse -d warehouse"]
+
+  etl:
+    image: postgres:17-alpine # psql only; the job needs no image of its own
+    profiles: [etl] # a job: not started by `up`, run on demand
+    restart: "no"
+    entrypoint: ["/bin/sh", "/etl/load.sh"]
+    environment:
+      PGHOST: warehouse-db
+      PGUSER: warehouse
+      PGDATABASE: warehouse
+      PGOPTIONS: -c client_min_messages=warning
+      PGPASSWORD: ${WAREHOUSE_DB_PASSWORD:?set WAREHOUSE_DB_PASSWORD in .env}
+      ETL_REQUIRE_ALL: ${ETL_REQUIRE_ALL:-0}
+      ETL_PAUSE_BEFORE_COMMIT: ${ETL_PAUSE_BEFORE_COMMIT:-0}
+    volumes:
+      - ./etl:/etl:ro
+      - ./warehouse/migrations:/migrations:ro
+      - ${ETL_INPUT_DIR:-./etl/input}:/input:ro
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
 
   # --- Monitoring (Lab 4 Grade 10, #154) -------------------------------------------------------------
   # Prometheus scrapes every /metrics; Alloy ships every container's JSON logs to Loki; Grafana shows
@@ -665,11 +1161,38 @@ volumes:
   registry-data:
   battle-data:
   map-redis-data:
+  map-redis-1-data:
+  map-redis-2-data:
+  map-sentinel-1-data:
+  map-sentinel-2-data:
+  map-sentinel-3-data:
   notification-data:
   guild-data:
   raid-data:
+  tamagotchi-db-1-data:
+  tamagotchi-db-2-data:
+  notification-db-1-data:
+  notification-db-2-data:
+  raid-db-1-data:
+  raid-db-2-data:
+  registry-db-1-data:
+  registry-db-2-data:
+  guild-db-1-data:
+  guild-db-2-data:
+  usermgmt-db-1-data:
+  usermgmt-db-2-data:
+  battle-db-1-data:
+  battle-db-2-data:
+  tamagotchi-rejoined-data:
+  notification-rejoined-data:
+  raid-rejoined-data:
+  registry-rejoined-data:
+  guild-rejoined-data:
+  usermgmt-rejoined-data:
+  battle-rejoined-data:
   raid-redis-data:
   broker-data: # the Broker's durable topic queues and dead letters
+  warehouse-data: # the Data Warehouse (#194)
   prometheus-data:
   loki-data:
   grafana-data:

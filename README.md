@@ -184,9 +184,23 @@ the earlier services use, and owned by Vlad (`@vladas9`). Its protocol is define
   `<service>.events`, built from the `topics` its replicas register with Service Discovery.
   Delivery is at least once, with retries; an event that cannot be delivered goes to the dead-letter
   channel.
+- **Distributed transactions** (Lab 5, since 5.0.0): the Broker coordinates the settlement of a decided
+  battle and the payout of a defeated raid in every participating service. Since 5.1.0 new transactions
+  run as sagas ([Saga contract](docs/lab5-saga-contract.md)): `verify`, `currency`, `creatures` (the
+  pivot) and `complete`, each journaled before the next is sent, and compensated in reverse order after
+  a refusal or the deadline before the pivot. `TX_PROTOCOL=2pc` returns to the two-phase commit of the
+  [transaction contract](docs/lab5-transaction-contract.md); every transaction keeps the protocol it
+  started with.
+- **Transaction API** (service token): `POST /api/v1/transactions` with `transactionId`, `operation`,
+  `operationVersion`, `businessKey`, `correlationId` and `payload` → `202` stored, `200` already known,
+  `400 VALIDATION_FAILED`, `409 TRANSACTION_CONFLICT`; `GET /api/v1/transactions/{id}` →
+  `{ transactionId, protocol, operation, businessKey, status, attempt, decision, reason, participants[] }`
+  for two-phase commit, `{ transactionId, protocol, operation, businessKey, status, reason, steps[] }`
+  for a saga, or
+  `404 TRANSACTION_NOT_FOUND`; `GET /api/v1/transactions?operation=&businessKey=&status=&offset=&limit=`.
 - **Inspection** on `127.0.0.1:8091` with the service token: `GET /api/v1/topics`,
-  `GET /api/v1/dead-letters` and `POST /api/v1/dead-letters/{id}/replay`; `GET /metrics` for
-  Prometheus.
+  `GET /api/v1/dead-letters`, `POST /api/v1/dead-letters/{id}/replay` and
+  `GET /api/v1/transactions[/{id}]`; `GET /metrics` for Prometheus.
 
 ---
 
@@ -222,6 +236,15 @@ receiver:
 Every replica registers with Service Discovery, with the topics it consumes and, when it serves gRPC,
 its `grpcAddress`; the Broker routes by that registry and reports failing replicas back to it.
 Prometheus scrapes every component's `/metrics`, Loki collects every log line and Grafana shows both.
+
+**Lab 5 additions.** The Gateway answers cacheable GETs and reads User Management's key set from three
+Redis nodes, sharded by consistent hashing ([Gateway cache](#gateway-cache)). Every service's store has a
+primary and two standbys: PostgreSQL with streaming replication and a fenced promotion, Map's Redis with
+Sentinel ([Database replication and failover](#database-replication-and-failover)). The Broker
+coordinates `battle.settlement` and `raid.payout` across Battle or Monster Raid, User Management and
+Tamagotchi ([transaction contract](docs/lab5-transaction-contract.md),
+[Saga contract](docs/lab5-saga-contract.md)). The ETL job loads the services' own exports into the Data
+Warehouse ([Data Warehouse and ETL](#data-warehouse-and-etl)).
 
 Two properties are worth pointing out, because they are the reason the boundaries are drawn this
 way:
@@ -777,6 +800,9 @@ Three ownership rules follow directly from
 Consistency across services is therefore **eventual**, bounded by broker latency. Consistency
 *within* a service is transactional: a consumer applies the effect and records the `eventId` in the
 same PostgreSQL transaction, so an at-least-once redelivery is absorbed rather than duplicated.
+Lab 5 makes two operations atomic across services, the rewards of a decided battle and of a defeated
+raid: the [distributed transaction contract](docs/lab5-transaction-contract.md) (#196) defines how the Broker
+coordinates them and what each participant implements.
 
 **Referential integrity** cannot be enforced with foreign keys across services. Instead, a service
 validates a foreign identifier synchronously at write time (Guild asks User Management whether a
@@ -893,6 +919,29 @@ and safe to cache for 30 seconds.
 `409 INSUFFICIENT_FUNDS` and the balance is unchanged. The synchronous adjust route exists for
 flows that must fail fast — a shop purchase — while battle and raid rewards arrive as events.
 
+##### Distributed transactions (Lab 5, User Management 5.1.0 and 5.2.0)
+
+The Message Broker calls these as the coordinator of `battle.settlement` and `raid.payout`. Two-phase
+commit uses `prepare`, `commit` and `rollback` (5.1.0, [transaction contract](docs/lab5-transaction-contract.md));
+the Saga uses `execute`, `compensate` and `resolve` for its `currency` step (5.2.0,
+[Saga contract](docs/lab5-saga-contract.md)).
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/internal/transactions/{transactionId}/prepare` | service | `transactionId`, `attempt`, `operation`, `operationVersion`, `businessKey`, `payload` (that of `battle.finished` or `raid.monster_defeated`) | `200` → `{ "vote": "commit" \| "already_applied" \| "reject", "code"? }`; `409 TRANSACTION_ABORTED`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/commit` | service | as `prepare` | `200` → `{ "status": "committed" }`; `409 COMMIT_REJECTED` |
+| `POST /api/v1/internal/transactions/{transactionId}/rollback` | service | as `prepare`, plus `final` boolean and `reason` string; `operation`, `businessKey` and `payload` may be `null` | `200` → `{ "status": "rolled_back" }`; `409 TRANSACTION_ALREADY_COMMITTED` |
+| `GET /api/v1/internal/transactions/prepared` | service | — | `200` → `{ "items": [{ "transactionId": UUID, "attempt": integer, "preparedAt": Timestamp }] }` |
+| `POST /api/v1/internal/transactions/{transactionId}/execute` | service | `transactionId`, `step` = `currency`, `operation`, `operationVersion`, `businessKey`, `payload` | `200` → `{ "result": "executed" \| "already_applied" \| "rejected", "code"?, "message"? }`; `409 TRANSACTION_ABORTED`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/compensate` | service | as `execute`, plus `reason` string | `200` → `{ "status": "compensated" }`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/resolve` | service | as `execute`, without `payload` | `200` → `{ "state": "executed" \| "aborted" }`; `429 TRANSACTION_BUSY` |
+
+User Management rejects with `USER_NOT_FOUND`. A debit in a transaction stops at zero, as for events,
+and the applied amount is recorded for a later compensation. A transaction and the matching event
+share one ledger key, so a battle or raid is paid once. The compensation of `currency` takes each
+applied delta back; a reward spent meanwhile stops the balance at zero, and the shortfall is recorded in
+`transaction_branches.compensation` and logged as `transaction.compensation_incomplete`.
+
 #### 2. Tamagotchi Service — `http://tamagotchi:8082`
 
 **`Tamagotchi`**
@@ -974,6 +1023,31 @@ silently overwriting each other.
 The ring is fixed: `flame → nature → earth → electric → water → shadow → flame`. `multiplier` is
 `1.5` when the attacker is strong against the defender, `0.75` when weak, and `1.0` otherwise.
 Battle and Monster Raid read this instead of hard-coding the table, so the ring has one owner.
+
+##### Distributed transactions (Lab 5, Tamagotchi 5.1.0 and 5.2.0)
+
+The Message Broker calls these as the coordinator of `battle.settlement` and `raid.payout`. Two-phase
+commit uses `prepare`, `commit` and `rollback` (5.1.0, [transaction contract](docs/lab5-transaction-contract.md));
+the Saga uses `execute`, `compensate` and `resolve` for its `creatures` step (5.2.0,
+[Saga contract](docs/lab5-saga-contract.md)).
+
+| Method and path | Auth | Request | Response |
+| --------------- | ---- | ------- | -------- |
+| `POST /api/v1/internal/transactions/{transactionId}/prepare` | service | `transactionId`, `attempt`, `operation`, `operationVersion`, `businessKey`, `payload` (that of `battle.finished` or `raid.monster_defeated`) | `200` → `{ "vote": "commit" \| "already_applied" \| "reject", "code"?, "message"? }`; `409 TRANSACTION_ABORTED`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/commit` | service | as `prepare` | `200` → `{ "status": "committed" }`; `409 COMMIT_REJECTED` |
+| `POST /api/v1/internal/transactions/{transactionId}/rollback` | service | as `prepare`, plus `final` boolean and `reason` string; `operation`, `businessKey` and `payload` may be `null` | `200` → `{ "status": "rolled_back" }`; `409 TRANSACTION_ALREADY_COMMITTED` |
+| `GET /api/v1/internal/transactions/prepared` | service | — | `200` → `{ "items": [{ "transactionId": UUID, "attempt": integer, "preparedAt": Timestamp }] }` |
+| `POST /api/v1/internal/transactions/{transactionId}/execute` | service | `transactionId`, `step` = `creatures`, `operation`, `operationVersion`, `businessKey`, `payload` | `200` → `{ "result": "executed" \| "already_applied" \| "rejected", "code"?, "message"? }`; `409 TRANSACTION_ABORTED`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/compensate` | service | as `execute`, plus `reason` string | `200` → `{ "status": "compensated" }`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/resolve` | service | as `execute`, without `payload` | `200` → `{ "state": "executed" \| "aborted" }`; `429 TRANSACTION_BUSY` |
+
+Tamagotchi rejects a battle settlement with `TAMAGOTCHI_NOT_FOUND` when the staked creature is gone
+and `TAMAGOTCHI_NOT_OWNED` when the loser no longer owns it; XP for a creature that is gone is
+skipped. The branch records the transfer and every XP grant it applied, for a later compensation.
+A transaction and the matching event share one business key, so a battle or raid is settled once.
+The compensation of `creatures` gives the creature back to the loser only while the winner still owns it
+from this battle, makes it primary again if the loser has no primary, deletes the winner's secondary
+reference and takes each XP grant back exactly; what can no longer be undone is recorded, never refused.
 
 #### 3. Package Registry Service — `http://package-registry:8083`
 
@@ -1147,6 +1221,21 @@ so it owns the link as well and User Management reads it.
 `use_boost` cannot be played: a non-empty `boosts`, `action: "use_boost"` or a non-null `boostId`
 is refused with `422 BOOSTS_NOT_SUPPORTED`. The fields stay in every payload, so enabling boosts
 once an owner and data model are agreed changes no shape; `BOOST_NOT_OWNED` is reserved for that.
+
+##### Distributed transactions (Lab 5, Battle 5.1.0 and 5.2.0)
+
+A decided battle stores a `battle.settlement` start request instead of `battle.finished`, bound to its own
+`transactionId`; `Battle.settlementStatus` is `pending`, `settled` or `failed`. Battle is the initiator:
+two-phase commit uses `prepare`, `commit` and `rollback` (5.1.0), and the Saga its `verify` and `complete`
+steps (5.2.0), with the routes and bodies of User Management's table above and `step` = `verify` or
+`complete`.
+
+- `verify` changes nothing: it checks the battle's own transaction ID, the stored result and that the
+  settlement is `pending`, or rejects with `SETTLEMENT_MISMATCH` or `BATTLE_NOT_DECIDED`.
+- `complete` marks the battle `settled` and stores `battle.finished`, with the code of the 2PC commit.
+- The compensation of `verify` marks the settlement `failed`, for the battle's own transaction only. The
+  compensation and `resolve` of `complete` change nothing, so the Broker can send `complete` again after
+  the pivot.
 
 ##### Turns
 
@@ -1502,6 +1591,7 @@ sends a message.
 | `monsterName` | string | Denormalized for display only |
 | `maxHp` / `currentHp` | integer | `currentHp` never drops below 0 |
 | `status` | string | `active`, `defeated`, `expired` or `cancelled` |
+| `settlementStatus` | string \| null | `pending`, `settled` or `failed` for a defeated raid |
 | `participantCount` | integer | |
 | `startedAt` / `expiresAt` / `endedAt` | `Timestamp` \| null | `expiresAt` = `startedAt` + `durationSeconds` |
 
@@ -1561,10 +1651,51 @@ participation again at WebSocket upgrade time.
 ```
 
 The HP decrement is a single atomic Redis `DECRBY` clamped at zero, because an entire guild hits one
-counter concurrently. The result is appended to `damage_log` in PostgreSQL for durability, and the
-transition to `defeated` is applied exactly once with a conditional update — the first attack that
-drives HP to zero wins the transition and publishes the terminal event; every later attack receives
-`409 RAID_NOT_ACTIVE`. Rate limit: 10 attacks per second per participant.
+counter concurrently. PostgreSQL records the damage. The first attack that drives HP to zero
+records the defeat and a durable `raid.payout` request in the same PostgreSQL transaction.
+Subsequent new attacks receive `409 RAID_NOT_ACTIVE`. Repeating a recorded command returns its
+stored result. Rate limit: 10 attacks per second per participant.
+
+##### Raid payout and settlement
+
+Broker coordinates reward currency in User Management and XP in Tamagotchi. Monster Raid 5.1.0
+supports Saga and two-phase commit. The raid stays `defeated` throughout, with
+`settlementStatus: "pending"` until settlement succeeds or fails.
+
+In Saga mode, `verify` checks that the raid is defeated and the supplied transaction ID and payload
+match its stored `raid.payout` request. After the currency and XP steps, `complete` marks the payout
+`settled` and writes `raid.monster_defeated` to the outbox once. Compensating `verify` marks the
+matching pending payout `failed`. Compensating `complete` acknowledges the request without changing
+settlement. Resolving `complete` reports whether it committed and leaves the payout unchanged.
+
+Broker sends the internal requests with `X-Service-Token` and `X-Correlation-Id`. The
+[Saga participant contract](docs/lab5-saga-contract.md#participant-api) defines the request and
+response examples. Raid accepts `step: "verify"` or `"complete"`, `operation: "raid.payout"`,
+`operationVersion: 1` and `businessKey` equal to the raid ID.
+
+| Method and path | Request fields | Response |
+| --- | --- | --- |
+| `POST /api/v1/internal/transactions/{transactionId}/execute` | `transactionId`, `step`, `operation`, `operationVersion`, `businessKey`, stored payout `payload` | `200` with `result` equal to `executed`, `already_applied` or `rejected`. Rejections include `code` and `message`. `409 TRANSACTION_ABORTED` after an abort. |
+| `POST /api/v1/internal/transactions/{transactionId}/compensate` | Execute fields plus `reason` | `200` with `{"status":"compensated"}` |
+| `POST /api/v1/internal/transactions/{transactionId}/resolve` | Execute fields except `payload` | `200` with `state` equal to `executed` or `aborted` |
+
+Unknown or active raids return `RAID_NOT_DEFEATED`. A different transaction ID or payload returns
+`SETTLEMENT_MISMATCH`. Invalid step names or request fields return `400 VALIDATION_FAILED`. A
+database lock timeout returns `429 TRANSACTION_BUSY` with `Retry-After: 1`. The standalone
+`Raid Saga participant` Postman folder exercises these routes through Broker with synthetic IDs.
+
+```bash
+npx newman run postman/monster-raid.postman_collection.json \
+  -e postman/tamagotchi-go.postman_environment.json \
+  --folder 'Raid Saga participant' --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+```
+
+The [2PC participant contract](docs/lab5-transaction-contract.md#participant-api) defines the
+authenticated `prepare`, `commit`, `rollback` and `prepared` routes. Broker commits the Raid
+branch after the other participants and a final rollback marks the payout `failed`. Both
+protocols use `raid.transaction_branches`. Run the Raid 2PC scenarios from the
+[recorded checkpoint](docs/lab5-2pc-checkpoint.md) with
+`python scripts/tx/check-2pc.py --scenario 3,4`.
 
 ##### WebSocket — `GET /api/v1/raids/{raidId}/feed`
 
@@ -1876,21 +2007,20 @@ Released images are public and provide `linux/amd64` and `linux/arm64` manifests
 and Apple Silicon machines. The table below lists the versions this Compose file selects and
 their publication evidence. Published image tags and submodule pins refer to the same main
 commit, verified by image revision labels or the public build provenance on both architectures.
-Every component below selects 4.x; updating references does not complete the shared-stack checks.
 
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
-| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/43326608468)) | 8080 | — | `aa7b0b9` |
-| Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/43297792016)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals in the `broker-data` volume | `cd194d5` |
+| API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/45868754336)) | 8080 | Shared cache in `cache-1..3` (Redis, memory only) | `6af5740` |
+| Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `5.1.0` | published, main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/45990285836)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals of queues, dead letters and transactions in the `broker-data` volume | `9e393f4` |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43432132987)) | — (internal 8090) | In-memory registry | `2294a0a` |
-| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `4.0.2` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/43313002797)) | — | PostgreSQL | `e0fabc2` |
-| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/runs/43299153526)) | — | PostgreSQL | `2c3547c` |
-| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/runs/43309493412)) | — | PostgreSQL | `8fb32bd` |
-| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `4.1.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/43403207651)) | — | PostgreSQL | `64e7ef1` |
+| User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `5.2.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/45959693853)) | — | PostgreSQL primary + 2 standbys | `f48a2bc` |
+| Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `5.2.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/runs/45871308465)) | — | PostgreSQL primary + 2 standbys | `ae1b830` |
+| Package Registry | [`gabimiric/tamagotchi-package-registry`](https://hub.docker.com/r/gabimiric/tamagotchi-package-registry/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-package-registry/actions/runs/45638217264)) | — | PostgreSQL primary + 2 standbys | `3caf86e` |
+| Battle | [`amzavladislav/tamagotchi-battle`](https://hub.docker.com/r/amzavladislav/tamagotchi-battle/tags) | `5.2.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-battle/actions/runs/45959713872)) | — | PostgreSQL primary + 2 standbys | `ca8e65d` |
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/43310895212)) | 18085, 28085, 38085 (WebSocket) | Redis | `3ca778c` |
-| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/runs/43298680441)) | — | PostgreSQL | `8a15f22` |
-| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-guild/actions/runs/43302752393)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL and Redis | `c643213` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `4.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/43295115421)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `ab479f6` |
+| Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/runs/45486229438)) | — | PostgreSQL primary + 2 standbys | `2e69d4a` |
+| Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-guild/actions/runs/45638258625)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL primary + 2 standbys, and Redis | `0f6e68b` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `5.1.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/45917411952)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `95fb77c` |
 
 Every selected service image accepts the contract's `DISCOVERY_URL`, `INSTANCE_BASE_URL` and, for
 Map, Guild and Raid, `INSTANCE_WS_PUBLIC_URL`. Package Registry,
@@ -1948,6 +2078,7 @@ others' key sets reject. Replace the file and restart the replicas to rotate it.
 | `GATEWAY_TOKEN` | Gateway and all eight services | Sent by the Gateway as `X-Gateway-Token`; services trust identity headers only when it matches. At least 16 characters |
 | `SERVICE_TOKEN` | Broker, Gateway and all eight services | Shared HTTP header / gRPC metadata credential for internal traffic. At least 16 characters |
 | `USERMGMT_DB_PASSWORD` … `RAID_DB_PASSWORD` | One per PostgreSQL database | Seven passwords, one per service: each service owns its database and its credentials |
+| `RAID_REPLICATION_PASSWORD` | Monster Raid PostgreSQL | Dedicated credential used by the PostgreSQL standbys |
 | `MAP_REDIS_PASSWORD`, `GUILD_REDIS_PASSWORD`, `RAID_REDIS_PASSWORD` | Map, Guild, Monster Raid | Redis passwords |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Service Discovery | Telegram bot and developers' chat for critical-load and health alerts; required unless `ALERTS_ENABLED=false` |
 
@@ -2069,6 +2200,298 @@ docker compose exec service-discovery wget -qO- http://pad-team-11-tamagotchi-go
 
 Each result, with the commands' output, is recorded in #133 before this stack is promoted.
 
+### Database replication and failover
+
+[Docker Compose](docker-compose.yml) provisions a primary and two standbys for the Monster Raid,
+Tamagotchi, Notification, Package Registry, Guild, User Management and Battle PostgreSQL databases and
+for Map Redis. PostgreSQL uses streaming replication and an operator-triggered promotion with fencing. Map uses three Redis Sentinels with quorum
+two and a stable `map-redis-writer:6379` endpoint. The endpoint selects a primary with a
+connected replica and disconnects clients from a demoted backend.
+
+#### Start and verify
+
+1. Back up existing `raid-data`, `tamagotchi-data`, `notification-data`, `registry-data`,
+   `guild-data`, `usermgmt-data`, `battle-data` and `map-redis-data` volumes before changing their topology.
+   Compose reuses these volumes for the initial primaries in the same project.
+   The standbys and Sentinels get new volumes. Keep the existing database and Redis passwords.
+2. Add separate `RAID_REPLICATION_PASSWORD`, `TAMAGOTCHI_REPLICATION_PASSWORD`,
+   `NOTIFICATION_REPLICATION_PASSWORD`, `REGISTRY_REPLICATION_PASSWORD`, `GUILD_REPLICATION_PASSWORD`,
+   `USERMGMT_REPLICATION_PASSWORD` and `BATTLE_REPLICATION_PASSWORD` values to the local `.env` using the
+   placeholders in `.env.example`. Use the same Compose project name for every subsequent command.
+3. Start the stack:
+
+   ```sh
+   docker compose up -d
+   ```
+
+   Wait for both PostgreSQL standbys to report recovery and for Redis Sentinel quorum to form.
+   The PostgreSQL initialization job creates a dedicated replication login. Each standby takes a
+   base backup on its first boot and resumes its existing volume on subsequent boots.
+
+The reproducible storage rehearsal provisions its own temporary project and removes that project's test
+containers and volumes at the end:
+
+```sh
+bash scripts/ha/check-replication.sh
+```
+
+It checks the existing-volume upgrade, a read and new write after both failovers, TTL expiry and
+rejoining the original PostgreSQL/Redis nodes. Repeat service-level checks for any rollout in the full
+shared stack and attach per-service results to #193.
+
+#### PostgreSQL promotion and rejoin
+
+During normal operation Raid's existing connection string lists all three nodes and selects a
+read-write session. A failed primary is stopped with Compose and its data volume is fenced before
+promoting a standby. The promotion helper refuses a candidate that has replayed less WAL than the
+other standby. Wait for both standbys to replay a test write before deliberately stopping the primary.
+Streaming replication is asynchronous, so promotion can lose writes that never reached a standby. The
+branches of a [distributed transaction](docs/lab5-transaction-contract.md#database-replication-and-promotion)
+are the exception: each is confirmed only after one standby has it, and while no standby runs it waits.
+
+On the test or deployment project, set `COMPOSE_PROJECT_NAME` to the project used to start the stack
+if it differs from the name in Compose. Set `HA_ENV_FILE` when using a separate env file.
+
+```sh
+bash scripts/ha/postgres-promote.sh \
+  monster-raid-db monster-raid-db-1 monster-raid-db-2
+```
+
+The second node becomes writable and the third follows it. To rejoin the original Compose name as a
+standby, persist these values in the same local env file. Set the source to the promoted node if it
+differs from the example. Use the original volume as a fenced copy and use a fresh named volume for
+the rejoined node:
+
+```dotenv
+RAID_POSTGRES_VOLUME=raid-rejoined-data
+RAID_POSTGRES_DATA_DIR=/var/lib/postgresql/data/pgdata
+RAID_POSTGRES_UPSTREAM=monster-raid-db-1
+```
+
+```sh
+docker compose up -d --no-deps --wait monster-raid-db
+```
+
+The rejoined node takes a base backup from the promoted writer. Check `pg_is_in_recovery()` returns
+true on it and `pg_stat_replication` shows both standbys on the new writer. Persist the rejoin settings
+so later deployments use the new volume. For another rejoin, select a fresh named volume before
+changing the old node's mapping.
+
+#### Service owner rollout
+
+Use the Raid PostgreSQL node, role initialization, standby definitions and promotion helper as the
+shared template. For your service, substitute the three Compose hostnames, its database credentials
+and volume names, and a dedicated replication password. Preserve its startup migration path. Use
+the driver-supported list of hosts with `target_session_attrs=read-write`. For pgx use the URL host
+list shown for Raid. For SQLAlchemy/psycopg use the libpq host list in the query, for example
+`postgresql+psycopg://user:password@/dbname?host=db,db-1,db-2&target_session_attrs=read-write`.
+Verify real service reads and writes through that connection after promotion.
+
+**Tamagotchi and Notification** use the same template: `tamagotchi-db` and `notification-db` are the
+primaries on their existing volumes, `-db-1` and `-db-2` the standbys, and each service connects with
+`postgresql+psycopg://<user>:<password>@/<db>?host=<svc>-db,<svc>-db-1,<svc>-db-2&target_session_attrs=read-write`.
+Promote with `bash scripts/ha/postgres-promote.sh tamagotchi-db tamagotchi-db-1 tamagotchi-db-2` (or the
+`notification-db` names). The rejoin settings are `TAMAGOTCHI_POSTGRES_VOLUME=tamagotchi-rejoined-data` and
+`NOTIFICATION_POSTGRES_VOLUME=notification-rejoined-data`, with the matching `*_POSTGRES_DATA_DIR` and
+`*_POSTGRES_UPSTREAM` as for Raid. Both services check a pooled connection before using it (5.0.0), so a
+connection left to the lost primary is reopened on the new one instead of failing a request. The check
+below runs each service's pinned image against a disposable copy of its database topology:
+
+```sh
+bash scripts/ha/check-service-failover.sh            # both; or name one: tamagotchi | notification
+```
+
+For each service it writes through the service, kills the primary, promotes `-db-1`, then reads the earlier
+write and makes a new one through the same running service. Result with the released 5.0.0 images: the write before
+the primary loss reached both standbys, after promotion `-db-1` was the writer and `-db-2` followed it, the
+earlier record was read and a new one written (`201`), the new write reached `-db-2`, and no service
+error was logged. With the 4.0.0 Tamagotchi image the first read after promotion failed before the pool
+recovered, which is why 5.0.0 adds the connection check.
+
+**Package Registry and Guild** use the same template: `package-registry-db` and `guild-db` are the
+primaries on their existing volumes (`registry-data`, `guild-data`), `-db-1` and `-db-2` the standbys, and
+each service connects with
+`postgresql+psycopg://<user>:<password>@/<db>?host=<svc>-db,<svc>-db-1,<svc>-db-2&target_session_attrs=read-write&connect_timeout=2`.
+Promote with `bash scripts/ha/postgres-promote.sh guild-db guild-db-1 guild-db-2` (or the
+`package-registry-db` names). The rejoin settings are `GUILD_POSTGRES_VOLUME=guild-rejoined-data` and
+`REGISTRY_POSTGRES_VOLUME=registry-rejoined-data`, with the matching `*_POSTGRES_DATA_DIR` and
+`*_POSTGRES_UPSTREAM` as for Raid. Both services check a pooled connection before using it, and since 5.0.0
+they also skip a database host whose name no longer resolves: after a promotion the fenced primary is
+stopped, and Docker's DNS takes seconds (about 4 s on Docker Desktop) to say its name does not exist, which
+libpq waits for before trying the next host. Without that, every new connection, and so every readiness
+check, missed its deadline, and both replicas stayed unready after a successful failover. The services
+look the listed names up in parallel for 300 ms and pass only the ones that resolve; once the old primary
+rejoins, it is found again.
+
+```sh
+bash scripts/ha/check-service-failover.sh package-registry guild
+```
+
+On Windows Git Bash, set `MSYS2_ARG_CONV_EXCL=/api` so API paths are not rewritten as file paths. The
+check also probes readiness three times after the promotion and counts the errors logged after it.
+Result with Package Registry and Guild 5.0.0: the write before the primary loss reached both standbys,
+`-db-1` became the writer and `-db-2` followed it, the earlier record was read and a new one written (`201`),
+readiness answered `200 200 200`, and no error was logged after the promotion. The errors logged while no
+primary existed come from the event outbox's background poll, which retries. With the 4.0.x images the
+first request after promotion could miss its deadline (`503 TASK_TIMEOUT`) and readiness stayed `503`.
+
+**Guild's Redis** carries chat fan-out between the Guild replicas and single-use WebSocket ticket claims.
+With the stack running:
+
+```sh
+python scripts/ha/check-guild-redis.py          # a clean stop; --kill for a crash (needs `pip install websockets`)
+```
+
+It joins two users to a guild through the Gateway, opens their chat sockets on different replicas and
+stops (or kills) `guild-redis`. Observed with Guild 5.0.0:
+
+| Phase | Behaviour |
+| ----- | --------- |
+| Redis down | Guild reports not ready (its readiness includes the chat broker), so the Broker has no Guild instance: new tickets, chat history and every Guild REST route answer `503 SERVICE_UNAVAILABLE`. Open sockets stay connected; a message sent then is stored and appears in history, but is not fanned out to a member on the other replica. |
+| Redis back | Guild is ready again within 3–6 s. Existing sockets fan out again, new tickets (`201`) open sockets on both replicas and messages reach the other member. |
+| Ticket reuse | Refused (`401`) before the outage. After a clean stop it is still refused: Redis saves a snapshot inside its container on shutdown. After a crash (`--kill`) a ticket used 12 s earlier was accepted again: Guild's Redis keeps no volume or append-only file, so claims made since the last snapshot are lost and a ticket can be reused for the rest of its 60 s lifetime. |
+
+**User Management and Battle** use the same template: `user-management-db` and `battle-db` are the primaries
+on their existing volumes (`usermgmt-data`, `battle-data`), `-db-1` and `-db-2` the standbys, and each service
+connects with
+`postgres://<user>:<password>@<svc>-db:5432,<svc>-db-1:5432,<svc>-db-2:5432/<db>?sslmode=disable&target_session_attrs=read-write&connect_timeout=2`.
+Promote with `bash scripts/ha/postgres-promote.sh battle-db battle-db-1 battle-db-2` (or the
+`user-management-db` names). The rejoin settings are `USERMGMT_POSTGRES_VOLUME=usermgmt-rejoined-data` and
+`BATTLE_POSTGRES_VOLUME=battle-rejoined-data`, with the matching `*_POSTGRES_DATA_DIR` and `*_POSTGRES_UPSTREAM` as
+for Raid. Since 5.0.0 both services bound the name lookup of one host to 500 ms, because pgx resolves every
+listed host before it connects and a stopped primary's name can take Docker's DNS seconds.
+
+```sh
+bash scripts/ha/check-service-failover.sh user-management battle
+```
+
+Their images carry no shell or Python, so the check sends its requests from a `python:3.13-alpine` container
+in the service's network; Battle's dependencies stay mocked there. Result with 5.0.0: the write before the
+primary loss reached both standbys, `-db-1` became the writer and `-db-2` followed it, the earlier record was
+read and a new one written (`201`) by the same running service, readiness answered `200 200 200` and no error
+was logged. With DNS that answers for the lost primary after 4 s, the first connection took 0.6 s instead of
+4.1 s, and readiness failed for about 1 s instead of 4 s. An existing standalone volume was taken over by the new
+topology with its rows on all three nodes, and the old primary rejoined as a standby on a fresh volume.
+
+The Redis replication group serves Map. Readiness and WebSocket or command recovery for the separate
+Raid and Guild Redis instances are tracked in #193. Sentinel quorum and the database replicas in this
+setup share one local Docker host.
+
+#### Local verification
+
+The storage rehearsal passed on disposable volumes, including an upgrade from standalone primary
+volumes, writes after both failovers and rejoining both original nodes as standbys. Separate checks
+used the released Map 4.0.1 and Monster Raid 4.0.0 images, real PostgreSQL and Redis, and fixture
+domain dependencies and WebSocket tickets:
+
+- Map read a position written before Redis primary loss and wrote an updated position through the same
+  endpoint after automatic promotion. Both replicas held the position with its TTL.
+- Raid read an existing raid and committed another attack after PostgreSQL promotion without changing
+  the application connection settings.
+- Stopping Raid's own Redis made readiness report 503 and prevented another attack from being
+  persisted. The direct attack path took about ten seconds to report failure in one run. The
+  existing feed closed. After Redis returned, a new connection with a fresh ticket received the
+  current snapshot and the next attack's `raid.damage` frame. Retrying that attack did not add a
+  second damage record.
+
+### Data Warehouse and ETL
+
+[#194](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/194) adds an analytical
+PostgreSQL, `warehouse-db`, and an `etl` job that loads the terminal results of battles and raids
+into it. The Warehouse is fed only from the services' own CSV exports: no domain service reads or
+writes it, and the ETL never reads a service database itself.
+
+| Part | Where | What it does |
+| ---- | ----- | ------------ |
+| Extract | [`scripts/etl/extract.sh`](scripts/etl/extract.sh), on the host | Runs each service's own export command and writes `etl/input/battle.csv` and `raid.csv` (gitignored). A file is written under a temporary name and renamed only when its command succeeded. |
+| Transform and load | `etl` job in [Compose](docker-compose.yml): [`etl/load.sh`](etl/load.sh), [`etl/load-battle.sql`](etl/load-battle.sql), [`etl/load-raid.sql`](etl/load-raid.sql) | Applies the pending [Warehouse migrations](warehouse/migrations/), checks each export against the CSV contract and upserts it by its source key. |
+| Schema | [`warehouse/migrations/001_terminal_results.sql`](warehouse/migrations/001_terminal_results.sql) | `warehouse.battle_results`, `warehouse.raid_results`, `warehouse.etl_runs`, and the views `terminal_results` and `daily_results`. |
+
+**Run.** With the stack up and `WAREHOUSE_DB_PASSWORD` in `.env`:
+
+```sh
+RAID_CHECKOUT=../tamagotchi-monster-raid bash scripts/etl/extract.sh   # see the sources below
+docker compose run --rm etl
+```
+
+`warehouse-db` starts with the stack; `etl` is a job (profile `etl`), so `up` does not start it and
+`run` exits when the load is done. It runs in the `postgres:17-alpine` image already used by the
+databases, so it has no image of its own. Settings: `ETL_INPUT_DIR` (host folder with the exports,
+default `etl/input`), `ETL_REQUIRE_ALL=1` (fail when an export is missing instead of skipping it) and
+`ETL_PAUSE_BEFORE_COMMIT=<seconds>` (holds each load open before its commit, for the interruption
+check). The exit status is non-zero when any export was rejected.
+
+**Sources** (CSV contract in #194: UTF-8, comma-delimited, exact header, every field required,
+lowercase UUIDs, RFC 3339 UTC timestamps with milliseconds):
+
+| Source | Header | Export command | Warehouse key |
+| ------ | ------ | -------------- | ------------- |
+| Monster Raid | `raidId,status,endedAt` | `scripts/export-raid-results.sql` from a Monster Raid checkout at the reviewed revision (`RAID_CHECKOUT`), run against `monster-raid-db` (`RAID_DB_SERVICE` after a promotion); [handoff](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/194#issuecomment-7140915705) | `raid:<raidId>` |
+| Battle | `battleId,outcome,finishedAt` | `/app/server export-results` in the running `battle` container (image 5.0.0 and later); it reads the container's own `DATABASE_URL`, so it also works after a promotion; [handoff](https://github.com/Nickseen/pad-team-11-tamagotchi-go/issues/194#issuecomment-7176005871). `BATTLE_CSV=<file>` passes an existing export instead, e.g. [`etl/fixtures/battle.csv`](etl/fixtures/battle.csv) | `battle:<battleId>` |
+
+**Transform.** The header must match exactly. Every row is checked before anything is written: a
+missing field, a value outside the contract (`knockout`, `forfeit`, `timeout`; `defeated`, `expired`,
+`cancelled`), an ID that is not a lowercase UUID, a timestamp that is not UTC with milliseconds or names a
+date or time that does not exist (`2026-02-30`, `24:00`), or an ID that appears twice rejects the whole
+export, and the job reports the first offending data rows.
+Timestamps are stored as `timestamptz` and the UTC calendar day is derived from them.
+
+**Repeatable load.** Each source loads in one transaction, serialized by an advisory lock. A record is
+inserted under its source key the first time, updated when its outcome or time changed, and left as it
+is otherwise; a record missing from a later export stays in the Warehouse. Each load also writes one
+`warehouse.etl_runs` row with the rows read, inserted, updated and unchanged. A repeated run therefore
+adds no facts, and a new record appears after the next run.
+
+**Interrupted load.** The facts and the `etl_runs` row commit together. A load stopped at any point (the
+job killed, the database restarted) leaves the Warehouse as it was, and running the job again brings it
+to the expected state. A failed export never replaces the previous file, since extract.sh renames a file
+only when its command succeeded.
+
+**Example queries** (`docker compose exec warehouse-db psql -U warehouse -d warehouse`):
+
+```sql
+SELECT day, source, result, results FROM warehouse.daily_results ORDER BY day, source, result;
+SELECT result, count(*) FROM warehouse.raid_results GROUP BY result;  -- e.g. defeated vs expired raids
+SELECT outcome, count(*) FROM warehouse.battle_results
+ WHERE finished_at >= now() - interval '7 days' GROUP BY outcome;
+SELECT run_id, source, rows_read, rows_inserted, rows_updated, rows_unchanged FROM warehouse.etl_runs ORDER BY run_id;
+```
+
+**Check.** `bash scripts/etl/check-etl.sh` runs the Warehouse and the job in a disposable Compose
+project with generated exports and removes them at the end. Result: the #194 samples loaded one row each;
+the same exports again inserted and updated nothing; a new record per source was inserted and a changed
+battle outcome updated; a load killed before its commit left the Warehouse unchanged and the repeated run
+loaded the new raid; an invalid ID, a duplicate ID, a wrong header, a non-UTC timestamp, 30 February and
+24:00 were each rejected without changing anything; header-only exports read zero rows.
+
+### Gateway cache
+
+Lab 5 Grades 6–7 (#195). The Gateway caches frequently read GET answers and User Management's key set in three
+Redis nodes, `cache-1` to `cache-3`, and chooses a key's node by consistent hashing. The nodes keep data in
+memory only (no snapshots, no AOF), evict least recently used keys at 64 MB, and require `CACHE_PASSWORD` from
+`.env`; they have no host port. The Gateway's [README, "Shared cache"](services/gateway/README.md#shared-cache)
+documents the cached routes, keys, TTL, invalidation, access rules and failure behaviour.
+
+Request path: client → Gateway (token validated, request classified) → the key's cache node, chosen on the hash
+ring → `X-Cache: HIT` answered from the cache, or `MISS`: Broker → service, answer stored on that node. A write
+through the Gateway to a cached family (Package Registry packages, monsters, raid definitions) gives every node
+a new generation for it. With a node down its keys answer `X-Cache: BYPASS` from the service, and the other
+nodes keep serving theirs.
+
+Reproduce:
+
+```sh
+npx newman run postman/gateway-cache.postman_collection.json \
+  -e postman/tamagotchi-go.postman_environment.json      # miss/hit, users, token, invalidation, query order
+docker compose stop cache-2                              # its keys: X-Cache: BYPASS, the others still HIT
+docker compose start cache-2
+(cd services/gateway && npm ci && npm run ring-report)   # key distribution and keys moved on add/remove
+```
+
+The ring report for 100000 keys over three nodes: 36.4% / 31.0% / 32.6% of the keys per node; adding a fourth
+node moves 26.4% of them, all to the new node (`hash % N`: 75.0%); removing one moves only its 31.0% (`hash %
+N`: 66.4%).
+
 ### Data and volumes
 
 Every durable store keeps its data in a named volume, so `docker compose down` followed by `up`
@@ -2076,15 +2499,18 @@ loses nothing. `docker compose down -v` deletes the volumes and starts everythin
 
 | Volume | Store |
 | ------ | ----- |
-| `usermgmt-data` | User Management database |
-| `tamagotchi-data` | Tamagotchi database |
-| `registry-data` | Package Registry database |
-| `battle-data` | Battle database |
-| `map-redis-data` | Map Redis, append-only |
-| `notification-data` | Notification database |
-| `guild-data` | Guild database |
-| `raid-data` | Monster Raid database |
+| `usermgmt-data`, `usermgmt-db-1-data`, `usermgmt-db-2-data` | User Management PostgreSQL data |
+| `tamagotchi-data`, `tamagotchi-db-1-data`, `tamagotchi-db-2-data` | Tamagotchi PostgreSQL data |
+| `registry-data`, `registry-db-1-data`, `registry-db-2-data` | Package Registry PostgreSQL data |
+| `battle-data`, `battle-db-1-data`, `battle-db-2-data` | Battle PostgreSQL data |
+| `map-redis-data`, `map-redis-1-data`, `map-redis-2-data` | Map Redis data, append-only |
+| `map-sentinel-1-data` through `map-sentinel-3-data` | Map Redis Sentinel election and topology state |
+| `notification-data`, `notification-db-1-data`, `notification-db-2-data` | Notification PostgreSQL data |
+| `guild-data`, `guild-db-1-data`, `guild-db-2-data` | Guild PostgreSQL data |
+| `raid-data`, `raid-db-1-data`, `raid-db-2-data` | Monster Raid PostgreSQL data |
+| `raid-rejoined-data`, `tamagotchi-rejoined-data`, `notification-rejoined-data`, `registry-rejoined-data`, `guild-rejoined-data`, `usermgmt-rejoined-data`, `battle-rejoined-data` | Fresh data volumes for the original primary names after rejoining as standbys |
 | `raid-redis-data` | Monster Raid Redis, append-only |
+| `warehouse-data` | Data Warehouse PostgreSQL (#194) |
 
 Guild's Redis keeps no volume: it carries chat fan-out between Guild instances and single-use
 WebSocket ticket claims, both transient, while chat history lives in Guild's database.
@@ -2129,16 +2555,17 @@ secrets.
 
 | Service | Collection | Covers beyond its own routes |
 | ------- | ---------- | ---------------------------- |
-| User Management | `user-management.postman_collection.json` | `403 INTERNAL_ROUTE_FORBIDDEN` for clients, also through an escaped path; forged identity headers replaced by the token's |
+| User Management | `user-management.postman_collection.json` | `403 INTERNAL_ROUTE_FORBIDDEN` for clients, also through an escaped path; forged identity headers replaced by the token's; the Saga `currency` step through the Broker with synthetic IDs: refused for unknown users, compensated, then `409 TRANSACTION_ABORTED` and resolved as aborted |
 | Tamagotchi | `tamagotchi.postman_collection.json` | Service routes through the Broker's request queue; the Gateway refusing the service token; Gateway errors |
 | Package Registry | `package-registry.postman_collection.json` | Packages created by any user; status through the Broker; `registry.*` events checked against the Broker's publication counts; admin requests skipped without `registryAdminToken` |
-| Battle | `battle.postman_collection.json` | Real data set up in Package Registry and Tamagotchi through the Gateway; the lineup checks Battle makes with Tamagotchi |
+| Battle | `battle.postman_collection.json` | Real data set up in Package Registry and Tamagotchi through the Gateway; the lineup checks Battle makes with Tamagotchi; the Saga `verify` and `complete` steps through the Broker with a synthetic battle: `BATTLE_NOT_DECIDED`, compensated, then `409 TRANSACTION_ABORTED` |
 | Map | `map.postman_collection.json` | Map → User Management relationships; `map.stream` ticket negotiation |
 | Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
 | Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history; `guild.*` events reaching the Broker and `user.deleted` removing a member |
-| Monster Raid | `monster-raid.postman_collection.json` | `raid.feed` ticket negotiation with the participant check; admin requests skipped without `adminToken` |
+| Monster Raid | `monster-raid.postman_collection.json` | Saga participant requests and 2PC prepared-branch inspection through Broker, plus `raid.feed` ticket negotiation |
+| Gateway cache | `gateway-cache.postman_collection.json` | Lab 5 #195: the shared cache through the Gateway: `X-Cache` miss then hit, another user and no token never served a cached answer, a write invalidating, query order, the public combat types shared, an uncached route |
 | Gateway | `gateway-logs.postman_collection.json` | Lab 4 #155: `GET /api/v1/gateway/logs` downloads the system logs as NDJSON (last 15 minutes); set `adminToken` (and optionally `userToken` for the `403` case) |
-| Message Broker | `message-broker.postman_collection.json` | Called directly at `{{brokerUrl}}`: status and metrics; request queues to Battle and Tamagotchi; publishing `user.deleted`; the topic list; a dead letter created, listed and replayed; `400`, `401` and `404` answers |
+| Message Broker | `message-broker.postman_collection.json` | Called directly at `{{brokerUrl}}`: status and metrics; request queues to Battle and Tamagotchi; publishing `user.deleted`; the topic list; a dead letter created, listed and replayed; transactions, with finished sagas and their four steps; `400`, `401` and `404` answers |
 
 The environment `tamagotchi-go.postman_environment.json` defines `gatewayUrl`
 (`http://localhost:8080`), `brokerUrl` (`http://localhost:8091`, the Broker's local inspection port), `guildUrl` for Guild's health probe, `packageId` for test-user
@@ -2164,7 +2591,7 @@ Install Newman or run it through `npx`. Pass the shared environment and supply t
 at runtime so it does not need to be written to the JSON file:
 
 ```sh
-for service in user-management tamagotchi package-registry battle map notification guild monster-raid message-broker; do
+for service in user-management tamagotchi package-registry battle map notification guild monster-raid message-broker gateway-cache; do
   npx newman run "postman/$service.postman_collection.json" \
     -e postman/tamagotchi-go.postman_environment.json \
     --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"

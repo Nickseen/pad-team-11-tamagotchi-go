@@ -1,0 +1,218 @@
+{
+  "recordedAt": "2026-11-27T13:57:19.781Z",
+  "title": "Lab 5 Saga scenarios (#197)",
+  "command": "python scripts/tx/check-saga.py --scenario 1",
+  "revisions": {
+    "cpr": "406d44cc0582",
+    "cprDirty": true,
+    "submodules": [
+      "-ca8e65d5ee3ca0e9bde7b52c6059c91710e0eac9 services/battle",
+      "-6af5740880796846ef51ad6b3e3b4f965a66e882 services/gateway",
+      " 0f6e68b9cd4df70d4d5509f48d5aee530fb39a56 services/guild (v2.0.1-13-g0f6e68b)",
+      "-3ca778ce52bae008db17c1e0d3673f06f9a6a6e1 services/map",
+      "-9e393f426a5eff90ed769668bbaa52c458ea0db1 services/message-broker",
+      "-95fb77c75ef6d4ec986d0eb7cda72157a602e313 services/monster-raid",
+      "-2e69d4af10408866258a4774ffd660e56362ef00 services/notification",
+      " 3caf86ecda687ea7ec281e3b3da80bc981558417 services/package-registry (v2.0.1-15-g3caf86e)",
+      "-2294a0a457d3960be8bd66b28831484fe05594f1 services/service-discovery",
+      "-ae1b830eaec5c10a6ef6a2328075a1f91437f462 services/tamagotchi",
+      "-f48a2bccc721c625cd3fb2c45abe09c0e89e2856 services/user-management"
+    ],
+    "images": {
+      "message-broker": {
+        "image": "nickseen/tamagotchi-message-broker:5.1.0",
+        "id": "sha256:3d6f1aa78a01",
+        "revision": null
+      },
+      "user-management": {
+        "image": "amzavladislav/tamagotchi-user-management:5.2.0",
+        "id": "sha256:94d319833cc2",
+        "revision": null
+      },
+      "tamagotchi": {
+        "image": "crislp/tamagotchi-tamagotchi:5.2.0",
+        "id": "sha256:75140fe4d557",
+        "revision": null
+      },
+      "battle": {
+        "image": "amzavladislav/tamagotchi-battle:5.2.0",
+        "id": "sha256:be32ee838e55",
+        "revision": null
+      },
+      "monster-raid-1": {
+        "image": "nickseen/tamagotchi-monster-raid:5.1.0",
+        "id": "sha256:cf9a561a38a9",
+        "revision": "95fb77c75ef6"
+      },
+      "monster-raid-2": {
+        "image": "nickseen/tamagotchi-monster-raid:5.1.0",
+        "id": "sha256:cf9a561a38a9",
+        "revision": "95fb77c75ef6"
+      }
+    },
+    "brokerTx": {}
+  },
+  "results": [
+    {
+      "scenario": 1,
+      "title": "A battle to knockout; a defeated raid",
+      "passed": true,
+      "error": null,
+      "notes": [
+        "expected: completed; the business outcome of 2PC scenarios 1 and 3",
+        "battle accc94d3-c89d-46be-999b-03fe9c7d7707 to knockout, saga e72d35b7-f0ae-4d01-b5d6-6ea48fd2018c, winner txa_9dd8d3",
+        "user-management transaction_branches: [{\"attempt\": 0, \"outcome\": \"executed\", \"effect\": {\"balances\": [{\"delta\": 250, \"userId\": \"2276f709-9274-4ab5-86d5-911f5abaf1ba\"}, {\"delta\": 0, \"userId\": \"4d39b168-8dc2-438e-9ae9-e1fbe4a4852a\"}]}}]",
+        "tamagotchi transaction_branches: [{\"attempt\": 0, \"outcome\": \"executed\", \"effect\": {\"xp\": [{\"amount\": 180, \"tamagotchiId\": \"30b0e15b-0c55-4e9b-9027-bebd47fd6c87\"}, {\"amount\": 60, \"tamagotchiId\": \"9d21fae8-c975-4944-865d-7b9a5f1afc75\"}], \"transfer\": {\"wasPrimary\": true, \"tamagotchiId\": \"9d21fae8-c975-4944-865d-7b9a5f1afc75\", \"previousOwnerId\": \"4d39b168-8dc2-438e-9ae9-e1fbe4a4852a\", \"secondaryReferenceId\": \"0df11f36-dc82-4fc0-9925-6a2a14fadc23\", \"previousCapturedInBattleId\": null}}}]",
+        "raid afe95597-54c1-4f4b-80d7-5b885ad35339, saga e4594d51-a6f4-45b7-bdd7-0d8da960ceae",
+        "user-management transaction_branches: [{\"attempt\": 0, \"outcome\": \"executed\", \"effect\": {\"balances\": [{\"delta\": 50, \"userId\": \"9dbeef28-efae-40be-af3b-cb10d7b348a8\"}, {\"delta\": 50, \"userId\": \"f64d7d24-91c5-45a9-a0f8-82e3bb2d9d16\"}]}}]",
+        "tamagotchi transaction_branches: [{\"attempt\": 0, \"outcome\": \"executed\", \"effect\": {\"xp\": [{\"amount\": 25, \"tamagotchiId\": \"e159d929-29f3-4473-8b51-e7bbd35e71bf\"}, {\"amount\": 25, \"tamagotchiId\": \"3eb6e13a-1fa2-488f-950f-045b3630f3f9\"}], \"transfer\": null}}]"
+      ],
+      "checks": [
+        {
+          "name": "protocol",
+          "expected": "saga",
+          "observed": "saga",
+          "ok": true
+        },
+        {
+          "name": "status",
+          "expected": "completed",
+          "observed": "completed",
+          "ok": true
+        },
+        {
+          "name": "steps",
+          "expected": "{'verify': 'executed', 'currency': 'executed', 'creatures': 'executed', 'complete': 'executed'}",
+          "observed": "{'verify': 'executed', 'currency': 'executed', 'creatures': 'executed', 'complete': 'executed'}",
+          "ok": true
+        },
+        {
+          "name": "transferred creature's owner",
+          "expected": "2276f709-9274-4ab5-86d5-911f5abaf1ba",
+          "observed": "2276f709-9274-4ab5-86d5-911f5abaf1ba",
+          "ok": true
+        },
+        {
+          "name": "capturedInBattleId",
+          "expected": "accc94d3-c89d-46be-999b-03fe9c7d7707",
+          "observed": "accc94d3-c89d-46be-999b-03fe9c7d7707",
+          "ok": true
+        },
+        {
+          "name": "winner's new secondary references",
+          "expected": "['9d21fae8-c975-4944-865d-7b9a5f1afc75']",
+          "observed": "['9d21fae8-c975-4944-865d-7b9a5f1afc75']",
+          "ok": true
+        },
+        {
+          "name": "winner's balance",
+          "expected": "increased",
+          "observed": "+250",
+          "ok": true
+        },
+        {
+          "name": "balances equal User Management's recorded effect",
+          "expected": "{'2276f709-9274-4ab5-86d5-911f5abaf1ba': 250, '4d39b168-8dc2-438e-9ae9-e1fbe4a4852a': 0}",
+          "observed": "{'2276f709-9274-4ab5-86d5-911f5abaf1ba': 250, '4d39b168-8dc2-438e-9ae9-e1fbe4a4852a': 0}",
+          "ok": true
+        },
+        {
+          "name": "XP of txa_9dd8d3's primary",
+          "expected": "increased",
+          "observed": "L1/0 -> L2/80",
+          "ok": true
+        },
+        {
+          "name": "XP of txb_297f1b's primary",
+          "expected": "increased",
+          "observed": "L1/0 -> L1/60",
+          "ok": true
+        },
+        {
+          "name": "settlementStatus",
+          "expected": "settled",
+          "observed": "settled",
+          "ok": true
+        },
+        {
+          "name": "battle.finished announced",
+          "expected": "1",
+          "observed": "1",
+          "ok": true
+        },
+        {
+          "name": "nothing changes afterwards",
+          "expected": "same snapshot",
+          "observed": "same snapshot",
+          "ok": true
+        },
+        {
+          "name": "pg_prepared_xacts in every participant database",
+          "expected": "empty",
+          "observed": "empty",
+          "ok": true
+        },
+        {
+          "name": "raid: protocol",
+          "expected": "saga",
+          "observed": "saga",
+          "ok": true
+        },
+        {
+          "name": "raid: status",
+          "expected": "completed",
+          "observed": "completed",
+          "ok": true
+        },
+        {
+          "name": "raid: steps",
+          "expected": "{'verify': 'executed', 'currency': 'executed', 'creatures': 'executed', 'complete': 'executed'}",
+          "observed": "{'verify': 'executed', 'currency': 'executed', 'creatures': 'executed', 'complete': 'executed'}",
+          "ok": true
+        },
+        {
+          "name": "raid: txo_ef23a6's balance",
+          "expected": "increased",
+          "observed": "+50",
+          "ok": true
+        },
+        {
+          "name": "raid: txo_ef23a6's primary XP",
+          "expected": "increased",
+          "observed": "L1/0 -> L1/25",
+          "ok": true
+        },
+        {
+          "name": "raid: txm_65d398's balance",
+          "expected": "increased",
+          "observed": "+50",
+          "ok": true
+        },
+        {
+          "name": "raid: txm_65d398's primary XP",
+          "expected": "increased",
+          "observed": "L1/0 -> L1/25",
+          "ok": true
+        },
+        {
+          "name": "raid: settlementStatus",
+          "expected": "settled",
+          "observed": "settled",
+          "ok": true
+        },
+        {
+          "name": "raid.monster_defeated announced",
+          "expected": "1",
+          "observed": "1",
+          "ok": true
+        },
+        {
+          "name": "pg_prepared_xacts in every participant database",
+          "expected": "empty",
+          "observed": "empty",
+          "ok": true
+        }
+      ]
+    }
+  ]
+}
