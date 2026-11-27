@@ -472,7 +472,9 @@ def revisions(compose: Compose) -> dict:
         p = subprocess.run(["docker", "inspect", "--format", "{{json .Config.Env}}", cid], capture_output=True, text=True)
         broker_env = {k: v for k, v in (e.split("=", 1) for e in json.loads(p.stdout or "[]"))
                       if k.startswith("TX_")}
-    return {"cpr": git("rev-parse", "--short=12", "HEAD"), "cprDirty": bool(git("status", "--porcelain", "--", ".", ":!services")),
+    # Earlier run reports are not code under test, so they do not make the checkout count as changed.
+    changed = git("status", "--porcelain", "--", ".", ":!services", ":!docs/lab5-2pc-runs", ":!docs/lab5-saga-runs")
+    return {"cpr": git("rev-parse", "--short=12", "HEAD"), "cprDirty": bool(changed),
             "submodules": git("submodule", "status").splitlines(), "images": images, "brokerTx": broker_env}
 
 
