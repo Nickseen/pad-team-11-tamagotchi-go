@@ -763,6 +763,37 @@
           ]
         },
         {
+          "name": "Finished sagas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/api/v1/transactions?status=completed&limit=5",
+            "description": "Sagas show `protocol` and their four steps instead of participants and attempts."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().items;",
+                  "pm.test('Every item is a saga with its four steps', () => items.forEach(t => {",
+                  "  pm.expect(t.protocol).to.eql('saga');",
+                  "  pm.expect(t.steps.map(s => s.step)).to.eql(['verify', 'currency', 'creatures', 'complete']);",
+                  "  pm.expect(t).to.not.have.property('participants');",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "An unknown transaction",
           "request": {
             "method": "GET",
