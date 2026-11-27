@@ -184,13 +184,19 @@ the earlier services use, and owned by Vlad (`@vladas9`). Its protocol is define
   `<service>.events`, built from the `topics` its replicas register with Service Discovery.
   Delivery is at least once, with retries; an event that cannot be delivered goes to the dead-letter
   channel.
-- **Distributed transactions** (Lab 5, since 5.0.0): the Broker coordinates the two-phase commit that
-  settles a decided battle or pays a defeated raid in every participating service or in none, as the
-  [transaction contract](docs/lab5-transaction-contract.md) defines.
+- **Distributed transactions** (Lab 5, since 5.0.0): the Broker coordinates the settlement of a decided
+  battle and the payout of a defeated raid in every participating service. Since 5.1.0 new transactions
+  run as sagas ([Saga contract](docs/lab5-saga-contract.md)): `verify`, `currency`, `creatures` (the
+  pivot) and `complete`, each journaled before the next is sent, and compensated in reverse order after
+  a refusal or the deadline before the pivot. `TX_PROTOCOL=2pc` returns to the two-phase commit of the
+  [transaction contract](docs/lab5-transaction-contract.md); every transaction keeps the protocol it
+  started with.
 - **Transaction API** (service token): `POST /api/v1/transactions` with `transactionId`, `operation`,
   `operationVersion`, `businessKey`, `correlationId` and `payload` → `202` stored, `200` already known,
   `400 VALIDATION_FAILED`, `409 TRANSACTION_CONFLICT`; `GET /api/v1/transactions/{id}` →
-  `{ transactionId, operation, businessKey, status, attempt, decision, reason, participants[] }` or
+  `{ transactionId, protocol, operation, businessKey, status, attempt, decision, reason, participants[] }`
+  for two-phase commit, `{ transactionId, protocol, operation, businessKey, status, reason, steps[] }`
+  for a saga, or
   `404 TRANSACTION_NOT_FOUND`; `GET /api/v1/transactions?operation=&businessKey=&status=&offset=&limit=`.
 - **Inspection** on `127.0.0.1:8091` with the service token: `GET /api/v1/topics`,
   `GET /api/v1/dead-letters`, `POST /api/v1/dead-letters/{id}/replay` and
@@ -913,10 +919,12 @@ and safe to cache for 30 seconds.
 `409 INSUFFICIENT_FUNDS` and the balance is unchanged. The synchronous adjust route exists for
 flows that must fail fast — a shop purchase — while battle and raid rewards arrive as events.
 
-##### Distributed transactions (Lab 5, User Management 5.1.0)
+##### Distributed transactions (Lab 5, User Management 5.1.0 and 5.2.0)
 
-The Message Broker calls these as the coordinator of `battle.settlement` and `raid.payout`; the
-[transaction contract](docs/lab5-transaction-contract.md) defines the bodies and the votes.
+The Message Broker calls these as the coordinator of `battle.settlement` and `raid.payout`. Two-phase
+commit uses `prepare`, `commit` and `rollback` (5.1.0, [transaction contract](docs/lab5-transaction-contract.md));
+the Saga uses `execute`, `compensate` and `resolve` for its `currency` step (5.2.0,
+[Saga contract](docs/lab5-saga-contract.md)).
 
 | Method and path | Auth | Request | Response |
 | --------------- | ---- | ------- | -------- |
@@ -924,10 +932,15 @@ The Message Broker calls these as the coordinator of `battle.settlement` and `ra
 | `POST /api/v1/internal/transactions/{transactionId}/commit` | service | as `prepare` | `200` → `{ "status": "committed" }`; `409 COMMIT_REJECTED` |
 | `POST /api/v1/internal/transactions/{transactionId}/rollback` | service | as `prepare`, plus `final` boolean and `reason` string; `operation`, `businessKey` and `payload` may be `null` | `200` → `{ "status": "rolled_back" }`; `409 TRANSACTION_ALREADY_COMMITTED` |
 | `GET /api/v1/internal/transactions/prepared` | service | — | `200` → `{ "items": [{ "transactionId": UUID, "attempt": integer, "preparedAt": Timestamp }] }` |
+| `POST /api/v1/internal/transactions/{transactionId}/execute` | service | `transactionId`, `step` = `currency`, `operation`, `operationVersion`, `businessKey`, `payload` | `200` → `{ "result": "executed" \| "already_applied" \| "rejected", "code"?, "message"? }`; `409 TRANSACTION_ABORTED`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/compensate` | service | as `execute`, plus `reason` string | `200` → `{ "status": "compensated" }`; `429 TRANSACTION_BUSY` |
+| `POST /api/v1/internal/transactions/{transactionId}/resolve` | service | as `execute`, without `payload` | `200` → `{ "state": "executed" \| "aborted" }`; `429 TRANSACTION_BUSY` |
 
 User Management rejects with `USER_NOT_FOUND`. A debit in a transaction stops at zero, as for events,
 and the applied amount is recorded for a later compensation. A transaction and the matching event
-share one ledger key, so a battle or raid is paid once.
+share one ledger key, so a battle or raid is paid once. The compensation of `currency` takes each
+applied delta back; a reward spent meanwhile stops the balance at zero, and the shortfall is recorded in
+`transaction_branches.compensation` and logged as `transaction.compensation_incomplete`.
 
 #### 2. Tamagotchi Service — `http://tamagotchi:8082`
 
@@ -1208,6 +1221,21 @@ so it owns the link as well and User Management reads it.
 `use_boost` cannot be played: a non-empty `boosts`, `action: "use_boost"` or a non-null `boostId`
 is refused with `422 BOOSTS_NOT_SUPPORTED`. The fields stay in every payload, so enabling boosts
 once an owner and data model are agreed changes no shape; `BOOST_NOT_OWNED` is reserved for that.
+
+##### Distributed transactions (Lab 5, Battle 5.1.0 and 5.2.0)
+
+A decided battle stores a `battle.settlement` start request instead of `battle.finished`, bound to its own
+`transactionId`; `Battle.settlementStatus` is `pending`, `settled` or `failed`. Battle is the initiator:
+two-phase commit uses `prepare`, `commit` and `rollback` (5.1.0), and the Saga its `verify` and `complete`
+steps (5.2.0), with the routes and bodies of User Management's table above and `step` = `verify` or
+`complete`.
+
+- `verify` changes nothing: it checks the battle's own transaction ID, the stored result and that the
+  settlement is `pending`, or rejects with `SETTLEMENT_MISMATCH` or `BATTLE_NOT_DECIDED`.
+- `complete` marks the battle `settled` and stores `battle.finished`, with the code of the 2PC commit.
+- The compensation of `verify` marks the settlement `failed`, for the battle's own transaction only. The
+  compensation and `resolve` of `complete` change nothing, so the Broker can send `complete` again after
+  the pivot.
 
 ##### Turns
 
@@ -1955,7 +1983,7 @@ Every component below selects 4.x; updating references does not complete the sha
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
 | API Gateway | [`nickseen/tamagotchi-gateway`](https://hub.docker.com/r/nickseen/tamagotchi-gateway/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-gateway/actions/runs/45868754336)) | 8080 | Shared cache in `cache-1..3` (Redis, memory only) | `6af5740` |
-| Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `5.0.1` | published, main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/45912520746)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals of queues, dead letters and transactions in the `broker-data` volume | `100dd24` |
+| Message Broker | [`nickseen/tamagotchi-message-broker`](https://hub.docker.com/r/nickseen/tamagotchi-message-broker/tags) | `5.1.0` | published, main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-message-broker/actions/runs/45990285836)) | 127.0.0.1:8091 (inspection); internal 8091 HTTP, 9091 gRPC | Journals of queues, dead letters and transactions in the `broker-data` volume | `9e393f4` |
 | Service Discovery | [`nickseen/tamagotchi-service-discovery`](https://hub.docker.com/r/nickseen/tamagotchi-service-discovery/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-service-discovery/actions/runs/43432132987)) | — (internal 8090) | In-memory registry | `2294a0a` |
 | User Management | [`amzavladislav/tamagotchi-user-management`](https://hub.docker.com/r/amzavladislav/tamagotchi-user-management/tags) | `5.2.0` | published; main source verified ([publication CI](https://github.com/vladas9/tamagotchi-user-management/actions/runs/45959693853)) | — | PostgreSQL primary + 2 standbys | `f48a2bc` |
 | Tamagotchi | [`crislp/tamagotchi-tamagotchi`](https://hub.docker.com/r/crislp/tamagotchi-tamagotchi/tags) | `5.2.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-tamagotchi/actions/runs/45871308465)) | — | PostgreSQL primary + 2 standbys | `ae1b830` |
@@ -1964,7 +1992,7 @@ Every component below selects 4.x; updating references does not complete the sha
 | Map | [`nickseen/tamagotchi-map`](https://hub.docker.com/r/nickseen/tamagotchi-map/tags) | `4.0.1` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-map/actions/runs/43310895212)) | 18085, 28085, 38085 (WebSocket) | Redis | `3ca778c` |
 | Notification | [`crislp/tamagotchi-notification`](https://hub.docker.com/r/crislp/tamagotchi-notification/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/CyberMoonie/tamagotchi-notification/actions/runs/45486229438)) | — | PostgreSQL primary + 2 standbys | `2e69d4a` |
 | Guild | [`gabimiric/tamagotchi-guild`](https://hub.docker.com/r/gabimiric/tamagotchi-guild/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/gabimiric/tamagotchi-guild/actions/runs/45638258625)) | 18087, 28087, 38087 (WebSocket) | PostgreSQL primary + 2 standbys, and Redis | `0f6e68b` |
-| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `5.0.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/45875656105)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `a69760e` |
+| Monster Raid | [`nickseen/tamagotchi-monster-raid`](https://hub.docker.com/r/nickseen/tamagotchi-monster-raid/tags) | `5.1.0` | published; main source verified ([publication CI](https://github.com/Nickseen/tamagotchi-monster-raid/actions/runs/45917411952)) | 18088, 28088, 38088 (WebSocket) | PostgreSQL and Redis | `95fb77c` |
 
 Every selected service image accepts the contract's `DISCOVERY_URL`, `INSTANCE_BASE_URL` and, for
 Map, Guild and Raid, `INSTANCE_WS_PUBLIC_URL`. Package Registry,

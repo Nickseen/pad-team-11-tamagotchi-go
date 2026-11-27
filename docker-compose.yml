@@ -279,7 +279,7 @@ x-monster-raid-env: &monster-raid-env
   GATEWAY_JWKS_URL: http://gateway:8080/api/v1/gateway/.well-known/jwks.json
 
 x-monster-raid: &monster-raid
-  image: nickseen/tamagotchi-monster-raid:5.0.0 # its image declares the /healthz check
+  image: nickseen/tamagotchi-monster-raid:5.1.0 # its image declares the /healthz check
   restart: on-failure
   depends_on:
     message-broker: # Lab 4: calls and events go through it (healthy once SD answered)
@@ -479,7 +479,7 @@ services:
   # the coordinator of distributed transactions (docs/lab5-transaction-contract.md), journaled in
   # broker-data. Published release; the matching main source is pinned in services/message-broker.
   message-broker:
-    image: nickseen/tamagotchi-message-broker:5.0.1
+    image: nickseen/tamagotchi-message-broker:5.1.0
     restart: unless-stopped
     depends_on:
       service-discovery:
