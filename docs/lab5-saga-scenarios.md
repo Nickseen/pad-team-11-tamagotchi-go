@@ -48,3 +48,19 @@ databases.
 The runner recreates the Broker with each rehearsal setting through a temporary Compose override and
 restores it afterwards. Scenario 9 needs `--allow-promotion`. Afterwards, rejoin the old writer as in the
 README before running it again; the runner promotes from whichever node is the writer.
+
+## Recorded results (2026-11-27)
+
+All 15 scenarios passed on Message Broker 5.1.0, User Management and Battle 5.2.0, Tamagotchi 5.2.0 and
+Monster Raid 5.1.0. Each report lists the CPR commit, submodule commits, image IDs and the checks.
+
+| Report | Scenarios | Result |
+| --- | --- | --- |
+| [`20261127T135559Z`](lab5-saga-runs/20261127T135559Z.md) | 1–8, 10–15 | 13 of 14 passed. Scenario 1 stopped before its saga: Guild answered `503 DEPENDENCY_UNAVAILABLE` to the raid's guild invitation for more than 30 s |
+| [`20261127T135719Z`](lab5-saga-runs/20261127T135719Z.md) | 1 | Passed, run straight after |
+| [`20261127T123246Z`](lab5-saga-runs/20261127T123246Z.md) | 9 | Passed: `tamagotchi-db` killed between `currency` and `creatures`, `tamagotchi-db-1` promoted, the saga completed there; `tamagotchi-db` then rejoined as a standby. Run from the working tree before the runner was committed, hence "uncommitted changes" in the report; its scenario 9 code is that of `9588ad4` |
+
+The runs used one laptop with the whole stack (about 60 containers in a 6.7 GB Docker VM). Earlier
+attempts stopped some scenarios before their saga began: Service Discovery leases expired or a
+dependency briefly answered `503`. None of those changed a saga's outcome, and every scenario passed
+when rerun. The fixtures therefore retry setup calls that were refused with nothing applied.
