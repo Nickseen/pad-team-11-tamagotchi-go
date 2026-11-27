@@ -146,6 +146,180 @@
       ]
     },
     {
+      "name": "Raid Saga participant",
+      "description": "Run independently against Broker and Monster Raid 5.1.0 with the stack's service token. Each request uses synthetic UUIDs and leaves existing payouts untouched.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('raidSagaTransactionId', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.variables.set('raidSagaBusinessKey', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Verify an unknown payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{raidSagaTransactionId}}\",\n  \"step\": \"verify\",\n  \"operation\": \"raid.payout\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{raidSagaBusinessKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidSagaBusinessKey}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/internal/transactions/{{raidSagaTransactionId}}/execute",
+            "description": "Rejects a synthetic raid ID without starting a payout."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Unknown raid is rejected', () => pm.expect(pm.response.json()).to.include({ result: 'rejected', code: 'RAID_NOT_DEFEATED' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acknowledge compensation for an unknown payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{raidSagaTransactionId}}\",\n  \"step\": \"verify\",\n  \"operation\": \"raid.payout\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{raidSagaBusinessKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidSagaBusinessKey}}\"\n  },\n  \"reason\": \"REHEARSAL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/internal/transactions/{{raidSagaTransactionId}}/compensate",
+            "description": "Compensation is acknowledged for a synthetic raid ID."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Compensation is acknowledged', () => pm.expect(pm.response.json()).to.eql({ status: 'compensated' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve an unknown completion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{raidSagaTransactionId}}\",\n  \"step\": \"complete\",\n  \"operation\": \"raid.payout\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{raidSagaBusinessKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/internal/transactions/{{raidSagaTransactionId}}/resolve",
+            "description": "Resolve takes no payload and reports the unknown completion as aborted."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Unknown completion is aborted', () => pm.expect(pm.response.json()).to.eql({ state: 'aborted' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a step owned by another service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Token",
+                "value": "{{serviceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{raidSagaTransactionId}}\",\n  \"step\": \"currency\",\n  \"operation\": \"raid.payout\",\n  \"operationVersion\": 1,\n  \"businessKey\": \"{{raidSagaBusinessKey}}\",\n  \"payload\": {\n    \"raidId\": \"{{raidSagaBusinessKey}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{brokerUrl}}/api/v1/queues/monster-raid/api/v1/internal/transactions/{{raidSagaTransactionId}}/execute",
+            "description": "Raid serves the initiator steps. User Management owns currency."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Wrong step is rejected', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Raid lifecycle (dependencies required)",
       "description": "Run in order with Guild, Registry, and Tamagotchi dependencies or mocks. Values must describe an owner/officer, an active definition, and that user’s primary Tamagotchi.",
       "item": [
