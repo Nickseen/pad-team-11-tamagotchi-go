@@ -1,0 +1,349 @@
+{
+  "capturedAt": "2026-11-26T23:56:42.316726+00:00",
+  "composeVersion": "5.5.1",
+  "cpr": "1c4e3662693f8466bf932ad57f3d4e0ebabf724e",
+  "services": {
+    "battle": {
+      "imageId": "sha256:06089484f37e9cdf89794abfdb8fb31909e21522ebdd2902cefb6b70aa9417f3",
+      "platform": "linux/arm64",
+      "reference": "amzavladislav/tamagotchi-battle:5.1.0",
+      "repoDigests": [
+        "amzavladislav/tamagotchi-battle@sha256:06089484f37e9cdf89794abfdb8fb31909e21522ebdd2902cefb6b70aa9417f3"
+      ],
+      "revision": null
+    },
+    "battle-db": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "battle-db-1": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "battle-db-2": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "cache-1": {
+      "imageId": "sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
+      "platform": "linux/arm64",
+      "reference": "redis:7.4-alpine",
+      "repoDigests": [
+        "redis@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe"
+      ],
+      "revision": null
+    },
+    "cache-2": {
+      "imageId": "sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
+      "platform": "linux/arm64",
+      "reference": "redis:7.4-alpine",
+      "repoDigests": [
+        "redis@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe"
+      ],
+      "revision": null
+    },
+    "cache-3": {
+      "imageId": "sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
+      "platform": "linux/arm64",
+      "reference": "redis:7.4-alpine",
+      "repoDigests": [
+        "redis@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe"
+      ],
+      "revision": null
+    },
+    "gateway": {
+      "imageId": "sha256:b3cd85ca2874326ffb7e42aafb86ce8c681a17a34c44895f628173ebe1f56840",
+      "platform": "linux/arm64",
+      "reference": "nickseen/tamagotchi-gateway:5.0.0",
+      "repoDigests": [
+        "nickseen/tamagotchi-gateway@sha256:b3cd85ca2874326ffb7e42aafb86ce8c681a17a34c44895f628173ebe1f56840"
+      ],
+      "revision": null
+    },
+    "guild-1": {
+      "imageId": "sha256:873b71acd804f335f9fe54fa9bf83179f9cf6585a0850232277edb41daddb108",
+      "platform": "linux/arm64",
+      "reference": "gabimiric/tamagotchi-guild:5.0.0",
+      "repoDigests": [
+        "gabimiric/tamagotchi-guild@sha256:873b71acd804f335f9fe54fa9bf83179f9cf6585a0850232277edb41daddb108"
+      ],
+      "revision": "0f6e68b9cd4df70d4d5509f48d5aee530fb39a56"
+    },
+    "guild-2": {
+      "imageId": "sha256:873b71acd804f335f9fe54fa9bf83179f9cf6585a0850232277edb41daddb108",
+      "platform": "linux/arm64",
+      "reference": "gabimiric/tamagotchi-guild:5.0.0",
+      "repoDigests": [
+        "gabimiric/tamagotchi-guild@sha256:873b71acd804f335f9fe54fa9bf83179f9cf6585a0850232277edb41daddb108"
+      ],
+      "revision": "0f6e68b9cd4df70d4d5509f48d5aee530fb39a56"
+    },
+    "guild-db": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "guild-db-1": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "guild-db-2": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "guild-redis": {
+      "imageId": "sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
+      "platform": "linux/arm64",
+      "reference": "redis:7.4-alpine",
+      "repoDigests": [
+        "redis@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe"
+      ],
+      "revision": null
+    },
+    "message-broker": {
+      "imageId": "sha256:99d25ac03b6603c8c0b3783873d40cac7338e5637955d34b63c567d78f9b621e",
+      "platform": "linux/arm64",
+      "reference": "nickseen/tamagotchi-message-broker:5.0.1",
+      "repoDigests": [
+        "nickseen/tamagotchi-message-broker@sha256:99d25ac03b6603c8c0b3783873d40cac7338e5637955d34b63c567d78f9b621e"
+      ],
+      "revision": null
+    },
+    "monster-raid-1": {
+      "imageId": "sha256:57935d27469549176f9f06ffb2d7ea583a3ff1e36ba832346578db0cd1e71e3d",
+      "platform": "linux/arm64",
+      "reference": "nickseen/tamagotchi-monster-raid:5.0.0",
+      "repoDigests": [
+        "nickseen/tamagotchi-monster-raid@sha256:57935d27469549176f9f06ffb2d7ea583a3ff1e36ba832346578db0cd1e71e3d"
+      ],
+      "revision": "a69760ee3e2a1cfbec9400ebc4f5064a73c858c6"
+    },
+    "monster-raid-2": {
+      "imageId": "sha256:57935d27469549176f9f06ffb2d7ea583a3ff1e36ba832346578db0cd1e71e3d",
+      "platform": "linux/arm64",
+      "reference": "nickseen/tamagotchi-monster-raid:5.0.0",
+      "repoDigests": [
+        "nickseen/tamagotchi-monster-raid@sha256:57935d27469549176f9f06ffb2d7ea583a3ff1e36ba832346578db0cd1e71e3d"
+      ],
+      "revision": "a69760ee3e2a1cfbec9400ebc4f5064a73c858c6"
+    },
+    "monster-raid-db": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "monster-raid-db-1": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "monster-raid-db-2": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "monster-raid-redis": {
+      "imageId": "sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
+      "platform": "linux/arm64",
+      "reference": "redis:7.4-alpine",
+      "repoDigests": [
+        "redis@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe"
+      ],
+      "revision": null
+    },
+    "notification": {
+      "imageId": "sha256:705f9094ce97d4be2d8fb7a91073953451f0e9f3c69a91e757d31cbd990cdcee",
+      "platform": "linux/arm64",
+      "reference": "crislp/tamagotchi-notification:5.0.0",
+      "repoDigests": [
+        "crislp/tamagotchi-notification@sha256:705f9094ce97d4be2d8fb7a91073953451f0e9f3c69a91e757d31cbd990cdcee"
+      ],
+      "revision": null
+    },
+    "notification-db": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "notification-db-1": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "notification-db-2": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "package-registry": {
+      "imageId": "sha256:064ccf6918c2447370a28f7d1d1abea0a00dd2f1241bb907de97066f6dd18e64",
+      "platform": "linux/arm64",
+      "reference": "gabimiric/tamagotchi-package-registry:5.0.0",
+      "repoDigests": [
+        "gabimiric/tamagotchi-package-registry@sha256:064ccf6918c2447370a28f7d1d1abea0a00dd2f1241bb907de97066f6dd18e64"
+      ],
+      "revision": "3caf86ecda687ea7ec281e3b3da80bc981558417"
+    },
+    "package-registry-db": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "package-registry-db-1": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "package-registry-db-2": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "service-discovery": {
+      "imageId": "sha256:31af7d9eab69e1d352425a160d728d5cc880496897f649013b8f9950c33b53c0",
+      "platform": "linux/arm64",
+      "reference": "nickseen/tamagotchi-service-discovery:4.0.1",
+      "repoDigests": [
+        "nickseen/tamagotchi-service-discovery@sha256:31af7d9eab69e1d352425a160d728d5cc880496897f649013b8f9950c33b53c0"
+      ],
+      "revision": null
+    },
+    "tamagotchi": {
+      "imageId": "sha256:75140fe4d557db28a9469ca43850122e59b9560ca4c07017b1bd5fcfc5ee93ab",
+      "platform": "linux/arm64",
+      "reference": "crislp/tamagotchi-tamagotchi:5.2.0",
+      "repoDigests": [
+        "crislp/tamagotchi-tamagotchi@sha256:75140fe4d557db28a9469ca43850122e59b9560ca4c07017b1bd5fcfc5ee93ab"
+      ],
+      "revision": null
+    },
+    "tamagotchi-db": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "tamagotchi-db-1": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "tamagotchi-db-2": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "user-management": {
+      "imageId": "sha256:d879cc0aaf627a8cee028b260c25cdd42cea2ace9a84ed98e372be703c988990",
+      "platform": "linux/arm64",
+      "reference": "amzavladislav/tamagotchi-user-management:5.1.1",
+      "repoDigests": [
+        "amzavladislav/tamagotchi-user-management@sha256:d879cc0aaf627a8cee028b260c25cdd42cea2ace9a84ed98e372be703c988990"
+      ],
+      "revision": null
+    },
+    "user-management-db": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "user-management-db-1": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    },
+    "user-management-db-2": {
+      "imageId": "sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065",
+      "platform": "linux/arm64",
+      "reference": "postgres:17-alpine",
+      "repoDigests": [
+        "postgres@sha256:d3244e8ce3f165ee3c93d9c4a4b1d0fe48b3a89e2287b717fdcbbde92d405065"
+      ],
+      "revision": null
+    }
+  }
+}

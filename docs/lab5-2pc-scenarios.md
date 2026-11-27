@@ -1,5 +1,7 @@
 # Lab 5: two-phase commit scenarios (#196)
 
+The [2PC checkpoint](lab5-2pc-checkpoint.md) records the verified release pins and all 11 results.
+
 The scenarios of the [transaction contract](lab5-transaction-contract.md#scenarios-to-record) as one
 script, [`scripts/tx/check-2pc.py`](../scripts/tx/check-2pc.py), with the shared helpers in
 [`scripts/tx/txstack.py`](../scripts/tx/txstack.py) that the Saga scenarios of #197 reuse. Python 3.10+,
