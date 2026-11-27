@@ -1656,16 +1656,45 @@ records the defeat and a durable `raid.payout` request in the same PostgreSQL tr
 Subsequent new attacks receive `409 RAID_NOT_ACTIVE`. Repeating a recorded command returns its
 stored result. Rate limit: 10 attacks per second per participant.
 
-##### Two-phase payout
+##### Raid payout and settlement
 
-Broker coordinates reward currency in User Management and XP in Tamagotchi. Raid's branch changes
-`settlementStatus` from `pending` to `settled` and saves `raid.monster_defeated` in the outbox.
-Broker commits that branch last, after confirming both other participants. A final rollback sets
-`settlementStatus` to `failed` while the raid stays defeated.
+Broker coordinates reward currency in User Management and XP in Tamagotchi. Monster Raid 5.1.0
+supports Saga and two-phase commit. The raid stays `defeated` throughout, with
+`settlementStatus: "pending"` until settlement succeeds or fails.
+
+In Saga mode, `verify` checks that the raid is defeated and the supplied transaction ID and payload
+match its stored `raid.payout` request. After the currency and XP steps, `complete` marks the payout
+`settled` and writes `raid.monster_defeated` to the outbox once. Compensating `verify` marks the
+matching pending payout `failed`. Compensating `complete` acknowledges the request without changing
+settlement. Resolving `complete` reports whether it committed and leaves the payout unchanged.
+
+Broker sends the internal requests with `X-Service-Token` and `X-Correlation-Id`. The
+[Saga participant contract](docs/lab5-saga-contract.md#participant-api) defines the request and
+response examples. Raid accepts `step: "verify"` or `"complete"`, `operation: "raid.payout"`,
+`operationVersion: 1` and `businessKey` equal to the raid ID.
+
+| Method and path | Request fields | Response |
+| --- | --- | --- |
+| `POST /api/v1/internal/transactions/{transactionId}/execute` | `transactionId`, `step`, `operation`, `operationVersion`, `businessKey`, stored payout `payload` | `200` with `result` equal to `executed`, `already_applied` or `rejected`. Rejections include `code` and `message`. `409 TRANSACTION_ABORTED` after an abort. |
+| `POST /api/v1/internal/transactions/{transactionId}/compensate` | Execute fields plus `reason` | `200` with `{"status":"compensated"}` |
+| `POST /api/v1/internal/transactions/{transactionId}/resolve` | Execute fields except `payload` | `200` with `state` equal to `executed` or `aborted` |
+
+Unknown or active raids return `RAID_NOT_DEFEATED`. A different transaction ID or payload returns
+`SETTLEMENT_MISMATCH`. Invalid step names or request fields return `400 VALIDATION_FAILED`. A
+database lock timeout returns `429 TRANSACTION_BUSY` with `Retry-After: 1`. The standalone
+`Raid Saga participant` Postman folder exercises these routes through Broker with synthetic IDs.
+
+```bash
+npx newman run postman/monster-raid.postman_collection.json \
+  -e postman/tamagotchi-go.postman_environment.json \
+  --folder 'Raid Saga participant' --env-var serviceToken="$POSTMAN_SERVICE_TOKEN"
+```
 
 The [2PC participant contract](docs/lab5-transaction-contract.md#participant-api) defines the
-authenticated `prepare`, `commit`, `rollback` and `prepared` routes. The branch ledger lives in
-`raid.transaction_branches`. Run the shared Raid scenarios with
+authenticated `prepare`, `commit`, `rollback` and `prepared` routes. Broker commits the Raid
+branch after the other participants and a final rollback marks the payout `failed`. Both
+protocols use `raid.transaction_branches`. Run the Raid 2PC scenarios from the
+[recorded checkpoint](docs/lab5-2pc-checkpoint.md) with
 `python scripts/tx/check-2pc.py --scenario 3,4`.
 
 ##### WebSocket — `GET /api/v1/raids/{raidId}/feed`
@@ -1978,7 +2007,6 @@ Released images are public and provide `linux/amd64` and `linux/arm64` manifests
 and Apple Silicon machines. The table below lists the versions this Compose file selects and
 their publication evidence. Published image tags and submodule pins refer to the same main
 commit, verified by image revision labels or the public build provenance on both architectures.
-Every component below selects 4.x; updating references does not complete the shared-stack checks.
 
 | Service | Image | Tag | Status | Host ports | Store | CPR submodule commit |
 | ------- | ----- | --- | ------ | ---------- | ----- | -------------------- |
@@ -2534,7 +2562,7 @@ secrets.
 | Map | `map.postman_collection.json` | Map → User Management relationships; `map.stream` ticket negotiation |
 | Notification | `notification.postman_collection.json` | A raid notification fanned out to a real guild's members |
 | Guild | `guild.postman_collection.json` | Guild → User Management invitee lookup; `guild.chat` ticket negotiation and chat history; `guild.*` events reaching the Broker and `user.deleted` removing a member |
-| Monster Raid | `monster-raid.postman_collection.json` | `raid.feed` ticket negotiation with the participant check; admin requests skipped without `adminToken` |
+| Monster Raid | `monster-raid.postman_collection.json` | Saga participant requests and 2PC prepared-branch inspection through Broker, plus `raid.feed` ticket negotiation |
 | Gateway cache | `gateway-cache.postman_collection.json` | Lab 5 #195: the shared cache through the Gateway: `X-Cache` miss then hit, another user and no token never served a cached answer, a write invalidating, query order, the public combat types shared, an uncached route |
 | Gateway | `gateway-logs.postman_collection.json` | Lab 4 #155: `GET /api/v1/gateway/logs` downloads the system logs as NDJSON (last 15 minutes); set `adminToken` (and optionally `userToken` for the `403` case) |
 | Message Broker | `message-broker.postman_collection.json` | Called directly at `{{brokerUrl}}`: status and metrics; request queues to Battle and Tamagotchi; publishing `user.deleted`; the topic list; a dead letter created, listed and replayed; `400`, `401` and `404` answers |
