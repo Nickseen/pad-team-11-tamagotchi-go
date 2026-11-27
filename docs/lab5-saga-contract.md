@@ -1,7 +1,7 @@
 # Lab 5: long-running saga contract
 
-Status: **draft** for CPR #197. It becomes binding when its PR is approved; implementations start after the 2PC
-checkpoint of #196. Published early so that the participants of #196 store what compensation needs.
+Status: **binding** for CPR #197 (approved in #208). Implemented by Message Broker 5.1.0, User Management and
+Battle 5.2.0, Tamagotchi 5.2.0 and Monster Raid 5.1.0.
 
 The Saga replaces the two phases of the [transaction contract](lab5-transaction-contract.md). What that document
 marks *kept by Saga* stays: the identifiers, the start request and `GET` routes of the Broker, the payloads, and
@@ -64,8 +64,10 @@ forward". It is part of the contract and of the acceptance checks.
    `already_applied` ones: executed, refused, resolved or never sent. A participant whose step did not run records the
    business key as finished, so no queued Lab 4 event pays there later. Compensations are repeated until each answers
    `200` and cannot be refused. Once a step's compensation is journaled, its `execute` is never sent again.
-7. **Restart.** The Broker continues at the first step, or the first compensation, that is not journaled as done; a
-   step that was in flight is resolved first.
+7. **Restart.** The Broker continues at the first step, or the first compensation, that is not journaled as done.
+   A step that was in flight is sent again, because `execute` is idempotent; it is resolved (rule 5) only when the
+   coordinator must choose, at the deadline. Resolving it at every restart would abort and compensate sagas that a
+   restart only delayed.
 
 `GET /api/v1/transactions/{id}` adds `protocol` (`2pc` or `saga`) and, for a saga, `steps`:
 
@@ -149,7 +151,9 @@ its tables with `create_all` needs explicit `ALTER` statements for an existing o
 3. `executed`: undo `effect`, write what was really undone into `compensation`, set `compensated`, answer.
 
 **Resolve**, in one ordinary transaction with the same settings: an `executed` row answers `executed`; otherwise do
-what compensate does for a missing row and answer `aborted`.
+what compensate does for a missing row and answer `aborted`. The initiator's `complete` is the exception: its `resolve`
+and `compensate` change nothing and write no row. After the pivot the coordinator only sends `complete` again, and in
+a `TX_REJECT_STEP=complete` rehearsal the settlement fails through the compensation of `verify`, which comes last.
 
 The ledger key stays after a compensation, and a step that never ran gets one, so no late event pays a failed battle or
 raid in any participant. Both can be repeated any
