@@ -238,6 +238,19 @@ class Fixtures:
         self.package_id = ""
         self.owner = ""
 
+    # Setup is not under test: a call that changed nothing because a dependency was briefly unavailable
+    # (503 TASK_TIMEOUT or DEPENDENCY_UNAVAILABLE, 429, no answer) is sent again, up to about 30 s.
+    RETRY_STATUSES = (0, 429, 503)
+
+    def call(self, *args, **kwargs) -> Reply:
+        reply = self.b.client(*args, **kwargs)
+        for _ in range(10):
+            if reply.status not in self.RETRY_STATUSES:
+                break
+            time.sleep(3)
+            reply = self.b.client(*args, **kwargs)
+        return reply
+
     def expect(self, reply: Reply, *ok: int, what: str) -> Reply:
         if reply.status not in ok:
             raise StepFailed(f"{what}: {reply.status} {json.dumps(reply.body)[:300]}")
@@ -248,11 +261,11 @@ class Fixtures:
             return self.package_id
         tag = new_id()[:8]
         self.owner = self.register(f"txo_{tag}", package=None).user_id
-        r = self.expect(self.b.client("POST", "package-registry", "/api/v1/packages", self.owner,
+        r = self.expect(self.call("POST", "package-registry", "/api/v1/packages", self.owner,
                                       {"slug": f"tx-{tag}", "name": f"Transactions {tag}",
                                        "description": "Lab 5 transaction scenarios"}), 201, what="create package")
         self.package_id = self.b.package_id = r.get("packageId")
-        self.expect(self.b.client("POST", "package-registry", f"/api/v1/packages/{self.package_id}/versions",
+        self.expect(self.call("POST", "package-registry", f"/api/v1/packages/{self.package_id}/versions",
                                   self.owner, {"version": "1.0.0", "growthRules": {}, "statDefinitions": [
                                       {"key": "happiness", "label": "Happiness", "minValue": 0, "maxValue": 100,
                                        "higherIsBetter": True, "combatBonus": None}]}),
@@ -261,7 +274,7 @@ class Fixtures:
 
     def register(self, username: str, package: str | None = "") -> Player:
         package_id = self.package() if package == "" else (package or new_id())
-        r = self.expect(self.b.client("POST", "user-management", "/api/v1/auth/register", None,
+        r = self.expect(self.call("POST", "user-management", "/api/v1/auth/register", None,
                                       {"username": username, "email": f"{username}@example.com",
                                        "password": "transactions-" + new_id()[:12], "packageId": package_id}),
                         201, what=f"register {username}")
@@ -270,29 +283,29 @@ class Fixtures:
     def player(self, name: str, combat_type="flame", creatures=1) -> Player:
         p = self.register(f"tx{name}_{new_id()[:6]}")
         for i in range(creatures):
-            r = self.expect(self.b.client("POST", "tamagotchi", "/api/v1/tamagotchis", p.user_id,
+            r = self.expect(self.call("POST", "tamagotchi", "/api/v1/tamagotchis", p.user_id,
                                           {"packageId": self.package(), "name": f"{name}{i}", "combatType": combat_type,
                                            "spriteRef": f"{name}.png", "stats": {"happiness": 60}}),
                             201, what=f"create a creature for {name}")
             p.creatures.append(r.get("tamagotchiId"))
         p.primary = p.creatures[0]
-        self.expect(self.b.client("PUT", "tamagotchi", "/api/v1/users/me/primary-tamagotchi", p.user_id,
+        self.expect(self.call("PUT", "tamagotchi", "/api/v1/users/me/primary-tamagotchi", p.user_id,
                                   {"tamagotchiId": p.primary}), 200, what=f"set {name}'s primary")
         return p
 
     def friends(self, a: Player, b: Player) -> None:
-        r = self.expect(self.b.client("POST", "user-management", "/api/v1/users/me/friend-requests", a.user_id,
+        r = self.expect(self.call("POST", "user-management", "/api/v1/users/me/friend-requests", a.user_id,
                                       {"targetUserId": b.user_id}), 201, what="friend request")
-        self.expect(self.b.client("POST", "user-management",
+        self.expect(self.call("POST", "user-management",
                                   f"/api/v1/users/me/friend-requests/{r.get('requestId')}/accept", b.user_id),
                     200, what="accept friend request")
 
     def battle(self, challenger: Player, opponent: Player) -> str:
-        r = self.expect(self.b.client("POST", "battle", "/api/v1/battles", challenger.user_id,
+        r = self.expect(self.call("POST", "battle", "/api/v1/battles", challenger.user_id,
                                       {"opponentId": opponent.user_id, "primaryTamagotchiId": challenger.primary,
                                        "secondaryTamagotchiId": None, "boosts": []}), 201, what="challenge")
         battle_id = r.get("battleId")
-        self.expect(self.b.client("POST", "battle", f"/api/v1/battles/{battle_id}/accept", opponent.user_id,
+        self.expect(self.call("POST", "battle", f"/api/v1/battles/{battle_id}/accept", opponent.user_id,
                                   {"primaryTamagotchiId": opponent.primary, "secondaryTamagotchiId": None,
                                    "boosts": []}), 200, what="accept")
         return battle_id
@@ -304,7 +317,7 @@ class Fixtures:
             if battle.get("status") != "active":
                 return battle
             actor = battle.get("currentTurnUserId")
-            r = self.b.client("POST", "battle", f"/api/v1/battles/{battle_id}/turns", actor,
+            r = self.call("POST", "battle", f"/api/v1/battles/{battle_id}/turns", actor,
                               {"commandId": new_id(), "action": "attack", "boostId": None})
             if r.status == 429:
                 time.sleep(0.5)
@@ -313,11 +326,11 @@ class Fixtures:
         raise StepFailed("the battle did not finish within 400 turns")
 
     def forfeit(self, battle_id: str, loser: Player) -> dict:
-        return self.expect(self.b.client("POST", "battle", f"/api/v1/battles/{battle_id}/forfeit", loser.user_id),
+        return self.expect(self.call("POST", "battle", f"/api/v1/battles/{battle_id}/forfeit", loser.user_id),
                            200, what="forfeit").body
 
     def get_battle(self, battle_id: str, user: str) -> dict:
-        return self.expect(self.b.client("GET", "battle", f"/api/v1/battles/{battle_id}", user), 200,
+        return self.expect(self.call("GET", "battle", f"/api/v1/battles/{battle_id}", user), 200,
                            what="read battle").body
 
     # ---- raids
@@ -459,7 +472,9 @@ def revisions(compose: Compose) -> dict:
         p = subprocess.run(["docker", "inspect", "--format", "{{json .Config.Env}}", cid], capture_output=True, text=True)
         broker_env = {k: v for k, v in (e.split("=", 1) for e in json.loads(p.stdout or "[]"))
                       if k.startswith("TX_")}
-    return {"cpr": git("rev-parse", "--short=12", "HEAD"), "cprDirty": bool(git("status", "--porcelain", "--", ".", ":!services")),
+    # Earlier run reports are not code under test, so they do not make the checkout count as changed.
+    changed = git("status", "--porcelain", "--", ".", ":!services", ":!docs/lab5-2pc-runs", ":!docs/lab5-saga-runs")
+    return {"cpr": git("rev-parse", "--short=12", "HEAD"), "cprDirty": bool(changed),
             "submodules": git("submodule", "status").splitlines(), "images": images, "brokerTx": broker_env}
 
 

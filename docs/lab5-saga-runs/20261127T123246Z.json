@@ -1,0 +1,169 @@
+{
+  "recordedAt": "2026-11-27T12:32:46.308Z",
+  "title": "Lab 5 Saga scenarios (#197)",
+  "command": "python scripts/tx/check-saga.py --scenario 9 --allow-promotion --out C:\\Users\\ASUSM5~1\\AppData\\Local\\Temp/saga-try",
+  "revisions": {
+    "cpr": "8ca8599543bf",
+    "cprDirty": true,
+    "submodules": [
+      "-ca8e65d5ee3ca0e9bde7b52c6059c91710e0eac9 services/battle",
+      "-6af5740880796846ef51ad6b3e3b4f965a66e882 services/gateway",
+      " 0f6e68b9cd4df70d4d5509f48d5aee530fb39a56 services/guild (v2.0.1-13-g0f6e68b)",
+      "-3ca778ce52bae008db17c1e0d3673f06f9a6a6e1 services/map",
+      "-9e393f426a5eff90ed769668bbaa52c458ea0db1 services/message-broker",
+      "-95fb77c75ef6d4ec986d0eb7cda72157a602e313 services/monster-raid",
+      "-2e69d4af10408866258a4774ffd660e56362ef00 services/notification",
+      " 3caf86ecda687ea7ec281e3b3da80bc981558417 services/package-registry (v2.0.1-15-g3caf86e)",
+      "-2294a0a457d3960be8bd66b28831484fe05594f1 services/service-discovery",
+      "-ae1b830eaec5c10a6ef6a2328075a1f91437f462 services/tamagotchi",
+      "-f48a2bccc721c625cd3fb2c45abe09c0e89e2856 services/user-management"
+    ],
+    "images": {
+      "message-broker": {
+        "image": "nickseen/tamagotchi-message-broker:5.1.0",
+        "id": "sha256:3d6f1aa78a01",
+        "revision": null
+      },
+      "user-management": {
+        "image": "amzavladislav/tamagotchi-user-management:5.2.0",
+        "id": "sha256:94d319833cc2",
+        "revision": null
+      },
+      "tamagotchi": {
+        "image": "crislp/tamagotchi-tamagotchi:5.2.0",
+        "id": "sha256:75140fe4d557",
+        "revision": null
+      },
+      "battle": {
+        "image": "amzavladislav/tamagotchi-battle:5.2.0",
+        "id": "sha256:be32ee838e55",
+        "revision": null
+      },
+      "monster-raid-1": {
+        "image": "nickseen/tamagotchi-monster-raid:5.1.0",
+        "id": "sha256:cf9a561a38a9",
+        "revision": "95fb77c75ef6"
+      },
+      "monster-raid-2": {
+        "image": "nickseen/tamagotchi-monster-raid:5.1.0",
+        "id": "sha256:cf9a561a38a9",
+        "revision": "95fb77c75ef6"
+      }
+    },
+    "brokerTx": {}
+  },
+  "results": [
+    {
+      "scenario": 9,
+      "title": "Primary lost and a standby promoted between two steps",
+      "passed": true,
+      "error": null,
+      "notes": [
+        "expected: completes on the promoted node",
+        "tamagotchi-db killed between currency and creatures; PostgreSQL writer: tamagotchi-db-1. Following it: tamagotchi-db-2. Fenced: tamagotchi-db.",
+        "battle dea71c44-a46c-4e93-9fe7-5e545d27bed8, saga 4009f656-c89d-4324-9a5e-cab457ed2e5b",
+        "user-management transaction_branches: [{\"attempt\": 0, \"outcome\": \"executed\", \"effect\": {\"balances\": [{\"delta\": 0, \"userId\": \"69f0131a-6f8e-46fb-a7c2-a0231ec2aab7\"}, {\"delta\": 250, \"userId\": \"b96d9e66-bdb0-4f1d-b81d-a655f717e4a1\"}]}}]",
+        "tamagotchi transaction_branches: [{\"attempt\": 0, \"outcome\": \"executed\", \"effect\": {\"xp\": [{\"amount\": 180, \"tamagotchiId\": \"41027771-c3fc-408b-bec5-ab1352010e34\"}, {\"amount\": 60, \"tamagotchiId\": \"233ab70e-27bd-4bed-b89e-e6b84d207da6\"}], \"transfer\": {\"wasPrimary\": true, \"tamagotchiId\": \"233ab70e-27bd-4bed-b89e-e6b84d207da6\", \"previousOwnerId\": \"69f0131a-6f8e-46fb-a7c2-a0231ec2aab7\", \"secondaryReferenceId\": \"b0a42702-173d-47a2-bd82-f7c68c17e211\", \"previousCapturedInBattleId\": null}}}]",
+        "Topology changed: tamagotchi-db is fenced; rejoin it as in the README before the next run."
+      ],
+      "checks": [
+        {
+          "name": "new Tamagotchi writer",
+          "expected": "tamagotchi-db-1",
+          "observed": "tamagotchi-db-1",
+          "ok": true
+        },
+        {
+          "name": "protocol",
+          "expected": "saga",
+          "observed": "saga",
+          "ok": true
+        },
+        {
+          "name": "status",
+          "expected": "completed",
+          "observed": "completed",
+          "ok": true
+        },
+        {
+          "name": "steps",
+          "expected": "{'verify': 'executed', 'currency': 'executed', 'creatures': 'executed', 'complete': 'executed'}",
+          "observed": "{'verify': 'executed', 'currency': 'executed', 'creatures': 'executed', 'complete': 'executed'}",
+          "ok": true
+        },
+        {
+          "name": "transferred creature's owner",
+          "expected": "b96d9e66-bdb0-4f1d-b81d-a655f717e4a1",
+          "observed": "b96d9e66-bdb0-4f1d-b81d-a655f717e4a1",
+          "ok": true
+        },
+        {
+          "name": "capturedInBattleId",
+          "expected": "dea71c44-a46c-4e93-9fe7-5e545d27bed8",
+          "observed": "dea71c44-a46c-4e93-9fe7-5e545d27bed8",
+          "ok": true
+        },
+        {
+          "name": "winner's new secondary references",
+          "expected": "['233ab70e-27bd-4bed-b89e-e6b84d207da6']",
+          "observed": "['233ab70e-27bd-4bed-b89e-e6b84d207da6']",
+          "ok": true
+        },
+        {
+          "name": "winner's balance",
+          "expected": "increased",
+          "observed": "+250",
+          "ok": true
+        },
+        {
+          "name": "balances equal User Management's recorded effect",
+          "expected": "{'69f0131a-6f8e-46fb-a7c2-a0231ec2aab7': 0, 'b96d9e66-bdb0-4f1d-b81d-a655f717e4a1': 250}",
+          "observed": "{'69f0131a-6f8e-46fb-a7c2-a0231ec2aab7': 0, 'b96d9e66-bdb0-4f1d-b81d-a655f717e4a1': 250}",
+          "ok": true
+        },
+        {
+          "name": "XP of txa_10cae5's primary",
+          "expected": "increased",
+          "observed": "L1/0 -> L2/80",
+          "ok": true
+        },
+        {
+          "name": "XP of txb_4b58dc's primary",
+          "expected": "increased",
+          "observed": "L1/0 -> L1/60",
+          "ok": true
+        },
+        {
+          "name": "settlementStatus",
+          "expected": "settled",
+          "observed": "settled",
+          "ok": true
+        },
+        {
+          "name": "battle.finished announced",
+          "expected": "1",
+          "observed": "1",
+          "ok": true
+        },
+        {
+          "name": "nothing changes afterwards",
+          "expected": "same snapshot",
+          "observed": "same snapshot",
+          "ok": true
+        },
+        {
+          "name": "pg_prepared_xacts in every participant database",
+          "expected": "empty",
+          "observed": "empty",
+          "ok": true
+        },
+        {
+          "name": "creatures branch on tamagotchi-db-1",
+          "expected": "['executed']",
+          "observed": "['executed']",
+          "ok": true
+        }
+      ]
+    }
+  ]
+}
